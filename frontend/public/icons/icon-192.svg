@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="32" fill="#16181d"/>
+  <path d="M0 168h192v24H0z" fill="#f5b301"/>
+  <text x="96" y="112" font-family="Archivo, sans-serif" font-size="56" font-weight="800" fill="#f5b301" text-anchor="middle">İPKS</text>
+</svg>

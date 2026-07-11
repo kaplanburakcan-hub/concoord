@@ -1,0 +1,198 @@
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { api } from "../../api/client";
+import { useAuth } from "../../auth/AuthContext";
+import { useProjects } from "../ProjectContext";
+
+// Faz 7 — Tedarik durum panosu + sipariş (PO) listesi.
+// Geciken siparişler (beklenen tarih geçti, kapanmadı) kırmızı vurgulanır
+// (Plan Faz 7: "tedarik durum panosu, geciken siparişler vurgulu").
+
+export type Delivery = {
+  id: string; delivery_note_no: string; delivered_at: string;
+  received_by_name: string; document_id?: string; note?: string;
+};
+export type PO = {
+  id: string; po_no: string; pr_id?: string; pr_no?: string;
+  supplier_name: string; amount?: number; currency: string; status: string;
+  expected_date?: string; note?: string; created_by_name: string;
+  overdue: boolean; delivery_count: number; deliveries?: Delivery[];
+  row_version: number; created_at: string;
+};
+type Board = {
+  pr_counts: Record<string, number>;
+  po_counts: Record<string, number>;
+  overdue_prs: { id: string; pr_no: string; needed_by_date: string }[];
+  overdue_pos: { id: string; po_no: string; expected_date?: string }[];
+};
+
+export const PO_STATUS_LABEL: Record<string, string> = {
+  Ordered: "Sipariş Verildi", PartiallyDelivered: "Kısmi Teslim",
+  Delivered: "Teslim Edildi", Cancelled: "İptal",
+};
+export const PO_STATUS_STYLE: Record<string, string> = {
+  Ordered: "bg-blue-500/15 text-blue-300 border-blue-500/40",
+  PartiallyDelivered: "bg-emniyet-500/15 text-emniyet-500 border-emniyet-500/40",
+  Delivered: "bg-green-500/15 text-green-300 border-green-500/40",
+  Cancelled: "bg-beton-800 text-beton-400 border-beton-700",
+};
+
+export default function PurchaseOrdersPage() {
+  const { current } = useProjects();
+  const { can } = useAuth();
+  const [pos, setPos] = useState<PO[]>([]);
+  const [board, setBoard] = useState<Board | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [supplier, setSupplier] = useState("");
+  const [amount, setAmount] = useState("");
+  const [expected, setExpected] = useState("");
+  const [note, setNote] = useState("");
+  const pid = current?.id;
+
+  const load = useCallback(async () => {
+    if (!pid) return;
+    setErr(null);
+    try {
+      const res = await api<{ purchase_orders: PO[] }>(
+        `/projects/${pid}/purchase-orders`, { projectId: pid });
+      setPos(res.purchase_orders);
+      const b = await api<Board>(`/projects/${pid}/procurement/board`, { projectId: pid });
+      setBoard(b);
+    } catch { setErr("Siparişler yüklenemedi ya da erişim yetkiniz yok."); }
+  }, [pid]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function create() {
+    if (!supplier.trim()) return;
+    try {
+      await api(`/projects/${pid}/purchase-orders`, {
+        method: "POST", projectId: pid,
+        body: {
+          supplier_name: supplier.trim(),
+          amount: amount ? Number(amount) : undefined,
+          expected_date: expected || undefined,
+          note: note.trim() || undefined,
+        },
+      });
+      setSupplier(""); setAmount(""); setExpected(""); setNote(""); setShowForm(false);
+      load();
+    } catch { setErr("Sipariş oluşturulamadı."); }
+  }
+
+  if (!current) return <p className="text-beton-400">Önce üst bardan bir proje seçin.</p>;
+
+  const fmtAmt = (o: PO) =>
+    o.amount != null ? `${o.amount.toLocaleString("tr-TR")} ${o.currency}` : "—";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <h1 className="text-lg font-display font-bold text-white">Siparişler</h1>
+        <Link to="/satinalma" className="text-xs text-emniyet-500 hover:underline">← Talepler (PR)</Link>
+        {can("procurement.manage_po") && (
+          <button onClick={() => setShowForm((v) => !v)}
+            className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
+            {showForm ? "Vazgeç" : "Bağımsız Sipariş"}
+          </button>
+        )}
+      </div>
+
+      {board && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat label="Onay Bekleyen PR" value={board.pr_counts["Submitted"] ?? 0} />
+          <Stat label="Açık Sipariş"
+            value={(board.po_counts["Ordered"] ?? 0) + (board.po_counts["PartiallyDelivered"] ?? 0)} />
+          <Stat label="Geciken PR" value={board.overdue_prs.length} danger />
+          <Stat label="Geciken Sipariş" value={board.overdue_pos.length} danger />
+        </div>
+      )}
+      {err && <p className="text-sm text-red-400">{err}</p>}
+
+      {showForm && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 flex flex-wrap items-end gap-3">
+          <label className="text-xs text-beton-300">
+            Tedarikçi
+            <input value={supplier} onChange={(e) => setSupplier(e.target.value)}
+              className="mt-1 block rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
+          </label>
+          <label className="text-xs text-beton-300">
+            Tutar
+            <input type="number" min={0} step="any" value={amount} onChange={(e) => setAmount(e.target.value)}
+              className="mt-1 block w-28 rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
+          </label>
+          <label className="text-xs text-beton-300">
+            Beklenen teslim
+            <input type="date" value={expected} onChange={(e) => setExpected(e.target.value)}
+              className="mt-1 block rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
+          </label>
+          <label className="flex-1 min-w-[160px] text-xs text-beton-300">
+            Not
+            <input value={note} onChange={(e) => setNote(e.target.value)}
+              className="mt-1 block w-full rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
+          </label>
+          <button onClick={create} disabled={!supplier.trim()}
+            className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400 disabled:opacity-40">
+            Oluştur
+          </button>
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-beton-800">
+        <table className="min-w-full text-sm">
+          <thead className="bg-beton-900 text-left text-xs text-beton-400">
+            <tr>
+              <th className="px-3 py-2">No</th>
+              <th className="px-3 py-2">Durum</th>
+              <th className="px-3 py-2">Tedarikçi</th>
+              <th className="px-3 py-2">Tutar</th>
+              <th className="px-3 py-2">Beklenen Teslim</th>
+              <th className="px-3 py-2">Teslimat</th>
+              <th className="px-3 py-2">PR</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-beton-800">
+            {pos.map((o) => (
+              <tr key={o.id} className={o.overdue ? "bg-red-500/5" : ""}>
+                <td className="px-3 py-2">
+                  <Link to={`/satinalma/siparisler/${o.id}`} className="text-emniyet-500 hover:underline">
+                    {o.po_no}
+                  </Link>
+                </td>
+                <td className="px-3 py-2">
+                  <span className={`rounded border px-1.5 py-0.5 text-xs ${PO_STATUS_STYLE[o.status] ?? ""}`}>
+                    {PO_STATUS_LABEL[o.status] ?? o.status}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-beton-100">{o.supplier_name}</td>
+                <td className="px-3 py-2 text-beton-300">{fmtAmt(o)}</td>
+                <td className="px-3 py-2">
+                  {o.expected_date ?? "—"}
+                  {o.overdue && <span className="ml-2 text-xs text-red-400">gecikti</span>}
+                </td>
+                <td className="px-3 py-2 text-beton-300">{o.delivery_count}</td>
+                <td className="px-3 py-2 text-beton-300">{o.pr_no ?? "—"}</td>
+              </tr>
+            ))}
+            {pos.length === 0 && (
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-beton-500">Kayıt yok.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
+  return (
+    <div className={`rounded-lg border p-3 ${danger && value > 0
+      ? "border-red-500/40 bg-red-500/10" : "border-beton-800 bg-beton-900"}`}>
+      <div className={`text-2xl font-display font-bold ${danger && value > 0 ? "text-red-300" : "text-white"}`}>
+        {value}
+      </div>
+      <div className="text-xs text-beton-400">{label}</div>
+    </div>
+  );
+}

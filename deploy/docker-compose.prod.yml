@@ -1,0 +1,53 @@
+# İPKS — prod (VPS) ek katmanı
+# Kullanım: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml --env-file .env up -d
+services:
+  postgres:
+    ports: []            # prod'da host'a port açılmaz
+    restart: unless-stopped
+
+  minio:
+    ports: []
+    restart: unless-stopped
+
+  api:
+    ports: []
+    restart: unless-stopped
+    environment:
+      IPKS_ENV: production
+
+  worker:
+    restart: unless-stopped
+
+  frontend:
+    ports: []
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/ipks.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    environment:
+      DOMAIN: ${DOMAIN}
+    depends_on:
+      - api
+      - frontend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/healthz-nginx"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  certbot:
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    # 12 saatte bir sertifika yenileme denemesi
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'

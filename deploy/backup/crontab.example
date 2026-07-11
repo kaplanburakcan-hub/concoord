@@ -1,0 +1,5 @@
+# İPKS yedekleme cron'ları (VPS'te `crontab -e` ile ekleyin; yollar /opt/ipks varsayımıyla)
+# Günlük yedek — her gece 02:30 (offsite dahil)
+30 2 * * * cd /opt/ipks && bash deploy/backup/backup.sh >> /var/log/ipks-backup.log 2>&1
+# Aylık restore testi — her ayın 2'si 04:00
+0 4 2 * * cd /opt/ipks && bash deploy/backup/restore-test.sh >> /var/log/ipks-restore-test.log 2>&1
