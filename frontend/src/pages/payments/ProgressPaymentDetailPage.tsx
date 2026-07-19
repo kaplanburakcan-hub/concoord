@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, apiDownload } from "../../api/client";
+import ApprovalChain from "./ApprovalChain";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 
@@ -10,6 +11,10 @@ type Payment = {
   period_start?: string; period_end?: string; vat_pct: number; row_version: number;
   gross_cum?: number; gross_prev?: number; gross_this?: number;
   total_deductions?: number; net_payable?: number;
+  withholding_applied?: boolean | null;
+  vat_amount?: number; vat_withheld?: number; vat_collected?: number;
+  payable_gross?: number; actual_cost?: number;
+  vat_withholding_ratio?: number; vat_exemption_code?: string | null;
 };
 type ItemView = {
   work_item_id: string; poz_no: string; description: string; unit: string;
@@ -18,6 +23,7 @@ type ItemView = {
 };
 type DeductionView = {
   type: string; description: string; rate_pct?: number; amount?: number;
+  nature?: string; reduces_cost?: boolean;
   source_entity?: string; source_id?: string;
 };
 type PenaltySuggestion = {
@@ -32,7 +38,21 @@ const STATUS_LABEL: Record<string, string> = {
 };
 const DED_LABEL: Record<string, string> = {
   AdvanceOffset: "Avans mahsubu", Retention: "Teminat kesintisi",
-  Tax: "Vergi/stopaj", OHSPenalty: "İSG ceza", Other: "Diğer",
+  Withholding: "Stopaj (yıllara sari)", Tax: "Vergi", OHSPenalty: "İSG ceza", Other: "Diğer",
+};
+
+// Kesinti niteliği (Faz 11): Mahsup / Geçici (iade edilecek) / Kâti.
+// Geçici kesintiler kabulde taşerona iade edilir; bu ayrım hem hakediş
+// takibinde hem EVM maliyet hesabında belirleyicidir.
+const NATURE_LABEL: Record<string, string> = {
+  Offset: "Mahsup",
+  Temporary: "Geçici · iade edilecek",
+  Permanent: "Kâti",
+};
+const NATURE_CLS: Record<string, string> = {
+  Offset: "text-blue-300 border-blue-500/40",
+  Temporary: "text-amber-400 border-amber-500/40",
+  Permanent: "text-beton-400 border-beton-700",
 };
 
 export default function ProgressPaymentDetailPage() {
@@ -92,6 +112,8 @@ export default function ProgressPaymentDetailPage() {
     setMsg(null); setErr(null);
     const body = {
       row_version: pmt.row_version,
+      withholding_applied: pmt.withholding_applied ?? null,
+      vat_withholding_ratio: pmt.vat_withholding_ratio ?? null,
       items: workItems
         .filter((w) => qty[w.id] !== undefined && qty[w.id] !== "")
         .map((w) => ({ work_item_id: w.id, cum_qty: Number(qty[w.id]) || 0 })),
@@ -128,8 +150,8 @@ export default function ProgressPaymentDetailPage() {
   }
 
   const vatAmount = useMemo(() => {
-    if (!pmt?.net_payable) return 0;
-    return Math.round(pmt.net_payable * (pmt.vat_pct / 100) * 100) / 100;
+    // Faz 11: KDV artık sunucuda dönem brütü üzerinden hesaplanıyor.
+    return pmt?.vat_amount ?? 0;
   }, [pmt]);
 
   if (!current) return <p className="text-beton-400">Önce bir proje seçin.</p>;
@@ -206,11 +228,53 @@ export default function ProgressPaymentDetailPage() {
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
           <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide">Kesintiler</h2>
           <p className="text-xs text-beton-400 mt-1">Avans ve teminat otomatik hesaplanır. Aşağıya vergi/İSG/diğer ekleyin.</p>
+
+          {/* Faz 11 — Stopaj (GVK Md. 42-44, yıllara sari inşaat işleri).
+              Aynı takvim yılında başlayıp biten işlerde kesilmez; sonraki yıla
+              sarkan işlerde kesilir. Varsayılan sözleşmenin "yıllara sari"
+              işaretinden gelir, burada hakediş bazında geçersiz kılınabilir. */}
+          {editable && (
+            <label className="mt-3 flex items-start gap-2 rounded-md border border-beton-800 bg-beton-950 p-2 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5 accent-emniyet-500"
+                checked={!!pmt.withholding_applied}
+                onChange={(e) =>
+                  setPmt({ ...pmt, withholding_applied: e.target.checked })
+                }
+              />
+              <span className="text-xs">
+                <span className="text-beton-200">Stopaj kesintisi uygula</span>
+                <span className="block text-beton-500 mt-0.5">
+                  Yıllara sari işlerde zorunlu. Kaydettiğinizde hesaba dahil edilir.
+                </span>
+              </span>
+            </label>
+          )}
           <ul className="mt-2 space-y-1 text-sm">
             {deductions.map((d, i) => (
-              <li key={i} className="flex justify-between text-beton-200">
-                <span>{DED_LABEL[d.type] || d.type}{d.description ? ` — ${d.description}` : ""}</span>
-                {canFin && <span className="tabular-nums">{d.amount?.toLocaleString("tr-TR")}</span>}
+              <li key={i} className="flex items-center justify-between gap-2 text-beton-200">
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="truncate">
+                    {DED_LABEL[d.type] || d.type}{d.description ? ` — ${d.description}` : ""}
+                  </span>
+                  {d.nature && (
+                    <span
+                      className={
+                        "flex-none text-[10px] px-1.5 py-0.5 rounded border " +
+                        (NATURE_CLS[d.nature] || "text-beton-400 border-beton-700")
+                      }
+                      title={
+                        d.reduces_cost
+                          ? "Maliyeti azaltır (mal/hizmet bedeli) — EVM AC hesabından düşülür"
+                          : "Maliyeti azaltmaz (finansman/vergi kalemi)"
+                      }
+                    >
+                      {NATURE_LABEL[d.nature] || d.nature}
+                    </span>
+                  )}
+                </span>
+                {canFin && <span className="tabular-nums flex-none">{d.amount?.toLocaleString("tr-TR")}</span>}
               </li>
             ))}
             {!deductions.length && <li className="text-beton-400">Kesinti yok.</li>}
@@ -283,6 +347,14 @@ export default function ProgressPaymentDetailPage() {
         </div>
 
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
+          {/* Faz 11 — çok adımlı onay zinciri (teknik ofis → ... → finansal kontrol) */}
+          <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide">Onay Zinciri</h2>
+          <div className="mt-2">
+            {id && <ApprovalChain paymentId={id} onChanged={load} />}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
           <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide">Özet</h2>
           {canFin ? (
             <dl className="mt-2 space-y-1 text-sm">
@@ -290,9 +362,19 @@ export default function ProgressPaymentDetailPage() {
               <Row label="B) Önceki dönem" v={pmt.gross_prev} />
               <Row label="C) Bu dönem brüt" v={pmt.gross_this} bold />
               <Row label="Toplam kesinti" v={pmt.total_deductions} />
-              <Row label="I) Net ödenecek (KDV hariç)" v={pmt.net_payable} bold />
-              <Row label={`KDV (%${pmt.vat_pct})`} v={vatAmount} />
-              <Row label="Genel toplam" v={(pmt.net_payable ?? 0) + vatAmount} bold />
+              {/* Faz 11 — gerçek hakediş akışı:
+                  brüt → KDV ekle (tevkifat düş) → kesintileri KDV dahil düş */}
+              <Row label={`KDV (%${pmt.vat_pct})`} v={pmt.vat_amount} />
+              {(pmt.vat_withheld ?? 0) > 0 && (
+                <Row label="Tevkif edilen KDV (vergi dairesine)" v={pmt.vat_withheld} />
+              )}
+              <Row label="Tahsil edilen KDV" v={pmt.vat_collected} />
+              <Row label="Ödenebilir toplam (KDV dahil)" v={pmt.payable_gross} bold />
+              <Row label="Kesintiler toplamı (KDV dahil)" v={pmt.total_deductions} />
+              <Row label="Yükleniciye ödenecek" v={pmt.net_payable} bold />
+              {(pmt.actual_cost ?? 0) > 0 && (
+                <Row label="Gerçekleşen maliyet (EVM · KDV hariç)" v={pmt.actual_cost} />
+              )}
             </dl>
           ) : (
             <p className="mt-2 text-sm text-beton-400">Finansal değerleri görüntüleme yetkiniz yok (yalnızca metraj).</p>

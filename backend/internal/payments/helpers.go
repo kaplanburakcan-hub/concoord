@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -108,4 +109,29 @@ func (h *Handler) requireScope(w http.ResponseWriter, r *http.Request, pid uuid.
 		return uuid.Nil, nil, false
 	}
 	return uid, sub, true
+}
+
+// parseDatePtr — "YYYY-MM-DD" biçimli opsiyonel tarihi *time.Time'a çevirir.
+// Boş/geçersiz girdide nil döner (dönem kontrolleri tarih yoksa uygulanmaz).
+func parseDatePtr(s *string) *time.Time {
+	if s == nil {
+		return nil
+	}
+	v := strings.TrimSpace(*s)
+	if v == "" {
+		return nil
+	}
+	t, err := time.Parse("2006-01-02", v)
+	if err != nil {
+		return nil
+	}
+	return &t
+}
+
+// nullIfEmpty — boş dizeyi SQL NULL'a çevirir (opsiyonel metin kolonları için).
+func nullIfEmpty(s string) *string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	return &s
 }

@@ -236,6 +236,12 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("contracts.delete")).Delete("/projects/{projectID}/contracts/{id}", payH.DeleteContract)
 
 			// Hakedişler + iş akışı
+			// Faz 11 — kesinti kataloğu (grup + kalem listesi). Proje bağımsızdır.
+			pr.With(mw.RequirePermission("progress_payments.view")).Get("/deduction-catalog", payH.DeductionCatalog)
+			// Faz 11 — çok adımlı onay zinciri. Adım izni zincir verisinden gelir,
+			// bu yüzden rota düzeyinde yalnızca görüntüleme izni aranır.
+			pr.With(mw.RequirePermission("progress_payments.view")).Get("/payments/{id}/approvals", payH.ApprovalChain)
+			pr.With(mw.RequirePermission("progress_payments.view")).Post("/payments/{id}/approvals", payH.ApproveStep)
 			pr.With(mw.RequirePermission("progress_payments.view")).Get("/projects/{projectID}/payments", payH.ListPayments)
 			pr.With(mw.RequirePermission("progress_payments.create_draft")).Post("/projects/{projectID}/payments", payH.CreatePayment)
 			pr.With(mw.RequirePermission("progress_payments.view")).Get("/projects/{projectID}/payments/{id}", payH.GetPayment)

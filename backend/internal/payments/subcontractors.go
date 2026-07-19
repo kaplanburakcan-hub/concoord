@@ -285,18 +285,20 @@ type contractDTO struct {
 	AdvanceRatePct   float64    `json:"advance_rate_pct"`
 	SignDate         *time.Time `json:"sign_date,omitempty"`
 	DocumentID       *uuid.UUID `json:"document_id,omitempty"`
+	IsMultiYear      bool       `json:"is_multi_year"`
+	WithholdingPct   float64    `json:"withholding_pct"`
 	RowVersion       int        `json:"row_version"`
 	CreatedAt        time.Time  `json:"created_at"`
 }
 
 const contractCols = `id, project_id, subcontractor_id, contract_no, type, parent_contract_id,
 	amount::float8, advance_amount::float8, retention_pct::float8, advance_rate_pct::float8,
-	sign_date, document_id, row_version, created_at`
+	sign_date, document_id, is_multi_year, withholding_pct::float8, row_version, created_at`
 
 func scanContract(row pgx.Row, c *contractDTO) error {
 	return row.Scan(&c.ID, &c.ProjectID, &c.SubcontractorID, &c.ContractNo, &c.Type, &c.ParentContractID,
 		&c.Amount, &c.AdvanceAmount, &c.RetentionPct, &c.AdvanceRatePct,
-		&c.SignDate, &c.DocumentID, &c.RowVersion, &c.CreatedAt)
+		&c.SignDate, &c.DocumentID, &c.IsMultiYear, &c.WithholdingPct, &c.RowVersion, &c.CreatedAt)
 }
 
 // maskFinancials — view_financials yoksa tutar alanlarını gizler (Plan §4).
@@ -353,6 +355,11 @@ type contractReq struct {
 	AdvanceRatePct   *float64 `json:"advance_rate_pct"`
 	SignDate         *string  `json:"sign_date"`
 	DocumentID       *string  `json:"document_id"`
+	// Faz 11 — yıllara sari inşaat işi (GVK 42-44). true ise bu sözleşmenin
+	// hakedişlerinde stopaj varsayılan olarak uygulanır (hakediş bazında
+	// elle geçersiz kılınabilir).
+	IsMultiYear      *bool    `json:"is_multi_year"`
+	WithholdingPct   *float64 `json:"withholding_pct"`
 	RowVersion       int      `json:"row_version"`
 }
 
@@ -415,11 +422,20 @@ func (h *Handler) CreateContract(w http.ResponseWriter, r *http.Request) {
 	var c contractDTO
 	err = scanContract(tx.QueryRow(r.Context(), `
 		INSERT INTO contracts (project_id, subcontractor_id, contract_no, type, parent_contract_id,
-			amount, advance_amount, retention_pct, advance_rate_pct, sign_date, document_id)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NULLIF($10,'')::date, $11)
+			amount, advance_amount, retention_pct, advance_rate_pct, sign_date, document_id,
+			is_multi_year, withholding_pct)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NULLIF($10,'')::date, $11,
+			-- Yıllara sari varsayılanı: açıkça verilmemişse proje takviminden
+			-- türetilir (başlangıç ve bitiş yılı farklıysa iş yıllara saridir).
+			COALESCE($12, (
+				SELECT p.start_date IS NOT NULL AND p.end_date IS NOT NULL
+				       AND date_part('year', p.end_date) > date_part('year', p.start_date)
+				FROM projects p WHERE p.id = $1
+			), false),
+			COALESCE($13, 5.00))
 		RETURNING `+contractCols,
 		pid, subID, req.ContractNo, ctype, parentID, req.Amount, advAmount, retention, advRate,
-		strDeref(req.SignDate), docID), &c)
+		strDeref(req.SignDate), docID, req.IsMultiYear, req.WithholdingPct), &c)
 	if err != nil {
 		if isUniqueViolation(err) {
 			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "Bu sözleşme no zaten kullanımda.", nil)
@@ -523,10 +539,13 @@ func (h *Handler) UpdateContract(w http.ResponseWriter, r *http.Request) {
 		UPDATE contracts SET
 			contract_no=$3, type=$4, amount=$5, advance_amount=$6, retention_pct=$7, advance_rate_pct=$8,
 			sign_date=COALESCE(NULLIF($9,'')::date, sign_date),
+			is_multi_year=COALESCE($10, is_multi_year),
+			withholding_pct=COALESCE($11, withholding_pct),
 			row_version=row_version+1
 		WHERE id=$1 AND project_id=$2
 		RETURNING `+contractCols,
-		cid, pid, contractNo, ctype, amount, advAmount, retention, advRate, strDeref(req.SignDate)), &c)
+		cid, pid, contractNo, ctype, amount, advAmount, retention, advRate, strDeref(req.SignDate),
+		req.IsMultiYear, req.WithholdingPct), &c)
 	if err != nil {
 		if isUniqueViolation(err) {
 			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "Bu sözleşme no zaten kullanımda.", nil)

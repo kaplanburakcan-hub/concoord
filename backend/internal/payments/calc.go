@@ -56,12 +56,32 @@ type ContractTerms struct {
 	AdvanceRatePct       float64 // bu dönem brütünden mahsup oranı (%)
 	RetentionPct         float64 // teminat kesinti oranı (%)
 	VatPct               float64 // KDV oranı (%)
+
+	// Stopaj (GVK Md. 42-44 — yıllara sari inşaat işleri). Aynı takvim yılında
+	// başlayıp biten işlerde kesilmez; sonraki yıla sarkan işlerde kesilir.
+	// ApplyWithholding çağıran tarafından çözülür: hakedişte elle işaretlenmişse
+	// o değer, değilse sözleşmenin is_multi_year varsayılanı.
+	ApplyWithholding bool    // bu hakedişte stopaj uygulanacak mı
+	WithholdingPct   float64 // stopaj oranı (%) — tipik 5.00
+
+	// KDV tevkifatı (Faz 11). Diğer kesintilerden YAPISAL OLARAK FARKLIDIR:
+	// brütten değil, hesaplanan KDV TUTARI üzerinden uygulanır. Yapım işlerinde
+	// 4/10 → 0.4: KDV'nin %40'ı taşerona ödenmez, alıcı tarafından doğrudan
+	// vergi dairesine yatırılır. İşin maliyetini (EVM AC) ETKİLEMEZ, yalnızca
+	// ödenecek tutarı değiştirir.
+	VatWithholdingRatio float64 // 0 = tevkifat yok, 0.4 = 4/10
 }
 
 // ExtraDeduction — otomatik olmayan (İSG ceza, vergi/stopaj, diğer) kesinti kalemi.
 // Amount doğrudan verilir; rate_pct yalnızca kayıt/gösterim içindir.
 type ExtraDeduction struct {
-	Type        string   `json:"type"` // Tax | OHSPenalty | Other
+	// Nature/ReducesCost boş bırakılırsa DeductionNature(Type) ile türetilir.
+	Nature      string   `json:"nature,omitempty"`
+	ReducesCost *bool    `json:"reduces_cost,omitempty"`
+	GroupCode   string   `json:"group_code,omitempty"`
+	CatalogCode string   `json:"catalog_code,omitempty"`
+	VatPct      float64  `json:"vat_pct,omitempty"` // kesintinin kendi KDV oranı (Amount KDV dahil)
+	Type        string   `json:"type"` // Withholding | Tax | OHSPenalty | Other
 	Description string   `json:"description"`
 	RatePct     *float64 `json:"rate_pct,omitempty"`
 	Amount      float64  `json:"amount"`
@@ -77,6 +97,21 @@ type DeductionLine struct {
 	Amount       float64  `json:"amount"`
 	SourceEntity *string  `json:"source_entity,omitempty"`
 	SourceID     *string  `json:"source_id,omitempty"`
+
+	// Nitelik (Faz 11): Offset=avans mahsubu, Temporary=iade edilecek (teminat),
+	// Permanent=kâti. ReducesCost, kesintinin EVM Gerçekleşen Maliyet (AC)
+	// hesabından düşülüp düşülmeyeceğini belirtir.
+	Nature      string `json:"nature"`
+	ReducesCost bool   `json:"reduces_cost"`
+	GroupCode   string `json:"group_code,omitempty"`   // Tax|Advance|Retention|Penalty|GoodsService|Adjustment
+	CatalogCode string `json:"catalog_code,omitempty"` // deduction_catalog.code
+
+	// Kesintinin KENDİ KDV oranı. Mal/hizmet kesintileri (yemek, elektrik,
+	// malzeme) ana yüklenicinin taşerona yaptığı satıştır ve KDV taşır; ceza ile
+	// finansman kalemleri (avans, teminat, stopaj) KDV'sizdir. Amount KDV DAHİL
+	// tutardır; NetAmount maliyet hesabında (AC) kullanılan KDV hariç kısımdır.
+	VatPct    float64 `json:"vat_pct"`
+	NetAmount float64 `json:"net_amount"`
 }
 
 // CalcResult — bir hakediş döneminin tam hesap sonucu (Plan §6.4 A–I).
@@ -85,12 +120,21 @@ type CalcResult struct {
 	GrossCum        float64         `json:"gross_cum"`        // A
 	GrossPrev       float64         `json:"gross_prev"`       // B
 	GrossThis       float64         `json:"gross_this"`       // C
-	Deductions      []DeductionLine `json:"deductions"`       // D..H
-	TotalDeductions float64         `json:"total_deductions"`
-	NetPayable      float64         `json:"net_payable"`      // I = C − Σkesinti (KDV hariç)
-	VatPct          float64         `json:"vat_pct"`
-	VatAmount       float64         `json:"vat_amount"`       // KDV ayrı satır
-	GrandTotal      float64         `json:"grand_total"`      // net + KDV
+	// --- KDV (dönem brütü üzerinden) ---
+	VatPct       float64 `json:"vat_pct"`
+	VatAmount    float64 `json:"vat_amount"`    // hesaplanan KDV = C × oran
+	VatWithheld  float64 `json:"vat_withheld"`  // tevkif edilen (vergi dairesine yatırılır)
+	VatCollected float64 `json:"vat_collected"` // tahsil edilen (ödemeye eklenir)
+
+	// --- Ödeme akışı ---
+	PayableGross    float64         `json:"payable_gross"` // C + tahsil edilen KDV
+	Deductions      []DeductionLine `json:"deductions"`
+	TotalDeductions float64         `json:"total_deductions"` // KDV DAHİL kesinti toplamı
+	NetPayable      float64         `json:"net_payable"`      // yükleniciye ödenecek nihai tutar
+
+	// --- Maliyet (EVM) ---
+	CostReducing float64 `json:"cost_reducing"` // maliyeti azaltan kesintilerin KDV hariç toplamı
+	ActualCost   float64 `json:"actual_cost"`   // AC = C − CostReducing (KDV hariç)
 }
 
 // Compute — bir hakediş döneminin kümülatif hesabını üretir (Plan §6.4).
@@ -139,6 +183,8 @@ func Compute(inputs []CalcLineInput, grossPrev float64, terms ContractTerms, ext
 			rate := terms.AdvanceRatePct
 			res.Deductions = append(res.Deductions, DeductionLine{
 				Type: "AdvanceOffset", Description: "Avans mahsubu", RatePct: &rate, Amount: offset,
+				Nature: NatureOffset, ReducesCost: false, GroupCode: "Advance", CatalogCode: "ADV_CONTRACT",
+				VatPct: 0, NetAmount: offset,
 			})
 		}
 	}
@@ -150,29 +196,85 @@ func Compute(inputs []CalcLineInput, grossPrev float64, terms ContractTerms, ext
 			rate := terms.RetentionPct
 			res.Deductions = append(res.Deductions, DeductionLine{
 				Type: "Retention", Description: "Teminat kesintisi", RatePct: &rate, Amount: ret,
+				Nature: NatureTemporary, ReducesCost: false, GroupCode: "Retention", CatalogCode: "RET_PERFORMANCE",
+				VatPct: 0, NetAmount: ret,
 			})
 		}
 	}
 
-	// F/G/H — İSG ceza, vergi/stopaj, diğer (manuel/otomasyon kalemleri).
+	// F — Stopaj (yıllara sari işler): bu dönem brütü üzerinden, KDV hariç.
+	// Taşeronun gelir vergisi mahsubudur; kaynakta kesilip onun adına yatırılır,
+	// bu yüzden ana yüklenicinin maliyetini AZALTMAZ (ReducesCost=false).
+	if res.GrossThis > 0 && terms.ApplyWithholding && terms.WithholdingPct > 0 {
+		wh := round2(res.GrossThis * terms.WithholdingPct / 100)
+		if wh > 0 {
+			rate := terms.WithholdingPct
+			res.Deductions = append(res.Deductions, DeductionLine{
+				Type: "Withholding", Description: "Stopaj (yıllara sari)", RatePct: &rate, Amount: wh,
+				Nature: NaturePermanent, ReducesCost: false, GroupCode: "Tax", CatalogCode: "WHT_INCOME",
+				VatPct: 0, NetAmount: wh,
+			})
+		}
+	}
+
+	// G/H — İSG ceza, vergi, diğer (manuel/otomasyon kalemleri).
 	for _, e := range extras {
 		amt := round2(e.Amount)
 		if amt == 0 {
 			continue
 		}
+		nature := e.Nature
+		if nature == "" {
+			nature = DeductionNature(e.Type)
+		}
+		reduces := DeductionReducesCost(e.Type)
+		if e.ReducesCost != nil {
+			reduces = *e.ReducesCost
+		}
+		// Kesintinin kendi KDV oranı; Amount KDV DAHİL tutardır.
+		net := amt
+		if e.VatPct > 0 {
+			net = round2(amt / (1 + e.VatPct/100))
+		}
 		res.Deductions = append(res.Deductions, DeductionLine{
 			Type: e.Type, Description: e.Description, RatePct: e.RatePct, Amount: amt,
 			SourceEntity: e.SourceEntity, SourceID: e.SourceID,
+			Nature: nature, ReducesCost: reduces,
+			GroupCode: e.GroupCode, CatalogCode: e.CatalogCode,
+			VatPct: e.VatPct, NetAmount: net,
 		})
 	}
 
-	var totalDed float64
+	// ---- Ödeme akışı (gerçek hakediş sırası) ----
+	//
+	//   KDV, DÖNEM BRÜTÜ üzerinden hesaplanır (kesintilerden ÖNCE): taşeron işin
+	//   tamamını faturalar. Tevkifat kadarı taşerona ödenmez, doğrudan vergi
+	//   dairesine yatırılır.
+	//
+	//   Kesintiler, KDV DAHİL ödenebilir toplamdan düşülür: ana yüklenicinin
+	//   taşerona sattığı mal/hizmet (yemek, elektrik, malzeme) kendi KDV'siyle
+	//   birlikte mahsup edilir.
+	res.VatAmount = round2(res.GrossThis * terms.VatPct / 100)
+	res.VatWithheld = round2(res.VatAmount * terms.VatWithholdingRatio)
+	res.VatCollected = round2(res.VatAmount - res.VatWithheld)
+	res.PayableGross = round2(res.GrossThis + res.VatCollected)
+
+	var totalDed, costRed float64
 	for _, d := range res.Deductions {
 		totalDed += d.Amount
+		if d.ReducesCost {
+			// Maliyet KDV HARİÇ hesaplanır: KDV devreden bir kalemdir, maliyet değil.
+			costRed += d.NetAmount
+		}
 	}
 	res.TotalDeductions = round2(totalDed)
-	res.NetPayable = round2(res.GrossThis - res.TotalDeductions)
-	res.VatAmount = round2(res.NetPayable * terms.VatPct / 100)
-	res.GrandTotal = round2(res.NetPayable + res.VatAmount)
+	res.NetPayable = round2(res.PayableGross - res.TotalDeductions)
+
+	// ---- EVM Gerçekleşen Maliyet (AC) ----
+	// İşin sözleşme bedeli (KDV hariç) eksi yalnızca maliyeti gerçekten azaltan
+	// kesintilerin KDV hariç tutarı. Avans, teminat ve stopaj finansman/vergi
+	// kalemidir — maliyeti değiştirmez.
+	res.CostReducing = round2(costRed)
+	res.ActualCost = round2(res.GrossThis - res.CostReducing)
 	return res
 }

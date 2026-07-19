@@ -1,6 +1,6 @@
 COMPOSE=docker compose -f deploy/docker-compose.yml --env-file .env
 
-.PHONY: up down logs build migrate-up migrate-down migrate-new seed test backup restore-test dr-drill loadtest smoke psql
+.PHONY: up down logs build migrate-up migrate-down migrate-new seed demo-data test backup restore-test dr-drill loadtest smoke psql
 
 up: ## Geliştirme ortamını ayağa kaldır
 	$(COMPOSE) up -d --build
@@ -22,6 +22,9 @@ migrate-down: ## Son migration'ı geri al
 
 seed: ## Seed verisini yükle (idempotent): izin sözlüğü + 7 rol + bootstrap admin
 	$(COMPOSE) exec api /app/api -seed
+
+demo-data: ## Gerçekçi DEMO-01 test verisi yükle (EVM/S-eğrisi, İSG, MAR, görevler)
+	$(COMPOSE) exec -T postgres psql -U $${POSTGRES_USER:-ipks} -d $${POSTGRES_DB:-ipks} < deploy/seed/demo-data.sql
 
 test: ## Backend birim testleri (auth, JWT, RBAC yetki matrisi)
 	cd backend && go test ./...

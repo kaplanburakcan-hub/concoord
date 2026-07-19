@@ -175,7 +175,7 @@ export default function Dashboard() {
               </div>
               <div className="mt-4">
                 {dash.evm.s_curve.length >= 2 ? (
-                  <SCurve points={dash.evm.s_curve} currency={cur} />
+                  <SCurve points={dash.evm.s_curve} currency={cur} asOf={dash.evm.as_of_month} />
                 ) : (
                   <div className="rounded-lg border border-dashed border-beton-700 bg-beton-950 px-4 py-8 text-center">
                     <p className="text-sm text-beton-400">S-eğrisi için henüz yeterli veri yok.</p>

@@ -31,6 +31,18 @@ type paymentDTO struct {
 	TotalDeductions *float64   `json:"total_deductions,omitempty"`
 	VatPct          float64    `json:"vat_pct"`
 	NetPayable      *float64   `json:"net_payable,omitempty"`
+	// Stopaj (Faz 11): nil = sözleşme varsayılanını izle (yıllara sari),
+	// true/false = bu hakediş için elle geçersiz kılma.
+	WithholdingApplied *bool   `json:"withholding_applied,omitempty"`
+	// KDV tevkifatı (0=yok, 0.4=4/10) ve %0 KDV'de istisna gerekçesi.
+	VatWithholdingRatio float64 `json:"vat_withholding_ratio"`
+	VatExemptionCode    *string `json:"vat_exemption_code,omitempty"`
+	VatAmount     float64 `json:"vat_amount"`
+	VatWithheld   float64 `json:"vat_withheld"`
+	VatCollected  float64 `json:"vat_collected"`
+	PayableGross  float64 `json:"payable_gross"`
+	ActualCost    float64 `json:"actual_cost"`
+	CurrentStepNo int     `json:"current_step_no"`
 	FinalizedAt     *time.Time `json:"finalized_at,omitempty"`
 	RowVersion      int        `json:"row_version"`
 	CreatedAt       time.Time  `json:"created_at"`
@@ -38,12 +50,19 @@ type paymentDTO struct {
 
 const paymentCols = `id, project_id, subcontractor_id, period_no, period_start, period_end, status,
 	gross_cum::float8, gross_prev::float8, gross_this::float8, total_deductions::float8,
-	vat_pct::float8, net_payable::float8, finalized_at, row_version, created_at`
+	vat_pct::float8, net_payable::float8, withholding_applied,
+	vat_withholding_ratio::float8, vat_exemption_code,
+	vat_amount::float8, vat_withheld::float8, vat_collected::float8,
+	payable_gross::float8, actual_cost::float8, current_step_no,
+	finalized_at, row_version, created_at`
 
 func scanPayment(row pgx.Row, p *paymentDTO) error {
 	var gc, gp, gt, td, np float64
 	if err := row.Scan(&p.ID, &p.ProjectID, &p.SubcontractorID, &p.PeriodNo, &p.PeriodStart, &p.PeriodEnd,
-		&p.Status, &gc, &gp, &gt, &td, &p.VatPct, &np, &p.FinalizedAt, &p.RowVersion, &p.CreatedAt); err != nil {
+		&p.Status, &gc, &gp, &gt, &td, &p.VatPct, &np, &p.WithholdingApplied,
+		&p.VatWithholdingRatio, &p.VatExemptionCode,
+		&p.VatAmount, &p.VatWithheld, &p.VatCollected, &p.PayableGross, &p.ActualCost, &p.CurrentStepNo,
+		&p.FinalizedAt, &p.RowVersion, &p.CreatedAt); err != nil {
 		return err
 	}
 	p.GrossCum, p.GrossPrev, p.GrossThis = &gc, &gp, &gt
@@ -165,6 +184,21 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 			periodNo = *maxPeriod + 1
 		} else {
 			periodNo = 1
+		}
+	}
+
+	// Faz 11 — dönem kontrolleri: tarih sırası, aynı taşeronda aralık çakışması,
+	// sözleşme süresi aşımı. Kullanıcıya anlaşılır mesaj döner; veritabanında
+	// ayrıca chk_pp_period_order + excl_pp_period_overlap koruması vardır.
+	if ps, pe := parseDatePtr(req.PeriodStart), parseDatePtr(req.PeriodEnd); ps != nil || pe != nil {
+		if f, err := ValidatePeriod(r.Context(), tx, PeriodCheckInput{
+			SubcontractorID: subID.String(), Start: ps, End: pe,
+		}); err != nil {
+			httpx.Internal(w, r)
+			return
+		} else if len(f) > 0 {
+			httpx.ValidationFailed(w, r, f)
+			return
 		}
 	}
 
@@ -421,19 +455,27 @@ func (h *Handler) computeForPayment(ctx context.Context, q pgxQuerier, pp *payme
 	// Sözleşme şartları (yürürlükteki Main/Sub, en yeni)
 	var terms ContractTerms
 	terms.VatPct = pp.VatPct
-	var advAmount, retPct, advRate float64
+	var advAmount, retPct, advRate, whPct float64
+	var multiYear bool
 	err = q.QueryRow(ctx, `
-		SELECT COALESCE(advance_amount,0)::float8, retention_pct::float8, advance_rate_pct::float8
+		SELECT COALESCE(advance_amount,0)::float8, retention_pct::float8, advance_rate_pct::float8,
+		       COALESCE(withholding_pct,5)::float8, COALESCE(is_multi_year,false)
 		FROM contracts
 		WHERE subcontractor_id=$1 AND deleted_at IS NULL AND type IN ('Main','Sub')
 		ORDER BY sign_date DESC NULLS LAST, created_at DESC LIMIT 1`, pp.SubcontractorID).
-		Scan(&advAmount, &retPct, &advRate)
+		Scan(&advAmount, &retPct, &advRate, &whPct, &multiYear)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return CalcResult{}, err
 	}
 	terms.AdvanceAmount = advAmount
 	terms.RetentionPct = retPct
 	terms.AdvanceRatePct = advRate
+
+	// Stopaj (Faz 11): hakedişte elle işaretlenmişse o değer, değilse
+	// sözleşmenin yıllara sari (is_multi_year) varsayılanı geçerlidir.
+	terms.WithholdingPct = whPct
+	terms.ApplyWithholding = ResolveWithholding(pp.WithholdingApplied, multiYear)
+	terms.VatWithholdingRatio = pp.VatWithholdingRatio
 
 	// Önceki dönemlere dek mahsup edilmiş avans
 	var advRecovered float64
@@ -503,18 +545,24 @@ func (h *Handler) persistCalc(ctx context.Context, tx pgx.Tx, ppID uuid.UUID, re
 			}
 		}
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO payment_deductions (progress_payment_id, type, source_entity, source_id, description, rate_pct, amount)
-			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-			ppID, d.Type, d.SourceEntity, srcID, d.Description, d.RatePct, d.Amount); err != nil {
+			INSERT INTO payment_deductions
+			  (progress_payment_id, type, source_entity, source_id, description, rate_pct, amount,
+			   nature, reduces_cost, group_code, catalog_code, vat_pct, net_amount)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+			ppID, d.Type, d.SourceEntity, srcID, d.Description, d.RatePct, d.Amount,
+			d.Nature, d.ReducesCost, nullIfEmpty(d.GroupCode), nullIfEmpty(d.CatalogCode),
+			d.VatPct, d.NetAmount); err != nil {
 			return err
 		}
 	}
 	_, err := tx.Exec(ctx, `
 		UPDATE progress_payments SET
 			gross_cum=$2, gross_prev=$3, gross_this=$4, total_deductions=$5, net_payable=$6, vat_pct=$7,
+			vat_amount=$8, vat_withheld=$9, vat_collected=$10, payable_gross=$11, actual_cost=$12,
 			row_version=row_version+1
 		WHERE id=$1`,
-		ppID, res.GrossCum, res.GrossPrev, res.GrossThis, res.TotalDeductions, res.NetPayable, res.VatPct)
+		ppID, res.GrossCum, res.GrossPrev, res.GrossThis, res.TotalDeductions, res.NetPayable, res.VatPct,
+		res.VatAmount, res.VatWithheld, res.VatCollected, res.PayableGross, res.ActualCost)
 	return err
 }
 
@@ -522,6 +570,12 @@ type updateDraftReq struct {
 	PeriodStart *string `json:"period_start"`
 	PeriodEnd   *string `json:"period_end"`
 	VatPct      *float64 `json:"vat_pct"`
+	// Stopaj tiki (Faz 11). Gönderilmezse mevcut değer korunur; gönderilirse
+	// bu hakediş için sözleşme varsayılanını geçersiz kılar.
+	WithholdingApplied *bool `json:"withholding_applied"`
+	// KDV tevkifat oranı (0=yok, 0.4=4/10) ve %0 KDV istisna gerekçesi.
+	VatWithholdingRatio *float64 `json:"vat_withholding_ratio"`
+	VatExemptionCode    *string  `json:"vat_exemption_code"`
 	RowVersion  int      `json:"row_version"`
 	Items       []struct {
 		WorkItemID string  `json:"work_item_id"`
@@ -534,6 +588,10 @@ type updateDraftReq struct {
 		RatePct      *float64 `json:"rate_pct"`
 		SourceEntity *string  `json:"source_entity"` // Faz 8: 'ohs_penalties'
 		SourceID     *string  `json:"source_id"`
+		// Faz 11 — katalog seçimi (grup + kalem kodu). Boş bırakılırsa tipten türetilir.
+		GroupCode    string   `json:"group_code"`
+		CatalogCode  string   `json:"catalog_code"`
+		VatPct       float64  `json:"vat_pct"` // kesintinin kendi KDV oranı (Amount KDV dahil)
 	} `json:"deductions"`
 }
 
@@ -590,6 +648,12 @@ func (h *Handler) UpdatePaymentDraft(w http.ResponseWriter, r *http.Request) {
 			"Kayıt başkası tarafından güncellendi.", map[string]int{"current_version": pp.RowVersion})
 		return
 	}
+	if req.WithholdingApplied != nil {
+		pp.WithholdingApplied = req.WithholdingApplied
+	}
+	if req.VatWithholdingRatio != nil {
+		pp.VatWithholdingRatio = *req.VatWithholdingRatio
+	}
 	if req.VatPct != nil {
 		pp.VatPct = *req.VatPct
 	}
@@ -613,7 +677,8 @@ func (h *Handler) UpdatePaymentDraft(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		extras = append(extras, ExtraDeduction{Type: d.Type, Description: d.Description, Amount: d.Amount,
-			RatePct: d.RatePct, SourceEntity: d.SourceEntity, SourceID: d.SourceID})
+			RatePct: d.RatePct, SourceEntity: d.SourceEntity, SourceID: d.SourceID,
+			GroupCode: d.GroupCode, CatalogCode: d.CatalogCode, VatPct: d.VatPct})
 	}
 
 	res, err := h.computeForPayment(r.Context(), tx, &pp, entries, extras)
@@ -627,11 +692,47 @@ func (h *Handler) UpdatePaymentDraft(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.PeriodStart != nil || req.PeriodEnd != nil {
+		// Yeni tarihler mevcut değerlerle birleştirilip doğrulanır.
+		ns, ne := pp.PeriodStart, pp.PeriodEnd
+		if d := parseDatePtr(req.PeriodStart); d != nil {
+			ns = d
+		}
+		if d := parseDatePtr(req.PeriodEnd); d != nil {
+			ne = d
+		}
+		if f, err := ValidatePeriod(r.Context(), tx, PeriodCheckInput{
+			SubcontractorID: pp.SubcontractorID.String(), PaymentID: ppID.String(),
+			Start: ns, End: ne,
+		}); err != nil {
+			httpx.Internal(w, r)
+			return
+		} else if len(f) > 0 {
+			httpx.ValidationFailed(w, r, f)
+			return
+		}
 		if _, err := tx.Exec(r.Context(), `
 			UPDATE progress_payments SET
 				period_start=COALESCE(NULLIF($2,'')::date, period_start),
 				period_end=COALESCE(NULLIF($3,'')::date, period_end)
 			WHERE id=$1`, ppID, strDeref(req.PeriodStart), strDeref(req.PeriodEnd)); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+	}
+	if req.WithholdingApplied != nil {
+		if _, err := tx.Exec(r.Context(),
+			`UPDATE progress_payments SET withholding_applied=$2 WHERE id=$1`,
+			ppID, *req.WithholdingApplied); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+	}
+	if req.VatWithholdingRatio != nil || req.VatExemptionCode != nil {
+		if _, err := tx.Exec(r.Context(), `
+			UPDATE progress_payments SET
+				vat_withholding_ratio = COALESCE($2, vat_withholding_ratio),
+				vat_exemption_code    = COALESCE(NULLIF($3,''), vat_exemption_code)
+			WHERE id=$1`, ppID, req.VatWithholdingRatio, strDeref(req.VatExemptionCode)); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
@@ -652,7 +753,7 @@ func (h *Handler) UpdatePaymentDraft(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{
 		"status": "recalculated", "gross_this": res.GrossThis, "total_deductions": res.TotalDeductions,
-		"net_payable": res.NetPayable, "vat_amount": res.VatAmount, "grand_total": res.GrandTotal,
+		"net_payable": res.NetPayable, "vat_amount": res.VatAmount, "actual_cost": res.ActualCost,
 	})
 }
 
@@ -883,9 +984,13 @@ func (h *Handler) SummaryPDF(w http.ResponseWriter, r *http.Request) {
 		data.GrossCum, data.GrossPrev, data.GrossThis = *pp.GrossCum, *pp.GrossPrev, *pp.GrossThis
 		data.TotalDeductions, data.NetPayable = *pp.TotalDeductions, *pp.NetPayable
 	}
+	// Faz 11 — KDV dönem brütü üzerinden hesaplanır; tevkifat kadarı ödemeye
+	// eklenmez. Kesintiler KDV dahil ödenebilir toplamdan düşülmüştür.
 	data.VatPct = pp.VatPct
-	data.VatAmount = round2(data.NetPayable * pp.VatPct / 100)
-	data.GrandTotal = round2(data.NetPayable + data.VatAmount)
+	data.VatAmount = pp.VatAmount
+	data.VatWithheld = pp.VatWithheld
+	data.VatCollected = pp.VatCollected
+	data.PayableGross = pp.PayableGross
 	if pp.PeriodStart != nil {
 		data.PeriodStart = pp.PeriodStart.Format("2006-01-02")
 	}

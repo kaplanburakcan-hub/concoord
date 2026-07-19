@@ -29,10 +29,12 @@ type PDFData struct {
 	GrossThis      float64
 	Deductions     []DeductionLine
 	TotalDeductions float64
-	NetPayable     float64
+	NetPayable     float64 // yükleniciye ödenecek nihai tutar
 	VatPct         float64
-	VatAmount      float64
-	GrandTotal     float64
+	VatAmount      float64 // hesaplanan KDV (dönem brütü üzerinden)
+	VatWithheld    float64 // tevkif edilen KDV (vergi dairesine)
+	VatCollected   float64 // tahsil edilen KDV (ödemeye eklenen)
+	PayableGross   float64 // brüt + tahsil edilen KDV
 }
 
 // BuildSummaryPDF — tek/çok sayfalı özet PDF baytları döner.
@@ -88,7 +90,10 @@ func BuildSummaryPDF(d PDFData) []byte {
 	add(false, 9, kv("   Toplam kesinti", num(d.TotalDeductions, 2), cur))
 	add(true, 10, kv("I) Net odenecek (KDV haric)", num(d.NetPayable, 2), cur))
 	add(false, 9, kv(fmt.Sprintf("   KDV (%%%s)", trimPct(d.VatPct)), num(d.VatAmount, 2), cur))
-	add(true, 11, kv("GENEL TOPLAM", num(d.GrandTotal, 2), cur))
+	add(false, 10, kv("Tevkif edilen KDV", num(d.VatWithheld, 2), cur))
+	add(false, 10, kv("Tahsil edilen KDV", num(d.VatCollected, 2), cur))
+	add(false, 10, kv("Odenebilir toplam", num(d.PayableGross, 2), cur))
+	add(true, 11, kv("YUKLENICIYE ODENECEK", num(d.NetPayable, 2), cur))
 
 	return renderPDF(lines)
 }

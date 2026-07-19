@@ -11,7 +11,7 @@ var PaymentStatuses = map[string]bool{
 }
 
 var DeductionTypes = map[string]bool{
-	"AdvanceOffset": true, "Retention": true, "Tax": true, "OHSPenalty": true, "Other": true,
+	"AdvanceOffset": true, "Retention": true, "Withholding": true, "Tax": true, "OHSPenalty": true, "Other": true,
 }
 
 // İş akışı geçiş grafiği (Plan §6.4). Kendi durumuna geçiş yok; ileri akış +

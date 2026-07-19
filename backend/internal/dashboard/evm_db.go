@@ -82,10 +82,19 @@ func LoadEVM(ctx context.Context, pool *pgxpool.Pool, pid uuid.UUID, now time.Ti
 	}
 	rows.Close()
 
-	// AC (1/2): kesinleşen hakediş NET tutarları.
+	// AC (1/2): kesinleşen hakedişlerin GERÇEKLEŞEN MALİYETİ.
+	//
+	// actual_cost hakediş hesaplanırken yazılır (Faz 11):
+	//   AC = dönem brütü (KDV hariç) − maliyeti azaltan kesintilerin KDV hariç tutarı
+	// Avans mahsubu, teminat ve stopaj finansman/vergi kalemidir; maliyeti
+	// değiştirmez. KDV de devreden bir kalemdir, maliyete girmez.
+	//
+	// COALESCE: Faz 11 öncesi kesinleşmiş hakedişlerde actual_cost boştur;
+	// bu kayıtlar için dönem brütü kullanılır (en yakın doğru değer).
 	acByMonth := map[string]float64{}
 	rows, err = pool.Query(ctx, `
-		SELECT to_char(finalized_at,'YYYY-MM'), sum(net_payable)
+		SELECT to_char(finalized_at,'YYYY-MM'),
+		       sum(CASE WHEN actual_cost > 0 THEN actual_cost ELSE gross_this END)
 		FROM progress_payments
 		WHERE project_id=$1 AND deleted_at IS NULL AND status='Finalized'
 		  AND finalized_at IS NOT NULL
