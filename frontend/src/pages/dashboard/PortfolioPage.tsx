@@ -33,10 +33,11 @@ export default function PortfolioPage() {
 
   return (
     <div>
-      <p className="font-mono text-xs tracking-[0.3em] text-emniyet-500 uppercase">
-        Faz 9 · Portföy
+      <p className="flex items-center gap-2 text-xs font-medium text-emniyet-500">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emniyet-500" />
+        Portföy
       </p>
-      <h1 className="font-display text-3xl font-extrabold text-white mt-2">
+      <h1 className="font-display text-3xl font-medium text-beton-100 mt-2 tracking-tight">
         Portföy Görünümü
       </h1>
       <p className="mt-1 text-sm text-beton-400">
@@ -54,7 +55,7 @@ export default function PortfolioPage() {
           <button
             key={c.project_id}
             onClick={() => select(c.project_id)}
-            className="text-left rounded-lg border border-beton-800 bg-beton-900 p-4 hover:border-emniyet-500 transition"
+            className="text-left rounded-xl border border-beton-800 bg-beton-900 p-5 hover:border-emniyet-500 transition"
             title="Bu projeyi aktif yap"
           >
             <div className="flex items-baseline justify-between gap-2">

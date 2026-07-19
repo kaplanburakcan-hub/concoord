@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { ThemeProvider } from "./theme/ThemeContext";
 import { AuthProvider } from "./auth/AuthContext";
 import { RequireAuth, RequirePerm } from "./auth/guards";
 import { ProjectProvider } from "./projects/ProjectContext";
@@ -37,6 +38,7 @@ import ChecklistTemplatesPage from "./pages/ohs/ChecklistTemplatesPage";
 // içinde: seçili proje değişince izinler o kapsamda yeniden çözülür.
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -286,5 +288,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </ThemeProvider>
   );
 }

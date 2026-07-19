@@ -88,7 +88,7 @@ export default function Dashboard() {
   if (!current)
     return (
       <div>
-        <h1 className="font-display text-2xl font-extrabold text-white">
+        <h1 className="font-display text-2xl font-medium text-beton-100 tracking-tight">
           Hoş geldiniz, {user?.full_name}
         </h1>
         <p className="mt-2 text-sm text-beton-400">
@@ -104,10 +104,11 @@ export default function Dashboard() {
     <div>
       <div className="flex items-baseline justify-between flex-wrap gap-2">
         <div>
-          <p className="font-mono text-xs tracking-[0.3em] text-emniyet-500 uppercase">
-            Faz 9 · Proje Dashboard'u
+          <p className="flex items-center gap-2 text-xs font-medium text-emniyet-500">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emniyet-500" />
+            Proje kontrol paneli
           </p>
-          <h1 className="font-display text-3xl font-extrabold text-white mt-2">
+          <h1 className="font-display text-3xl font-medium text-beton-100 mt-2 tracking-tight">
             {current.code} — {current.name}
           </h1>
           {dash && (
@@ -132,13 +133,15 @@ export default function Dashboard() {
         <div className="mt-6 grid gap-4">
           {/* İlerleme çubuğu — herkese açık (tutar içermez) */}
           <Card title="Fiziki ilerleme">
-            <div className="h-3 rounded bg-beton-800 overflow-hidden">
+            <div className="h-3 rounded-full bg-beton-800 border border-beton-700 overflow-hidden">
               <div
-                className="h-full bg-emniyet-500 transition-all"
+                className="h-full rounded-full bg-emniyet-500 transition-all"
                 style={{ width: `${Math.min(100, dash.progress_pct)}%` }}
               />
             </div>
-            <p className="mt-1 font-mono text-xs text-beton-400">%{dash.progress_pct.toFixed(1)}</p>
+            <p className="mt-2 text-xs text-beton-400" style={{ fontVariantNumeric: "tabular-nums" }}>
+              %{dash.progress_pct.toFixed(1)}
+            </p>
           </Card>
 
           {/* EVM — yalnızca finansal rapor izniyle gelir */}
@@ -162,13 +165,25 @@ export default function Dashboard() {
                 <Kpi label="EAC" value={money(dash.evm.eac)} />
                 <Kpi label="ETC" value={money(dash.evm.etc)} />
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-3 text-xs text-beton-300 font-mono">
-                <span>PV {money(dash.evm.pv)}</span>
-                <span>EV {money(dash.evm.ev)}</span>
-                <span>AC {money(dash.evm.ac)}</span>
+              <div
+                className="mt-3 grid grid-cols-3 gap-3 text-xs text-beton-400"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                <span>PV <span className="text-beton-200">{money(dash.evm.pv)}</span></span>
+                <span>EV <span className="text-beton-200">{money(dash.evm.ev)}</span></span>
+                <span>AC <span className="text-beton-200">{money(dash.evm.ac)}</span></span>
               </div>
               <div className="mt-4">
-                <SCurve points={dash.evm.s_curve} currency={cur} />
+                {dash.evm.s_curve.length >= 2 ? (
+                  <SCurve points={dash.evm.s_curve} currency={cur} />
+                ) : (
+                  <div className="rounded-lg border border-dashed border-beton-700 bg-beton-950 px-4 py-8 text-center">
+                    <p className="text-sm text-beton-400">S-eğrisi için henüz yeterli veri yok.</p>
+                    <p className="mt-1 text-xs text-beton-500">
+                      Grafik, en az iki dönem hakediş/ilerleme kaydı girildiğinde görünür.
+                    </p>
+                  </div>
+                )}
               </div>
               <p className="mt-1 text-[11px] text-beton-500">
                 PV kaynağı: {planSourceTR(dash.evm.plan_source)} · BAC {money(dash.evm.bac)}
@@ -368,9 +383,9 @@ function entityTR(e: string) {
 
 function Card({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-beton-800 bg-beton-900 p-4">
+    <div className="rounded-xl border border-beton-800 bg-beton-900 p-5" style={{ boxShadow: "var(--shadow)" }}>
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-white">{title}</h2>
+        <h2 className="text-sm font-medium text-beton-100">{title}</h2>
         {action}
       </div>
       <div className="mt-3">{children}</div>
@@ -378,10 +393,31 @@ function Card({ title, action, children }: { title: string; action?: ReactNode; 
   );
 }
 function Kpi({ label, value, bad }: { label: string; value: string; bad?: boolean }) {
+  // "—" değeri (henüz hesaplanamayan endeks) soluk ve küçük gösterilir ki
+  // gerçek rakamlarla görsel olarak karışmasın.
+  const empty = value === "—" || value.trim() === "";
   return (
-    <div className="rounded-md bg-beton-950 border border-beton-800 p-3">
-      <p className="text-[11px] uppercase tracking-wider text-beton-500">{label}</p>
-      <p className={"mt-1 font-mono text-lg " + (bad ? "text-red-400" : "text-white")}>{value}</p>
+    <div
+      className="rounded-xl bg-beton-900 border border-beton-800 px-4 py-3"
+      style={{ boxShadow: "var(--shadow)" }}
+    >
+      <p className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-beton-500">
+        <span
+          className="inline-block w-1.5 h-1.5 rounded-full"
+          style={{ background: empty ? "rgb(var(--beton-600))" : bad ? "#ef4444" : "var(--accent)" }}
+        />
+        {label}
+      </p>
+      {empty ? (
+        <p className="mt-1.5 text-sm text-beton-500">Veri yok</p>
+      ) : (
+        <p
+          className={"mt-1.5 font-display text-xl font-medium " + (bad ? "text-red-400" : "text-beton-100")}
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          {value}
+        </p>
+      )}
     </div>
   );
 }

@@ -2,6 +2,99 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   İPKS tema sistemi — "Profesyonel Proje Kontrol Arayüzü"
+   Renkler CSS değişkenlerine bağlıdır: beton/emniyet token'ları
+   RGB kanal üçlüsü olarak tutulur (opaklık modifikatörleri —
+   ör. bg-emniyet-500/15 — çalışmaya devam etsin diye).
+   Chrome (kenar çubuğu + üst bar) = RAL 5026 derin lacivert.
+   Vurgu = azure; işlev alanı = uçuk gökyüzü mavisi + nokta deseni.
+   ============================================================ */
+:root, [data-theme="light"] {
+  /* beton ölçeği (yüzey/kenar/metin) — açık tema */
+  --beton-950: 232 241 251;  /* sayfa zemini (uçuk gökyüzü) */
+  --beton-900: 255 255 255;  /* kart yüzeyi */
+  --beton-800: 217 228 241;  /* kenarlık / hafif dolgu */
+  --beton-700: 196 212 232;  /* güçlü kenarlık */
+  --beton-600: 132 150 173;
+  --beton-500: 132 150 173;  /* soluk metin */
+  --beton-400: 84 101 127;   /* ikincil metin */
+  --beton-300: 64 80 106;
+  --beton-200: 15 32 54;     /* gövde metni */
+  --beton-100: 15 32 54;     /* başlık */
+  /* vurgu (azure) + gökyüzü */
+  --emniyet-500: 47 111 237;
+  --emniyet-600: 31 87 201;
+  --sky: 56 189 248;
+  /* chrome (RAL 5026) */
+  --chrome: #00142e; --chrome-2: #0a2247; --chrome-active: #123058;
+  --chrome-text: #e4ecfa; --chrome-text-2: #8ba1c6; --chrome-text-3: #647da4;
+  --chrome-border: rgba(255,255,255,.10);
+  /* çeşitli (hex — SVG/inline için) */
+  --accent: #2f6fed; --accent-sky: #38bdf8;
+  --grid: #e6eef8; --muted: #8496ad; --dot: rgba(24,58,120,.07);
+  --shadow: 0 1px 2px rgba(16,40,80,.05), 0 4px 14px rgba(16,40,80,.05);
+}
+[data-theme="dark"] {
+  --beton-950: 10 20 36;
+  --beton-900: 15 30 53;
+  --beton-800: 30 50 84;
+  --beton-700: 42 66 106;
+  --beton-600: 107 127 158;
+  --beton-500: 107 127 158;
+  --beton-400: 157 176 204;
+  --beton-300: 190 205 225;
+  --beton-200: 230 236 246;
+  --beton-100: 245 248 252;
+  --emniyet-500: 79 139 255;
+  --emniyet-600: 63 120 236;
+  --sky: 95 199 251;
+  --chrome: #000f22; --chrome-2: #0a2044; --chrome-active: #123058;
+  --chrome-text: #dce7f8; --chrome-text-2: #8399bb; --chrome-text-3: #5f7392;
+  --chrome-border: rgba(255,255,255,.07);
+  --accent: #4f8bff; --accent-sky: #5fc7fb;
+  --grid: #1a2f51; --muted: #6b7f9e; --dot: rgba(120,160,220,.055);
+  --shadow: 0 1px 2px rgba(0,0,0,.3);
+}
+
 body {
   @apply bg-beton-950 text-beton-200 font-body antialiased;
+  transition: background-color .25s, color .25s;
 }
+
+/* Aptos Light varsayılan; sayısal hizalama için mono sınıfı tabular kalsın */
+.font-mono { font-variant-numeric: tabular-nums; }
+
+/* İşlev alanı nokta deseni (AppShell <main> bu sınıfı kullanır) */
+.app-canvas {
+  background-color: rgb(var(--beton-950));
+  background-image: radial-gradient(var(--dot) 1.1px, transparent 1.1px);
+  background-size: 22px 22px;
+}
+
+/* --- Güvenlik geçişleri (35 sayfayı elle değiştirmeden) --- */
+/* Accent üstündeki metin her iki temada da beyaz (emniyet artık azure). */
+body .text-beton-950 { color: #fff !important; }
+/* İçerikteki text-white başlıkları açık temada koyu mürekkebe döner
+   (chrome/sidebar <main> dışında olduğundan beyaz kalır). */
+[data-theme="light"] main .text-white { color: rgb(15 32 54) !important; }
+
+/* --- Durum renkleri: light modda kontrast düzeltmesi ---
+   Sayfalarda kullanılan semantik tonlar (red-400/300, green-300, blue-300…)
+   koyu zemin için seçilmişti; beyaz/pastel yüzeyde okunmuyorlardı. Açık temada
+   bir-iki kademe koyu karşılıklarına çevrilir. Yarı saydam dolgu tonları
+   (bg-red-500/15 gibi) olduğu gibi kalır — zaten hafif ve iki temada da çalışır. */
+[data-theme="light"] .text-red-300,
+[data-theme="light"] .text-red-400   { color: #dc2626 !important; }
+[data-theme="light"] .text-green-300,
+[data-theme="light"] .text-green-400 { color: #15803d !important; }
+[data-theme="light"] .text-blue-300,
+[data-theme="light"] .text-blue-400  { color: #1d4ed8 !important; }
+[data-theme="light"] .text-amber-300,
+[data-theme="light"] .text-amber-400,
+[data-theme="light"] .text-yellow-300,
+[data-theme="light"] .text-yellow-400 { color: #b45309 !important; }
+[data-theme="light"] .text-emerald-300,
+[data-theme="light"] .text-emerald-400 { color: #15803d !important; }
+[data-theme="light"] .text-sky-300,
+[data-theme="light"] .text-sky-400   { color: #0369a1 !important; }

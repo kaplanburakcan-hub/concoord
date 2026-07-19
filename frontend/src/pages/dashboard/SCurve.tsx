@@ -1,21 +1,25 @@
 // S-eğrisi (PV/EV/AC) — bağımlılıksız satır içi SVG çizim.
-// Kümülatif noktalar backend'den hazır gelir; burada yalnızca ölçekleme yapılır.
+// Faz 10 arayüz yenileme: renkler token sınıfları + currentColor ile verilir,
+// böylece light/dark ve palet değişimine otomatik uyum sağlar. EV altına düz
+// %opaklık dolgu (kazanılan değer vurgusu).
 
 export type SCurvePoint = { month: string; pv: number; ev: number; ac: number };
 
-const SERIES: { key: keyof Omit<SCurvePoint, "month">; label: string; color: string }[] = [
-  { key: "pv", label: "PV (plan)", color: "#8a93a3" },
-  { key: "ev", label: "EV (kazanılan)", color: "#f5b301" },
-  { key: "ac", label: "AC (gerçekleşen)", color: "#e05d5d" },
+const SERIES: { key: keyof Omit<SCurvePoint, "month">; label: string; cls: string; dash?: boolean }[] = [
+  { key: "pv", label: "PV · planlanan", cls: "text-beton-500", dash: true },
+  { key: "ev", label: "EV · kazanılan", cls: "text-emniyet-500" },
+  { key: "ac", label: "AC · gerçekleşen", cls: "text-red-400" },
 ];
 
 export default function SCurve({ points, currency }: { points: SCurvePoint[]; currency: string }) {
   if (!points || points.length === 0) {
     return <p className="text-sm text-beton-400">S-eğrisi için veri yok.</p>;
   }
-  const W = 640;
-  const H = 220;
-  const PAD = { l: 56, r: 10, t: 10, b: 26 };
+  // Geniş viewBox oranı: tam genişlikte render edildiğinde grafik dikeyde
+  // makul yükseklikte kalır (720x260 oranı ~390px'e uzuyordu).
+  const W = 1100;
+  const H = 260;
+  const PAD = { l: 52, r: 14, t: 14, b: 28 };
   const max = Math.max(1, ...points.flatMap((p) => [p.pv, p.ev, p.ac]));
   const x = (i: number) =>
     PAD.l + (points.length === 1 ? 0 : (i / (points.length - 1)) * (W - PAD.l - PAD.r));
@@ -23,48 +27,66 @@ export default function SCurve({ points, currency }: { points: SCurvePoint[]; cu
 
   const path = (key: "pv" | "ev" | "ac") =>
     points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`).join(" ");
+  const area = (key: "pv" | "ev" | "ac") =>
+    `M${x(0).toFixed(1)},${y(0).toFixed(1)} ` +
+    points.map((p, i) => `L${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`).join(" ") +
+    ` L${x(points.length - 1).toFixed(1)},${y(0).toFixed(1)} Z`;
 
   const fmt = (v: number) =>
     v >= 1_000_000 ? (v / 1_000_000).toFixed(1) + "M" : v >= 1_000 ? (v / 1_000).toFixed(0) + "K" : v.toFixed(0);
 
-  // Y ekseni: 0, ½, tam.
   const ticks = [0, max / 2, max];
-  // X etiketleri: en fazla ~8 etiket.
   const step = Math.max(1, Math.ceil(points.length / 8));
 
   return (
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="S-eğrisi">
         {ticks.map((t, i) => (
-          <g key={i}>
-            <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke="#2a2e37" strokeWidth={1} />
-            <text x={PAD.l - 6} y={y(t) + 3} textAnchor="end" fontSize={9} fill="#8a93a3">
-              {fmt(t)}
-            </text>
+          <g key={i} className="text-beton-800">
+            <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke="currentColor" strokeWidth={1} />
           </g>
+        ))}
+        {ticks.map((t, i) => (
+          <text key={"tl" + i} x={PAD.l - 8} y={y(t) + 3.5} textAnchor="end" fontSize={10} className="fill-beton-500">
+            {fmt(t)}
+          </text>
         ))}
         {points.map((p, i) =>
           i % step === 0 || i === points.length - 1 ? (
-            <text key={p.month} x={x(i)} y={H - 8} textAnchor="middle" fontSize={9} fill="#8a93a3">
+            <text key={p.month} x={x(i)} y={H - 8} textAnchor="middle" fontSize={10} className="fill-beton-500">
               {p.month}
             </text>
           ) : null
         )}
+
+        {/* EV altı düz dolgu (kazanılan değer vurgusu) */}
+        <path d={area("ev")} className="text-emniyet-500" fill="currentColor" fillOpacity={0.12} stroke="none" />
+
         {SERIES.map((s) => (
-          <path key={s.key} d={path(s.key)} fill="none" stroke={s.color} strokeWidth={2} />
+          <path
+            key={s.key}
+            d={path(s.key)}
+            className={s.cls}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={s.key === "ev" ? 2.8 : 2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={s.dash ? "5 4" : undefined}
+          />
         ))}
-        {SERIES.map((s) =>
-          points.map((p, i) => (
-            <circle key={s.key + p.month} cx={x(i)} cy={y(p[s.key])} r={2.2} fill={s.color}>
-              <title>{`${p.month} · ${s.label}: ${p[s.key].toLocaleString("tr-TR")} ${currency}`}</title>
-            </circle>
-          ))
-        )}
+
+        {points.map((p, i) => (
+          <circle key={"ev" + p.month} cx={x(i)} cy={y(p.ev)} r={2.8} className="text-emniyet-500" fill="currentColor">
+            <title>{`${p.month} · EV: ${p.ev.toLocaleString("tr-TR")} ${currency}`}</title>
+          </circle>
+        ))}
       </svg>
-      <div className="mt-1 flex gap-4 text-xs">
+
+      <div className="mt-2 flex gap-5 text-xs flex-wrap">
         {SERIES.map((s) => (
-          <span key={s.key} className="flex items-center gap-1.5 text-beton-300">
-            <span className="inline-block w-3 h-0.5" style={{ background: s.color }} />
+          <span key={s.key} className="flex items-center gap-2 text-beton-400">
+            <span className={"inline-block w-3.5 h-0.5 rounded " + s.cls} style={{ background: "currentColor" }} />
             {s.label}
           </span>
         ))}

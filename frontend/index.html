@@ -1,17 +1,29 @@
 <!doctype html>
-<html lang="tr">
+<html lang="tr" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#16181d" />
+    <meta name="theme-color" content="#00142e" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
     <title>İPKS — İnşaat Proje Koordinasyon ve Saha Takip</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Birincil font Aptos Light'tır (Windows/Office'te yerleşik). Aptos yoksa
+         yakın alternatif olarak Inter Light yüklenir. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap"
       rel="stylesheet"
     />
+    <script>
+      // Boyamadan önce temayı ayarla (varsayılan: light) — flaş olmasın.
+      try {
+        var t = localStorage.getItem("ipks-theme") || "light";
+        document.documentElement.setAttribute("data-theme", t);
+        document.querySelector('meta[name=theme-color]')
+          .setAttribute("content", t === "dark" ? "#000f22" : "#00142e");
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
