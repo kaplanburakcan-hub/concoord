@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -42,6 +43,11 @@ type paymentDTO struct {
 	VatCollected  float64 `json:"vat_collected"`
 	PayableGross  float64 `json:"payable_gross"`
 	ActualCost    float64 `json:"actual_cost"`
+	TotalAdditions float64 `json:"total_additions"`
+	// Kesin hakediş: hesabı kapatır; geçici kabul belgesi zorunludur.
+	IsFinal                         bool       `json:"is_final"`
+	ProvisionalAcceptanceDocumentID *uuid.UUID `json:"provisional_acceptance_document_id,omitempty"`
+	ProvisionalAcceptanceDate       *time.Time `json:"provisional_acceptance_date,omitempty"`
 	CurrentStepNo int     `json:"current_step_no"`
 	FinalizedAt     *time.Time `json:"finalized_at,omitempty"`
 	RowVersion      int        `json:"row_version"`
@@ -53,7 +59,8 @@ const paymentCols = `id, project_id, subcontractor_id, period_no, period_start, 
 	vat_pct::float8, net_payable::float8, withholding_applied,
 	vat_withholding_ratio::float8, vat_exemption_code,
 	vat_amount::float8, vat_withheld::float8, vat_collected::float8,
-	payable_gross::float8, actual_cost::float8, current_step_no,
+	payable_gross::float8, actual_cost::float8, total_additions::float8, current_step_no,
+	is_final, provisional_acceptance_document_id, provisional_acceptance_date,
 	finalized_at, row_version, created_at`
 
 func scanPayment(row pgx.Row, p *paymentDTO) error {
@@ -61,7 +68,9 @@ func scanPayment(row pgx.Row, p *paymentDTO) error {
 	if err := row.Scan(&p.ID, &p.ProjectID, &p.SubcontractorID, &p.PeriodNo, &p.PeriodStart, &p.PeriodEnd,
 		&p.Status, &gc, &gp, &gt, &td, &p.VatPct, &np, &p.WithholdingApplied,
 		&p.VatWithholdingRatio, &p.VatExemptionCode,
-		&p.VatAmount, &p.VatWithheld, &p.VatCollected, &p.PayableGross, &p.ActualCost, &p.CurrentStepNo,
+		&p.VatAmount, &p.VatWithheld, &p.VatCollected, &p.PayableGross, &p.ActualCost,
+		&p.TotalAdditions, &p.CurrentStepNo,
+		&p.IsFinal, &p.ProvisionalAcceptanceDocumentID, &p.ProvisionalAcceptanceDate,
 		&p.FinalizedAt, &p.RowVersion, &p.CreatedAt); err != nil {
 		return err
 	}
@@ -510,7 +519,26 @@ func (h *Handler) computeForPayment(ctx context.Context, q pgxQuerier, pp *payme
 			UnitPrice: price, ContractQty: cqty, PrevCumQty: prevCum[e.WorkItemID], CumQty: e.CumQty,
 		})
 	}
-	return Compute(inputs, grossPrev, terms, extras), nil
+	// Bu hakedişe bağlanmış teminat iadeleri ilave olarak hesaba girer:
+	// ödenecek tutarı artırır, maliyeti (AC) etkilemez.
+	var additions []AdditionLine
+	arows, aerr := q.Query(ctx, `
+		SELECT id::text, description, amount::float8, stage
+		FROM deduction_refunds
+		WHERE progress_payment_id = $1 AND deleted_at IS NULL
+		ORDER BY created_at`, pp.ID)
+	if aerr == nil {
+		for arows.Next() {
+			var a AdditionLine
+			a.Type = "RetentionRefund"
+			if err := arows.Scan(&a.RefundID, &a.Description, &a.Amount, &a.Stage); err == nil {
+				additions = append(additions, a)
+			}
+		}
+		arows.Close()
+	}
+
+	return ComputeWith(inputs, grossPrev, terms, extras, additions), nil
 }
 
 var errWorkItemNotFound = errors.New("poz bulunamadı veya bu taşerona ait değil")
@@ -559,10 +587,12 @@ func (h *Handler) persistCalc(ctx context.Context, tx pgx.Tx, ppID uuid.UUID, re
 		UPDATE progress_payments SET
 			gross_cum=$2, gross_prev=$3, gross_this=$4, total_deductions=$5, net_payable=$6, vat_pct=$7,
 			vat_amount=$8, vat_withheld=$9, vat_collected=$10, payable_gross=$11, actual_cost=$12,
+			total_additions=$13,
 			row_version=row_version+1
 		WHERE id=$1`,
 		ppID, res.GrossCum, res.GrossPrev, res.GrossThis, res.TotalDeductions, res.NetPayable, res.VatPct,
-		res.VatAmount, res.VatWithheld, res.VatCollected, res.PayableGross, res.ActualCost)
+		res.VatAmount, res.VatWithheld, res.VatCollected, res.PayableGross, res.ActualCost,
+		res.TotalAdditions)
 	return err
 }
 
@@ -576,6 +606,10 @@ type updateDraftReq struct {
 	// KDV tevkifat oranı (0=yok, 0.4=4/10) ve %0 KDV istisna gerekçesi.
 	VatWithholdingRatio *float64 `json:"vat_withholding_ratio"`
 	VatExemptionCode    *string  `json:"vat_exemption_code"`
+	// Kesin hakediş ve dayanağı olan geçici kabul belgesi.
+	IsFinal                         *bool   `json:"is_final"`
+	ProvisionalAcceptanceDocumentID *string `json:"provisional_acceptance_document_id"`
+	ProvisionalAcceptanceDate       *string `json:"provisional_acceptance_date"`
 	RowVersion  int      `json:"row_version"`
 	Items       []struct {
 		WorkItemID string  `json:"work_item_id"`
@@ -727,6 +761,45 @@ func (h *Handler) UpdatePaymentDraft(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Kesin hakediş, geçici kabulün yapılmış olmasını gerektirir: teminat
+	// iadesinin ve hesap kapatmanın dayanağı bu belgedir.
+	if req.IsFinal != nil && *req.IsFinal {
+		docID := ""
+		if req.ProvisionalAcceptanceDocumentID != nil {
+			docID = strings.TrimSpace(*req.ProvisionalAcceptanceDocumentID)
+		}
+		if docID == "" {
+			// Kayıtta zaten varsa yeniden istenmez.
+			var existing *uuid.UUID
+			_ = tx.QueryRow(r.Context(),
+				`SELECT provisional_acceptance_document_id FROM progress_payments WHERE id=$1`,
+				ppID).Scan(&existing)
+			if existing == nil {
+				httpx.ValidationFailed(w, r, map[string]string{
+					"provisional_acceptance_document_id": "kesin hakediş için geçici kabul belgesi zorunludur",
+				})
+				return
+			}
+		}
+		if _, err := tx.Exec(r.Context(), `
+			UPDATE progress_payments SET
+				is_final = true,
+				provisional_acceptance_document_id =
+					COALESCE(NULLIF($2,'')::uuid, provisional_acceptance_document_id),
+				provisional_acceptance_date =
+					COALESCE(NULLIF($3,'')::date, provisional_acceptance_date)
+			WHERE id=$1`, ppID, docID, strDeref(req.ProvisionalAcceptanceDate)); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+	} else if req.IsFinal != nil {
+		if _, err := tx.Exec(r.Context(),
+			`UPDATE progress_payments SET is_final=false WHERE id=$1`, ppID); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+	}
+
 	if req.VatWithholdingRatio != nil || req.VatExemptionCode != nil {
 		if _, err := tx.Exec(r.Context(), `
 			UPDATE progress_payments SET

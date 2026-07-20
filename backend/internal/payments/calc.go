@@ -114,6 +114,16 @@ type DeductionLine struct {
 	NetAmount float64 `json:"net_amount"`
 }
 
+// AdditionLine — hakedişte ödenecek tutarı ARTIRAN kalem (teminat iadesi vb.).
+// Kesintinin aynadaki karşılığıdır: kesinti düşer, ilave ekler.
+type AdditionLine struct {
+	Type        string  `json:"type"`         // RetentionRefund | Other
+	Description string  `json:"description"`
+	Amount      float64 `json:"amount"`
+	RefundID    string  `json:"refund_id,omitempty"`
+	Stage       string  `json:"stage,omitempty"`
+}
+
 // CalcResult — bir hakediş döneminin tam hesap sonucu (Plan §6.4 A–I).
 type CalcResult struct {
 	Lines           []CalcLine      `json:"lines"`
@@ -128,6 +138,8 @@ type CalcResult struct {
 
 	// --- Ödeme akışı ---
 	PayableGross    float64         `json:"payable_gross"` // C + tahsil edilen KDV
+	Additions       []AdditionLine  `json:"additions"`     // teminat iadeleri vb.
+	TotalAdditions  float64         `json:"total_additions"`
 	Deductions      []DeductionLine `json:"deductions"`
 	TotalDeductions float64         `json:"total_deductions"` // KDV DAHİL kesinti toplamı
 	NetPayable      float64         `json:"net_payable"`      // yükleniciye ödenecek nihai tutar
@@ -144,6 +156,14 @@ type CalcResult struct {
 // hesaplanır. Negatif dönem brütünde (düzeltme senaryosu) otomatik kesintiler 0
 // alınır — ters kayıt manuel kalemle yapılır.
 func Compute(inputs []CalcLineInput, grossPrev float64, terms ContractTerms, extras []ExtraDeduction) CalcResult {
+	return ComputeWith(inputs, grossPrev, terms, extras, nil)
+}
+
+// ComputeWith — Compute'un ilaveleri (teminat iadesi vb.) de dikkate alan hâli.
+// İlaveler ödenebilir toplama EKLENİR; maliyeti (AC) etkilemezler çünkü daha önce
+// kesilmiş bir tutarın geri verilmesidir, yeni bir iş bedeli değildir.
+func ComputeWith(inputs []CalcLineInput, grossPrev float64, terms ContractTerms,
+	extras []ExtraDeduction, additions []AdditionLine) CalcResult {
 	res := CalcResult{VatPct: terms.VatPct}
 	var grossCum float64
 	for _, in := range inputs {
@@ -268,7 +288,20 @@ func Compute(inputs []CalcLineInput, grossPrev float64, terms ContractTerms, ext
 		}
 	}
 	res.TotalDeductions = round2(totalDed)
-	res.NetPayable = round2(res.PayableGross - res.TotalDeductions)
+
+	// İlaveler: teminat iadesi gibi, daha önce kesilmiş tutarın geri ödenmesi.
+	// Ödenecek tutarı artırır; işin maliyetini (AC) DEĞİŞTİRMEZ.
+	var totalAdd float64
+	for _, a := range additions {
+		if a.Amount == 0 {
+			continue
+		}
+		res.Additions = append(res.Additions, a)
+		totalAdd += a.Amount
+	}
+	res.TotalAdditions = round2(totalAdd)
+
+	res.NetPayable = round2(res.PayableGross + res.TotalAdditions - res.TotalDeductions)
 
 	// ---- EVM Gerçekleşen Maliyet (AC) ----
 	// İşin sözleşme bedeli (KDV hariç) eksi yalnızca maliyeti gerçekten azaltan

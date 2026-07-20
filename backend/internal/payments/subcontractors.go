@@ -285,6 +285,9 @@ type contractDTO struct {
 	AdvanceRatePct   float64    `json:"advance_rate_pct"`
 	SignDate         *time.Time `json:"sign_date,omitempty"`
 	DocumentID       *uuid.UUID `json:"document_id,omitempty"`
+	StartDate        *time.Time `json:"start_date,omitempty"`
+	EndDate          *time.Time `json:"end_date,omitempty"`
+	RevisedEndDate   *time.Time `json:"revised_end_date,omitempty"`
 	IsMultiYear      bool       `json:"is_multi_year"`
 	WithholdingPct   float64    `json:"withholding_pct"`
 	RowVersion       int        `json:"row_version"`
@@ -293,12 +296,14 @@ type contractDTO struct {
 
 const contractCols = `id, project_id, subcontractor_id, contract_no, type, parent_contract_id,
 	amount::float8, advance_amount::float8, retention_pct::float8, advance_rate_pct::float8,
-	sign_date, document_id, is_multi_year, withholding_pct::float8, row_version, created_at`
+	sign_date, document_id, start_date, end_date, revised_end_date,
+	is_multi_year, withholding_pct::float8, row_version, created_at`
 
 func scanContract(row pgx.Row, c *contractDTO) error {
 	return row.Scan(&c.ID, &c.ProjectID, &c.SubcontractorID, &c.ContractNo, &c.Type, &c.ParentContractID,
 		&c.Amount, &c.AdvanceAmount, &c.RetentionPct, &c.AdvanceRatePct,
-		&c.SignDate, &c.DocumentID, &c.IsMultiYear, &c.WithholdingPct, &c.RowVersion, &c.CreatedAt)
+		&c.SignDate, &c.DocumentID, &c.StartDate, &c.EndDate, &c.RevisedEndDate,
+		&c.IsMultiYear, &c.WithholdingPct, &c.RowVersion, &c.CreatedAt)
 }
 
 // maskFinancials — view_financials yoksa tutar alanlarını gizler (Plan §4).
@@ -358,6 +363,9 @@ type contractReq struct {
 	// Faz 11 — yıllara sari inşaat işi (GVK 42-44). true ise bu sözleşmenin
 	// hakedişlerinde stopaj varsayılan olarak uygulanır (hakediş bazında
 	// elle geçersiz kılınabilir).
+	StartDate        *string  `json:"start_date"`
+	EndDate          *string  `json:"end_date"`
+	RevisedEndDate   *string  `json:"revised_end_date"`
 	IsMultiYear      *bool    `json:"is_multi_year"`
 	WithholdingPct   *float64 `json:"withholding_pct"`
 	RowVersion       int      `json:"row_version"`
@@ -423,7 +431,7 @@ func (h *Handler) CreateContract(w http.ResponseWriter, r *http.Request) {
 	err = scanContract(tx.QueryRow(r.Context(), `
 		INSERT INTO contracts (project_id, subcontractor_id, contract_no, type, parent_contract_id,
 			amount, advance_amount, retention_pct, advance_rate_pct, sign_date, document_id,
-			is_multi_year, withholding_pct)
+			is_multi_year, withholding_pct, start_date, end_date, revised_end_date)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NULLIF($10,'')::date, $11,
 			-- Yıllara sari varsayılanı: açıkça verilmemişse proje takviminden
 			-- türetilir (başlangıç ve bitiş yılı farklıysa iş yıllara saridir).
@@ -432,10 +440,12 @@ func (h *Handler) CreateContract(w http.ResponseWriter, r *http.Request) {
 				       AND date_part('year', p.end_date) > date_part('year', p.start_date)
 				FROM projects p WHERE p.id = $1
 			), false),
-			COALESCE($13, 5.00))
+			COALESCE($13, 5.00),
+			NULLIF($14,'')::date, NULLIF($15,'')::date, NULLIF($16,'')::date)
 		RETURNING `+contractCols,
 		pid, subID, req.ContractNo, ctype, parentID, req.Amount, advAmount, retention, advRate,
-		strDeref(req.SignDate), docID, req.IsMultiYear, req.WithholdingPct), &c)
+		strDeref(req.SignDate), docID, req.IsMultiYear, req.WithholdingPct,
+		strDeref(req.StartDate), strDeref(req.EndDate), strDeref(req.RevisedEndDate)), &c)
 	if err != nil {
 		if isUniqueViolation(err) {
 			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "Bu sözleşme no zaten kullanımda.", nil)
@@ -541,11 +551,15 @@ func (h *Handler) UpdateContract(w http.ResponseWriter, r *http.Request) {
 			sign_date=COALESCE(NULLIF($9,'')::date, sign_date),
 			is_multi_year=COALESCE($10, is_multi_year),
 			withholding_pct=COALESCE($11, withholding_pct),
+			start_date=NULLIF($12,'')::date,
+			end_date=NULLIF($13,'')::date,
+			revised_end_date=NULLIF($14,'')::date,
 			row_version=row_version+1
 		WHERE id=$1 AND project_id=$2
 		RETURNING `+contractCols,
 		cid, pid, contractNo, ctype, amount, advAmount, retention, advRate, strDeref(req.SignDate),
-		req.IsMultiYear, req.WithholdingPct), &c)
+		req.IsMultiYear, req.WithholdingPct,
+		strDeref(req.StartDate), strDeref(req.EndDate), strDeref(req.RevisedEndDate)), &c)
 	if err != nil {
 		if isUniqueViolation(err) {
 			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "Bu sözleşme no zaten kullanımda.", nil)

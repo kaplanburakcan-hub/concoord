@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
@@ -55,6 +55,20 @@ export default function PurchaseRequestsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Akış panosundaki "Yeni ..." düğmesi buraya ?yeni=1 ile gelir ve formu açar.
+  // Parametre açıldıktan HEMEN SONRA temizlenir; iki sebeple:
+  //   1. Sayfa yenilendiğinde form kendiliğinden açılmasın.
+  //   2. Aynı bağlantıya tekrar tıklandığında adres gerçekten değişsin
+  //      (aksi hâlde React Router aynı adrese gidişi yok sayar ve form açılmaz).
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (new URLSearchParams(location.search).has("yeni")) {
+      setShowForm(true);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.search, location.pathname, navigate]);
+
   function setItem(i: number, patch: Partial<PRItem>) {
     setItems((xs) => xs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   }
@@ -92,10 +106,10 @@ export default function PurchaseRequestsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-display font-bold text-white">Satınalma Talepleri</h1>
-        <Link to="/satinalma/siparisler" className="text-xs text-emniyet-500 hover:underline">
-          Siparişler (PO) →
-        </Link>
+        {/* Modül içi geçiş artık kenar çubuğundaki alt başlıklarda
+            (Satınalma → Talepler / Siparişler); başlık yanına iliştirilmiş
+            zayıf bağlantı kaldırıldı. */}
+        <h1 className="text-lg font-display font-medium text-beton-100">Satınalma Talepleri</h1>
         {can("procurement.create_pr") && (
           <button
             onClick={() => setShowForm((v) => !v)}

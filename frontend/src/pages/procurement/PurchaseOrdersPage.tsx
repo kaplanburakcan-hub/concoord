@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
@@ -8,9 +8,20 @@ import { useProjects } from "../ProjectContext";
 // Geciken siparişler (beklenen tarih geçti, kapanmadı) kırmızı vurgulanır
 // (Plan Faz 7: "tedarik durum panosu, geciken siparişler vurgulu").
 
+export type DeliveryItem = {
+  id: string; material_name: string; unit: string;
+  ordered_qty?: number; received_qty: number; accepted_qty: number; rejected_qty: number;
+  note?: string;
+};
 export type Delivery = {
   id: string; delivery_note_no: string; delivered_at: string;
   received_by_name: string; document_id?: string; note?: string;
+  // Faz 11 — mal kabul detayı
+  receipt_type?: string; location_note?: string;
+  condition?: string; discrepancy_note?: string;
+  // İki zorunlu kanıt: irsaliye (document_id) ve malzeme fotoğrafı
+  photo_document_id?: string; material_photo_document_id?: string;
+  items?: DeliveryItem[];
 };
 export type PO = {
   id: string; po_no: string; pr_id?: string; pr_no?: string;
@@ -64,6 +75,20 @@ export default function PurchaseOrdersPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Akış panosundaki "Yeni ..." düğmesi buraya ?yeni=1 ile gelir ve formu açar.
+  // Parametre açıldıktan HEMEN SONRA temizlenir; iki sebeple:
+  //   1. Sayfa yenilendiğinde form kendiliğinden açılmasın.
+  //   2. Aynı bağlantıya tekrar tıklandığında adres gerçekten değişsin
+  //      (aksi hâlde React Router aynı adrese gidişi yok sayar ve form açılmaz).
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (new URLSearchParams(location.search).has("yeni")) {
+      setShowForm(true);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.search, location.pathname, navigate]);
+
   async function create() {
     if (!supplier.trim()) return;
     try {
@@ -89,12 +114,11 @@ export default function PurchaseOrdersPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-display font-bold text-white">Siparişler</h1>
-        <Link to="/satinalma" className="text-xs text-emniyet-500 hover:underline">← Talepler (PR)</Link>
+        <h1 className="text-lg font-display font-medium text-beton-100">Satınalma Siparişleri</h1>
         {can("procurement.manage_po") && (
           <button onClick={() => setShowForm((v) => !v)}
             className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
-            {showForm ? "Vazgeç" : "Bağımsız Sipariş"}
+            {showForm ? "Vazgeç" : "Yeni Sipariş"}
           </button>
         )}
       </div>

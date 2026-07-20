@@ -35,7 +35,26 @@ type deliveryDTO struct {
 	ReceivedByName string     `json:"received_by_name"`
 	DocumentID     *uuid.UUID `json:"document_id,omitempty"`
 	Note           *string    `json:"note,omitempty"`
+	// Faz 11 — mal kabul detayı
+	ReceiptType     string             `json:"receipt_type"`
+	LocationNote    *string            `json:"location_note,omitempty"`
+	Condition       string             `json:"condition"`
+	DiscrepancyNote *string            `json:"discrepancy_note,omitempty"`
+	PhotoDocumentID         *uuid.UUID `json:"photo_document_id,omitempty"`
+	MaterialPhotoDocumentID *uuid.UUID `json:"material_photo_document_id,omitempty"`
+	Items           []deliveryItemDTO  `json:"items"`
 	CreatedAt      time.Time  `json:"created_at"`
+}
+
+type deliveryItemDTO struct {
+	ID           uuid.UUID `json:"id"`
+	MaterialName string    `json:"material_name"`
+	Unit         string    `json:"unit"`
+	OrderedQty   *float64  `json:"ordered_qty,omitempty"`
+	ReceivedQty  float64   `json:"received_qty"`
+	AcceptedQty  float64   `json:"accepted_qty"`
+	RejectedQty  float64   `json:"rejected_qty"`
+	Note         *string   `json:"note,omitempty"`
 }
 
 type poDTO struct {
@@ -94,7 +113,8 @@ func (h *Handler) getPO(ctx context.Context, pid, id uuid.UUID, withDeliveries b
 	}
 	rows, err := h.pool.Query(ctx, `
 		SELECT d.id, d.delivery_note_no, d.delivered_at, d.received_by, u.full_name,
-		       d.document_id, d.note, d.created_at
+		       d.document_id, d.note, d.receipt_type, d.location_note, d.condition,
+		       d.discrepancy_note, d.photo_document_id, d.material_photo_document_id, d.created_at
 		FROM deliveries d JOIN users u ON u.id = d.received_by
 		WHERE d.po_id=$1 AND d.deleted_at IS NULL
 		ORDER BY d.delivered_at DESC`, id)
@@ -105,10 +125,35 @@ func (h *Handler) getPO(ctx context.Context, pid, id uuid.UUID, withDeliveries b
 	for rows.Next() {
 		var d deliveryDTO
 		if err := rows.Scan(&d.ID, &d.DeliveryNoteNo, &d.DeliveredAt, &d.ReceivedBy,
-			&d.ReceivedByName, &d.DocumentID, &d.Note, &d.CreatedAt); err != nil {
+			&d.ReceivedByName, &d.DocumentID, &d.Note, &d.ReceiptType, &d.LocationNote,
+			&d.Condition, &d.DiscrepancyNote, &d.PhotoDocumentID, &d.MaterialPhotoDocumentID,
+			&d.CreatedAt); err != nil {
 			return nil, err
 		}
+		d.Items = []deliveryItemDTO{}
 		o.Deliveries = append(o.Deliveries, d)
+	}
+	rows.Close()
+
+	// Teslimat kalemleri (tek sorgu, N+1 yok).
+	for i := range o.Deliveries {
+		irows, ierr := h.pool.Query(ctx, `
+			SELECT id, material_name, unit, ordered_qty::float8,
+			       received_qty::float8, accepted_qty::float8, rejected_qty::float8, note
+			FROM delivery_items WHERE delivery_id=$1 ORDER BY created_at`, o.Deliveries[i].ID)
+		if ierr != nil {
+			return nil, ierr
+		}
+		for irows.Next() {
+			var it deliveryItemDTO
+			if err := irows.Scan(&it.ID, &it.MaterialName, &it.Unit, &it.OrderedQty,
+				&it.ReceivedQty, &it.AcceptedQty, &it.RejectedQty, &it.Note); err != nil {
+				irows.Close()
+				return nil, err
+			}
+			o.Deliveries[i].Items = append(o.Deliveries[i].Items, it)
+		}
+		irows.Close()
 	}
 	return &o, rows.Err()
 }
@@ -494,15 +539,88 @@ func (h *Handler) AddDelivery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Faz 11 — mal kabul detayı. Varsayılanlar geriye dönük uyumu korur:
+	// alan gönderilmezse "depoya, tam ve sağlam" kabul edilir.
+	receiptType := req.ReceiptType
+	if receiptType == "" {
+		receiptType = "Warehouse"
+	}
+	condition := req.Condition
+	if condition == "" {
+		condition = "Complete"
+	}
+	var photoID *uuid.UUID
+	if req.PhotoDocumentID != nil && strings.TrimSpace(*req.PhotoDocumentID) != "" {
+		d, perr := uuid.Parse(strings.TrimSpace(*req.PhotoDocumentID))
+		if perr != nil {
+			httpx.ValidationFailed(w, r, map[string]string{"photo_document_id": "geçersiz UUID"})
+			return
+		}
+		photoID = &d
+	}
+	// Malzeme fotoğrafı zorunludur (validateDelivery boşluğu yakalar; burada
+	// dokümanın bu projeye ait olduğu doğrulanır).
+	var matPhotoID *uuid.UUID
+	if req.MaterialPhotoDocumentID != nil && strings.TrimSpace(*req.MaterialPhotoDocumentID) != "" {
+		d, perr := uuid.Parse(strings.TrimSpace(*req.MaterialPhotoDocumentID))
+		if perr != nil {
+			httpx.ValidationFailed(w, r, map[string]string{"material_photo_document_id": "geçersiz UUID"})
+			return
+		}
+		var one int
+		qerr := h.pool.QueryRow(r.Context(), `
+			SELECT 1 FROM documents WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`,
+			d, pid).Scan(&one)
+		if errors.Is(qerr, pgx.ErrNoRows) {
+			httpx.ValidationFailed(w, r,
+				map[string]string{"material_photo_document_id": "bu projede kayıtlı doküman değil"})
+			return
+		}
+		if qerr != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		matPhotoID = &d
+	}
+
 	var did uuid.UUID
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO deliveries (po_id, delivery_note_no, delivered_at, received_by, document_id, note)
-		VALUES ($1,$2,$3,$4,$5,NULLIF(btrim(coalesce($6,'')),''))
+		INSERT INTO deliveries (po_id, delivery_note_no, delivered_at, received_by, document_id, note,
+		                        receipt_type, location_note, condition, discrepancy_note,
+		                        photo_document_id, material_photo_document_id, inspected_by)
+		VALUES ($1,$2,$3,$4,$5,NULLIF(btrim(coalesce($6,'')),''),
+		        $7, NULLIF(btrim(coalesce($8,'')),''), $9, NULLIF(btrim(coalesce($10,'')),''),
+		        $11, $12, $4)
 		RETURNING id`,
-		poID, strings.TrimSpace(req.DeliveryNoteNo), at, uid, docID, req.Note).Scan(&did)
+		poID, strings.TrimSpace(req.DeliveryNoteNo), at, uid, docID, req.Note,
+		receiptType, req.LocationNote, condition, req.DiscrepancyNote, photoID, matPhotoID).Scan(&did)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
+	}
+
+	// Kalem bazında teslim alma: gelen / kabul / red miktarları.
+	for _, it := range req.Items {
+		var prItemID *uuid.UUID
+		if it.PRItemID != nil && strings.TrimSpace(*it.PRItemID) != "" {
+			if d, perr := uuid.Parse(strings.TrimSpace(*it.PRItemID)); perr == nil {
+				prItemID = &d
+			}
+		}
+		unit := strings.TrimSpace(it.Unit)
+		if unit == "" {
+			unit = "ad"
+		}
+		if _, err := tx.Exec(r.Context(), `
+			INSERT INTO delivery_items
+			  (delivery_id, pr_item_id, material_name, unit, ordered_qty,
+			   received_qty, accepted_qty, rejected_qty, note)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULLIF(btrim(coalesce($9,'')),''))`,
+			did, prItemID, strings.TrimSpace(it.MaterialName), unit, it.OrderedQty,
+			it.ReceivedQty, it.AcceptedQty, it.RejectedQty, it.Note); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
 	}
 
 	to := "PartiallyDelivered"

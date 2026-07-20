@@ -60,7 +60,7 @@ export default function PurchaseRequestDetailPage() {
   return (
     <div className="space-y-4 max-w-3xl">
       <div className="flex items-center gap-3">
-        <Link to="/satinalma" className="text-xs text-beton-400 hover:text-beton-200">← Talepler</Link>
+        <Link to="/satinalma/talepler" className="text-xs text-beton-400 hover:text-beton-200">← Talepler</Link>
         <h1 className="text-lg font-display font-bold text-white">{pr.pr_no}</h1>
         <span className={`rounded border px-1.5 py-0.5 text-xs ${PR_STATUS_STYLE[pr.status] ?? ""}`}>
           {PR_STATUS_LABEL[pr.status] ?? pr.status}

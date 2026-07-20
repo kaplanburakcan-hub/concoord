@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { api, apiDownload } from "../../api/client";
 import { apiWithOfflineFallback } from "../../offline/queue";
 import { useAuth } from "../../auth/AuthContext";
@@ -159,9 +158,9 @@ export default function FindingsPage() {
   return (
     <div className="space-y-4 max-w-3xl">
       <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="text-lg font-display font-bold text-white">İSG Bulguları</h1>
-        <Link to="/isg/denetimler" className="text-xs text-beton-400 hover:text-beton-200">Denetimler</Link>
-        <Link to="/isg/cezalar" className="text-xs text-beton-400 hover:text-beton-200">Cezalar</Link>
+        {/* Modül içi geçiş kenar çubuğu alt başlıklarında (İSG → Bulgular /
+            Denetimler / Cezalar); başlık yanındaki soluk bağlantılar kaldırıldı. */}
+        <h1 className="text-lg font-display font-medium text-beton-100">İSG Bulguları</h1>
         {overdue > 0 && (
           <span className="rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-xs text-red-300">
             {overdue} bulgunun termini geçti

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
+import RetentionPanel from "./RetentionPanel";
 
 type Sub = { id: string; company_name: string };
 type Payment = {
@@ -60,7 +61,7 @@ export default function ProgressPaymentsPage() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-extrabold text-white">Hakedişler</h1>
+      <h1 className="font-display text-2xl font-medium text-beton-100 tracking-tight">Hakedişler</h1>
       <p className="text-sm text-beton-400 mt-1">{current.name} — kümülatif hakediş iş akışı ve kesinti yönetimi.</p>
       {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
 
@@ -125,6 +126,15 @@ export default function ProgressPaymentsPage() {
           )}
         </tbody>
       </table>
+
+      {/* Faz 11 — teminat (geçici kesinti) bakiyesi ve iade akışı.
+          Hakediş listesinin altında: iade kararı, hakediş geçmişiyle
+          birlikte değerlendirilir. */}
+      {can("progress_payments.view_financials") && (
+        <div className="mt-6">
+          <RetentionPanel projectId={pid!} canRefund={can("progress_payments.finalize")} />
+        </div>
+      )}
     </div>
   );
 }

@@ -333,3 +333,34 @@ func TestRealHakedisFlow(t *testing.T) {
 		t.Fatalf("AC 85.000 olmalıydı, %.2f", res.ActualCost)
 	}
 }
+
+// TestRetentionRefundAddition — teminat iadesi ödenecek tutarı ARTIRIR ve
+// maliyeti (AC) DEĞİŞTİRMEZ: daha önce kesilmiş bir tutarın geri verilmesidir,
+// yeni bir iş bedeli değildir.
+func TestRetentionRefundAddition(t *testing.T) {
+	terms := ContractTerms{VatPct: 20, RetentionPct: 5}
+	res := ComputeWith(
+		[]CalcLineInput{{PozNo: "X", UnitPrice: 1000, PrevCumQty: 0, CumQty: 100}}, // brüt 100.000
+		0, terms, nil,
+		[]AdditionLine{
+			{Type: "RetentionRefund", Description: "Geçici kabul iadesi", Amount: 25000,
+				Stage: "ProvisionalAcceptance"},
+		},
+	)
+
+	// Teminat kesintisi: 100.000 × %5 = 5.000
+	if !approx(res.TotalDeductions, 5000) {
+		t.Fatalf("kesinti 5.000 olmalıydı, %.2f", res.TotalDeductions)
+	}
+	if !approx(res.TotalAdditions, 25000) {
+		t.Fatalf("ilave 25.000 olmalıydı, %.2f", res.TotalAdditions)
+	}
+	// Ödenecek = brüt 100.000 + KDV 20.000 + iade 25.000 − teminat 5.000 = 140.000
+	if !approx(res.NetPayable, 140000) {
+		t.Fatalf("ödenecek 140.000 olmalıydı, %.2f", res.NetPayable)
+	}
+	// İade maliyeti etkilemez.
+	if !approx(res.ActualCost, 100000) {
+		t.Fatalf("AC 100.000 olmalıydı, %.2f", res.ActualCost)
+	}
+}

@@ -7,6 +7,7 @@
 package procurement
 
 import (
+	"fmt"
 	"strings"
 	"time"
 )
@@ -88,18 +89,55 @@ func validatePO(req poReq) (*time.Time, map[string]string) {
 	return expected, errs
 }
 
+type deliveryItemReq struct {
+	PRItemID     *string `json:"pr_item_id"`
+	MaterialName string  `json:"material_name"`
+	Unit         string  `json:"unit"`
+	OrderedQty   *float64 `json:"ordered_qty"`
+	ReceivedQty  float64 `json:"received_qty"`
+	AcceptedQty  float64 `json:"accepted_qty"`
+	RejectedQty  float64 `json:"rejected_qty"`
+	Note         *string `json:"note"`
+}
+
 type deliveryReq struct {
 	DeliveryNoteNo string  `json:"delivery_note_no"`
 	DeliveredAt    *string `json:"delivered_at"` // RFC3339 | null (=now)
 	DocumentID     *string `json:"document_id"`  // irsaliye fotoğrafı (Faz 2 doküman)
 	Note           *string `json:"note"`
 	MarkDelivered  bool    `json:"mark_delivered"` // bu teslimat siparişi kapatır
+
+	// Faz 11 — mal kabul detayı
+	ReceiptType      string  `json:"receipt_type"`       // Warehouse | Site | DirectToSubcontractor
+	LocationNote     *string `json:"location_note"`      // depo adı / blok-kat / taşeron
+	Condition        string  `json:"condition"`          // Complete | Short | Damaged | Defective | Rejected
+	DiscrepancyNote  *string `json:"discrepancy_note"`   // uygunsuzlukta ZORUNLU
+	PhotoDocumentID         *string `json:"photo_document_id"`          // uygunsuzluk ek fotoğrafı (opsiyonel)
+	MaterialPhotoDocumentID *string `json:"material_photo_document_id"` // malzeme fotoğrafı (ZORUNLU)
+	Items            []deliveryItemReq `json:"items"`
+}
+
+// Geçerli mal kabul değerleri (şema CHECK'leriyle aynı).
+var deliveryReceiptTypes = map[string]bool{
+	"Warehouse": true, "Site": true, "DirectToSubcontractor": true,
+}
+var deliveryConditions = map[string]bool{
+	"Complete": true, "Short": true, "Damaged": true, "Defective": true, "Rejected": true,
 }
 
 func validateDelivery(req deliveryReq) (time.Time, map[string]string) {
 	errs := map[string]string{}
 	if strings.TrimSpace(req.DeliveryNoteNo) == "" {
 		errs["delivery_note_no"] = "irsaliye numarası zorunludur"
+	}
+	// Mal kabulde iki ayrı kanıt zorunludur: tedarikçinin beyanı (irsaliye) ve
+	// sahanın tespiti (malzemenin fiili hâli). Eksik/hasar tartışmasında ancak
+	// ikisi birlikte karşılaştırılabilir bir kayıt oluşturur.
+	if req.DocumentID == nil || strings.TrimSpace(*req.DocumentID) == "" {
+		errs["document_id"] = "irsaliye fotoğrafı zorunludur"
+	}
+	if req.MaterialPhotoDocumentID == nil || strings.TrimSpace(*req.MaterialPhotoDocumentID) == "" {
+		errs["material_photo_document_id"] = "malzeme fotoğrafı zorunludur"
 	}
 	at := time.Now()
 	if req.DeliveredAt != nil && strings.TrimSpace(*req.DeliveredAt) != "" {
@@ -108,6 +146,33 @@ func validateDelivery(req deliveryReq) (time.Time, map[string]string) {
 			errs["delivered_at"] = "geçerli bir zaman girin (RFC3339)"
 		} else {
 			at = t
+		}
+	}
+
+	// --- Faz 11: mal kabul doğrulamaları ---
+	if req.ReceiptType != "" && !deliveryReceiptTypes[req.ReceiptType] {
+		errs["receipt_type"] = "geçersiz teslim yeri"
+	}
+	if req.Condition != "" && !deliveryConditions[req.Condition] {
+		errs["condition"] = "geçersiz teslim durumu"
+	}
+	// Uygunsuz teslimatta açıklama zorunlu: gerekçesiz "eksik geldi" kaydı
+	// tedarikçiyle yapılacak görüşmede dayanak oluşturmaz.
+	if req.Condition != "" && req.Condition != "Complete" {
+		if req.DiscrepancyNote == nil || strings.TrimSpace(*req.DiscrepancyNote) == "" {
+			errs["discrepancy_note"] = "eksik/hasarlı teslimatta açıklama zorunludur"
+		}
+	}
+	for i, it := range req.Items {
+		p := fmt.Sprintf("items[%d]", i)
+		if strings.TrimSpace(it.MaterialName) == "" {
+			errs[p+".material_name"] = "malzeme adı zorunludur"
+		}
+		if it.ReceivedQty < 0 || it.AcceptedQty < 0 || it.RejectedQty < 0 {
+			errs[p+".qty"] = "miktarlar negatif olamaz"
+		}
+		if it.AcceptedQty+it.RejectedQty > it.ReceivedQty+0.001 {
+			errs[p+".qty"] = "kabul + red, gelen miktarı aşamaz"
 		}
 	}
 	return at, errs

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, apiDownload } from "../../api/client";
+import { api, apiDownload, apiUpload } from "../../api/client";
 import ApprovalChain from "./ApprovalChain";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
@@ -15,12 +15,26 @@ type Payment = {
   vat_amount?: number; vat_withheld?: number; vat_collected?: number;
   payable_gross?: number; actual_cost?: number;
   vat_withholding_ratio?: number; vat_exemption_code?: string | null;
+  total_additions?: number;
+  // Kesin hakediş: hesabı kapatır; geçici kabul belgesi zorunludur.
+  is_final?: boolean;
+  provisional_acceptance_document_id?: string | null;
+  provisional_acceptance_date?: string | null;
 };
 type ItemView = {
   work_item_id: string; poz_no: string; description: string; unit: string;
   unit_price?: number; prev_cum_qty: number; this_period_qty: number; cum_qty: number;
   cum_amount?: number; this_amount?: number;
 };
+// Faz 11 — kesinti kataloğu (gruplu kalem listesi). Kalem seçilince türü, KDV
+// oranı ve niteliği otomatik gelir; böylece hakediş girişinde kalem atlanmaz.
+type CatalogItem = {
+  group_code: string; code: string; label: string; deduction_type: string;
+  nature: string; reduces_cost: boolean; default_rate_pct?: number;
+  default_vat_pct?: number; budget_code?: string; note?: string;
+};
+type CatalogGroup = { code: string; label: string; hint: string };
+
 type DeductionView = {
   type: string; description: string; rate_pct?: number; amount?: number;
   nature?: string; reduces_cost?: boolean;
@@ -64,6 +78,11 @@ export default function ProgressPaymentDetailPage() {
   const canEdit = can("progress_payments.edit_draft");
 
   const [pmt, setPmt] = useState<Payment | null>(null);
+  const [catalog, setCatalog] = useState<{ groups: CatalogGroup[]; items: CatalogItem[] }>({
+    groups: [], items: [],
+  });
+  // Kesin hakediş dayanağı: geçici kabul tutanağı
+  const [paFile, setPaFile] = useState<File | null>(null);
   const [items, setItems] = useState<ItemView[]>([]);
   const [deductions, setDeductions] = useState<DeductionView[]>([]);
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
@@ -71,6 +90,8 @@ export default function ProgressPaymentDetailPage() {
   const [extras, setExtras] = useState<{
     type: string; description: string; amount: string;
     source_entity?: string; source_id?: string;
+    // Faz 11 — katalog seçimi ve kesintinin kendi KDV oranı
+    catalog_code?: string; group_code?: string; vat_pct?: number;
   }[]>([]);
   const [suggestions, setSuggestions] = useState<PenaltySuggestion[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -105,15 +126,37 @@ export default function ProgressPaymentDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Kesinti kataloğu proje bağımsızdır; bir kez yüklenir.
+  useEffect(() => {
+    api<{ groups: CatalogGroup[]; items: CatalogItem[] }>("/deduction-catalog")
+      .then(setCatalog)
+      .catch(() => { /* katalog yoksa serbest giriş yine çalışır */ });
+  }, []);
+
   const editable = pmt?.status === "Draft" && canEdit;
 
   async function save() {
     if (!pmt) return;
     setMsg(null); setErr(null);
+    // Kesin hakediş işaretliyse geçici kabul tutanağı yüklenir (zorunlu).
+    let paDocId: string | undefined;
+    if (pmt.is_final && paFile) {
+      const doc = await api<{ id: string }>(`/projects/${pid}/documents`, {
+        method: "POST", projectId: pid,
+        body: { title: `Geçici kabul tutanağı — ${pmt.period_no}. hakediş`, doc_category: "Contract" },
+      });
+      const fd = new FormData();
+      fd.append("file", paFile);
+      await apiUpload(`/projects/${pid}/documents/${doc.id}/versions`, fd);
+      paDocId = doc.id;
+    }
+
     const body = {
       row_version: pmt.row_version,
       withholding_applied: pmt.withholding_applied ?? null,
       vat_withholding_ratio: pmt.vat_withholding_ratio ?? null,
+      is_final: pmt.is_final ?? false,
+      provisional_acceptance_document_id: paDocId ?? undefined,
       items: workItems
         .filter((w) => qty[w.id] !== undefined && qty[w.id] !== "")
         .map((w) => ({ work_item_id: w.id, cum_qty: Number(qty[w.id]) || 0 })),
@@ -122,6 +165,8 @@ export default function ProgressPaymentDetailPage() {
         .map((e) => ({
           type: e.type, description: e.description, amount: Number(e.amount),
           source_entity: e.source_entity, source_id: e.source_id,
+          catalog_code: e.catalog_code ?? "", group_code: e.group_code ?? "",
+          vat_pct: e.vat_pct ?? 0,
         })),
     };
     try {
@@ -251,6 +296,51 @@ export default function ProgressPaymentDetailPage() {
               </span>
             </label>
           )}
+
+          {/* Faz 11 — Kesin hakediş. İşin tamamlandığını ve hesabın kapandığını
+              belirtir; teminat iadeleri bu hakedişte sonuçlandırılır. Geçici
+              kabul yapılmadan kesin hakediş düzenlenemez, bu yüzden tutanak
+              zorunludur. */}
+          {editable && (
+            <div className="mt-2 rounded-md border border-beton-800 bg-beton-950 p-2">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 accent-emniyet-500"
+                  checked={!!pmt.is_final}
+                  onChange={(e) => setPmt({ ...pmt, is_final: e.target.checked })}
+                />
+                <span className="text-xs">
+                  <span className="text-beton-200">Kesin hakediş</span>
+                  <span className="block text-beton-500 mt-0.5">
+                    Hesap kapanır; teminat iadeleri ve kalan mahsuplar bu hakedişte sonuçlandırılır.
+                  </span>
+                </span>
+              </label>
+
+              {pmt.is_final && (
+                <div className="mt-2 pl-6">
+                  <label className="block text-[11px] text-beton-400 mb-1">
+                    Geçici kabul tutanağı <span className="text-red-400">*</span>
+                    {pmt.provisional_acceptance_document_id && (
+                      <span className="ml-2 text-green-300">· belge yüklü</span>
+                    )}
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => setPaFile(e.target.files?.[0] ?? null)}
+                    className="block w-full text-xs text-beton-400 file:mr-2 file:rounded file:border-0 file:bg-beton-800 file:px-2 file:py-1 file:text-beton-200"
+                  />
+                  {!paFile && !pmt.provisional_acceptance_document_id && (
+                    <p className="mt-1 text-[11px] text-amber-400">
+                      Kesin hakediş için geçici kabul tutanağı zorunludur.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <ul className="mt-2 space-y-1 text-sm">
             {deductions.map((d, i) => (
               <li key={i} className="flex items-center justify-between gap-2 text-beton-200">
@@ -322,26 +412,55 @@ export default function ProgressPaymentDetailPage() {
           {editable && (
             <div className="mt-3 border-t border-beton-800 pt-3 space-y-2">
               {extras.map((e, i) => (
-                <div key={i} className="grid grid-cols-[110px_1fr_100px_auto] gap-2">
-                  <select value={e.type}
-                    onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, type: ev.target.value } : x))}
-                    className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-white">
-                    <option value="Tax">Vergi</option>
-                    <option value="OHSPenalty">İSG ceza</option>
-                    <option value="Other">Diğer</option>
+                <div key={i} className="grid grid-cols-[1fr_1fr_90px_70px_auto] gap-2 items-center">
+                  {/* Katalogdan kalem seçimi: tür, KDV oranı ve nitelik otomatik gelir */}
+                  <select
+                    value={e.catalog_code ?? ""}
+                    onChange={(ev) => {
+                      const it = catalog.items.find((c) => c.code === ev.target.value);
+                      setExtras(extras.map((x, j) => j === i ? {
+                        ...x,
+                        catalog_code: it?.code ?? "",
+                        group_code: it?.group_code ?? "",
+                        type: it?.deduction_type ?? x.type,
+                        vat_pct: it?.default_vat_pct ?? 0,
+                        description: x.description || it?.label || "",
+                      } : x))
+                    }}
+                    className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100">
+                    <option value="">— kalem seçin —</option>
+                    {catalog.groups.map((g) => (
+                      <optgroup key={g.code} label={`${g.label} · ${g.hint}`}>
+                        {catalog.items.filter((c) => c.group_code === g.code).map((c) => (
+                          <option key={c.code} value={c.code}>{c.label}</option>
+                        ))}
+                      </optgroup>
+                    ))}
                   </select>
-                  <input value={e.description} placeholder="Açıklama"
+                  <input value={e.description} placeholder="Açıklama / dayanak"
                     onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, description: ev.target.value } : x))}
-                    className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-white" />
+                    className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
                   <input value={e.amount} placeholder="Tutar" inputMode="decimal"
                     onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, amount: ev.target.value } : x))}
-                    className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-white text-right" />
+                    className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100 text-right" />
+                  <select
+                    value={String(e.vat_pct ?? 0)}
+                    onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, vat_pct: Number(ev.target.value) } : x))}
+                    title="Kesintinin kendi KDV oranı (tutar KDV dahil girilir)"
+                    className="rounded bg-beton-950 border border-beton-800 px-1 py-1 text-sm text-beton-100">
+                    <option value="0">%0</option>
+                    <option value="10">%10</option>
+                    <option value="20">%20</option>
+                  </select>
                   <button onClick={() => setExtras(extras.filter((_, j) => j !== i))}
                     className="text-red-400 hover:text-red-300 text-xs px-1">Sil</button>
                 </div>
               ))}
-              <button onClick={() => setExtras([...extras, { type: "Tax", description: "", amount: "" }])}
+              <button onClick={() => setExtras([...extras, { type: "Other", description: "", amount: "", vat_pct: 0 }])}
                 className="text-emniyet-500 hover:underline text-xs">+ Kesinti satırı ekle</button>
+              <p className="text-[10px] text-beton-500">
+                Mal/hizmet kesintileri KDV DAHİL girilir; maliyet hesabında KDV hariç tutar kullanılır.
+              </p>
             </div>
           )}
         </div>
@@ -370,6 +489,9 @@ export default function ProgressPaymentDetailPage() {
               )}
               <Row label="Tahsil edilen KDV" v={pmt.vat_collected} />
               <Row label="Ödenebilir toplam (KDV dahil)" v={pmt.payable_gross} bold />
+              {(pmt.total_additions ?? 0) > 0 && (
+                <Row label="İlaveler (teminat iadesi)" v={pmt.total_additions} />
+              )}
               <Row label="Kesintiler toplamı (KDV dahil)" v={pmt.total_deductions} />
               <Row label="Yükleniciye ödenecek" v={pmt.net_payable} bold />
               {(pmt.actual_cost ?? 0) > 0 && (

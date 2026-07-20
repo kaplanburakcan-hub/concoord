@@ -24,6 +24,7 @@ import WeeklyReportsPage from "./pages/reports/WeeklyReportsPage";
 import MonthlyReportsPage from "./pages/reports/MonthlyReportsPage";
 import PortfolioPage from "./pages/dashboard/PortfolioPage";
 import PurchaseRequestsPage from "./pages/procurement/PurchaseRequestsPage";
+import ProcurementBoardPage from "./pages/procurement/ProcurementBoardPage";
 import PurchaseRequestDetailPage from "./pages/procurement/PurchaseRequestDetailPage";
 import PurchaseOrdersPage from "./pages/procurement/PurchaseOrdersPage";
 import PurchaseOrderDetailPage from "./pages/procurement/PurchaseOrderDetailPage";
@@ -170,8 +171,19 @@ export default function App() {
                         }
                       />
 
+                      {/* Satınalma modülünün ana görünümü akış panosudur:
+                          modüle girildiğinde önce "işler nerede" sorusu yanıtlanır.
+                          Ayrıntılı listeler alt sekmelerdedir. */}
                       <Route
                         path="/satinalma"
+                        element={
+                          <RequirePerm perm="procurement.view">
+                            <ProcurementBoardPage />
+                          </RequirePerm>
+                        }
+                      />
+                      <Route
+                        path="/satinalma/talepler"
                         element={
                           <RequirePerm perm="procurement.view">
                             <PurchaseRequestsPage />

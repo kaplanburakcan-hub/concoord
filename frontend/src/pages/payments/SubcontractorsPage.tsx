@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, apiUpload } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
+import ContractPanel from "./ContractPanel";
 
 type Sub = {
   id: string; company_name: string; tax_no?: string; contact_person?: string;
@@ -48,11 +49,20 @@ export default function SubcontractorsPage() {
           canManage={can("contracts.upload")} onChanged={load}
         />
         {sel ? (
-          <WorkItemPanel
-            projectId={pid!} subId={sel}
-            canManage={can("contracts.upload")} canDelete={can("contracts.delete")}
-            canFin={can("progress_payments.view_financials")}
-          />
+          <div className="space-y-4">
+            {/* Faz 11 — sözleşme paneli: avans/teminat/stopaj ve süre bilgileri
+                hakediş hesabını ve dönem kontrollerini besler. */}
+            <ContractPanel
+              projectId={pid!} subId={sel}
+              canManage={can("contracts.upload")}
+              canFin={can("progress_payments.view_financials")}
+            />
+            <WorkItemPanel
+              projectId={pid!} subId={sel}
+              canManage={can("contracts.upload")} canDelete={can("contracts.delete")}
+              canFin={can("progress_payments.view_financials")}
+            />
+          </div>
         ) : (
           <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 text-beton-400 text-sm">
             Soldan bir taşeron seçin.

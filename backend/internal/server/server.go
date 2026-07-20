@@ -240,6 +240,10 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("progress_payments.view")).Get("/deduction-catalog", payH.DeductionCatalog)
 			// Faz 11 — çok adımlı onay zinciri. Adım izni zincir verisinden gelir,
 			// bu yüzden rota düzeyinde yalnızca görüntüleme izni aranır.
+			// Faz 11 — teminat bakiyesi ve iade akışı
+			pr.With(mw.RequirePermission("progress_payments.view_financials")).Get("/projects/{projectID}/retention", payH.RetentionBalances)
+			pr.With(mw.RequirePermission("progress_payments.view_financials")).Get("/projects/{projectID}/subcontractors/{subID}/refunds", payH.ListRefunds)
+			pr.With(mw.RequirePermission("progress_payments.finalize")).Post("/projects/{projectID}/subcontractors/{subID}/refunds", payH.CreateRefund)
 			pr.With(mw.RequirePermission("progress_payments.view")).Get("/payments/{id}/approvals", payH.ApprovalChain)
 			pr.With(mw.RequirePermission("progress_payments.view")).Post("/payments/{id}/approvals", payH.ApproveStep)
 			pr.With(mw.RequirePermission("progress_payments.view")).Get("/projects/{projectID}/payments", payH.ListPayments)

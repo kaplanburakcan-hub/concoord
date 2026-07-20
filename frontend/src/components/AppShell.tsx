@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Can } from "../auth/guards";
 import { useProjects } from "../projects/ProjectContext";
@@ -11,7 +11,13 @@ import NotificationBell from "./NotificationBell";
 // (proje seçici, tema düğmesi, bildirim, kullanıcı). İçerik <main.app-canvas>
 // içinde (uçuk gökyüzü + nokta deseni). Navigasyon <Can> ile korunur.
 
-type NavDef = { to: string; label: string; perm?: string; icon: ReactNode; badge?: number };
+// children: modül içi alt sayfalar (ör. Satınalma → Talepler / Siparişler).
+// Sayfa içine serpiştirilmiş küçük bağlantılar yerine navigasyonda hiyerarşi
+// olarak gösterilir; alt başlıklar yalnızca o modüldeyken açılır.
+type NavDef = {
+  to: string; label: string; perm?: string; icon: ReactNode; badge?: number;
+  children?: { to: string; label: string; end?: boolean }[];
+};
 type NavGroup = { title: string; items: NavDef[] };
 
 const I = {
@@ -48,7 +54,13 @@ const GROUPS: NavGroup[] = [
       { to: "/hakedis", label: "Hakedişler", perm: "progress_payments.view", icon: I.hakedis },
       { to: "/taseronlar", label: "Taşeronlar", perm: "contracts.view", icon: I.taseron },
       { to: "/malzeme-onaylari", label: "Malzeme Onayları", perm: "material_approvals.view", icon: I.malzeme },
-      { to: "/satinalma", label: "Satınalma", perm: "procurement.view", icon: I.satinalma },
+      {
+        to: "/satinalma", label: "Satınalma", perm: "procurement.view", icon: I.satinalma,
+        children: [
+          { to: "/satinalma/talepler", label: "Talepler (PR)" },
+          { to: "/satinalma/siparisler", label: "Siparişler (PO)" },
+        ],
+      },
       { to: "/aylik-raporlar", label: "Aylık Rapor", perm: "reports.view_financial_reports", icon: I.aylik },
     ],
   },
@@ -56,7 +68,14 @@ const GROUPS: NavGroup[] = [
     title: "Saha",
     items: [
       { to: "/saha-raporlari", label: "Saha Raporları", perm: "reports.view", icon: I.saha },
-      { to: "/isg", label: "İSG", perm: "ohs.view", icon: I.isg },
+      {
+        to: "/isg", label: "İSG", perm: "ohs.view", icon: I.isg,
+        children: [
+          { to: "/isg", label: "Bulgular", end: true },
+          { to: "/isg/denetimler", label: "Denetimler" },
+          { to: "/isg/cezalar", label: "Cezalar" },
+        ],
+      },
       { to: "/gorevler", label: "Görevler", perm: "tasks.view", icon: I.gorev },
     ],
   },
@@ -215,10 +234,18 @@ export default function AppShell({ children }: { children: ReactNode }) {
 }
 
 function SideLink({ item }: { item: NavDef }) {
+  const { pathname } = useLocation();
+  // Alt başlıklar yalnızca ilgili modüldeyken görünür: sidebar kısa kalır,
+  // kullanıcı bulunduğu modülün bölümlerini bir bakışta görür.
+  const inSection =
+    !!item.children &&
+    (pathname === item.to || pathname.startsWith(item.to.replace(/\/$/, "") + "/"));
+
   return (
+    <>
     <NavLink
       to={item.to}
-      end={item.to === "/"}
+      end={item.to === "/" || !!item.children}
       className={({ isActive }) =>
         "relative flex items-center gap-3 px-3 py-2.5 rounded-[9px] text-[14px] transition " +
         (isActive ? "text-white" : "hover:opacity-90")
@@ -226,7 +253,11 @@ function SideLink({ item }: { item: NavDef }) {
       style={({ isActive }) =>
         isActive
           ? { background: "var(--chrome-active)", color: "#fff" }
-          : { color: "var(--chrome-text-2)" }
+          : inSection
+            // Alt sayfadayken ana başlık tamamen sönük kalmasın: modülde
+            // olunduğu belli olsun ama aktif sayfayla karışmasın.
+            ? { background: "var(--chrome-2)", color: "var(--chrome-text)" }
+            : { color: "var(--chrome-text-2)" }
       }
     >
       {({ isActive }) => (
@@ -247,5 +278,22 @@ function SideLink({ item }: { item: NavDef }) {
         </>
       )}
     </NavLink>
+
+    {inSection && (
+      <div className="mb-1 ml-[30px] border-l pl-3" style={{ borderColor: "var(--chrome-border)" }}>
+        {item.children!.map((c) => (
+          <NavLink
+            key={c.to}
+            to={c.to}
+            end={c.end}
+            className="block py-1.5 text-[13px] transition"
+            style={({ isActive }) => ({ color: isActive ? "var(--accent-sky)" : "var(--chrome-text-2)" })}
+          >
+            {c.label}
+          </NavLink>
+        ))}
+      </div>
+    )}
+    </>
   );
 }
