@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Can } from "../auth/guards";
@@ -36,55 +36,94 @@ const I = {
   kullanici: <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /><circle cx="18" cy="9" r="2.4" /></svg>,
   izin: <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 3v18" /></svg>,
   denetim: <svg viewBox="0 0 24 24"><path d="M12 8v4l3 2" /><circle cx="12" cy="12" r="9" /></svg>,
+  toplanti: <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  fotograf: <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
+  makine: <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>,
+  ozet: <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>,
+  idarihakedis: <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>,
+  rapor: <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>,
+  personel: <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.87"/></svg>,
+  depo: <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
 };
 
 const GROUPS: NavGroup[] = [
+  // ─── GENEL ──────────────────────────────────────────────────────────
+  // Şirket geneli stratejik görünüm. Proje seçimine bağlı değil.
   {
     title: "Genel",
     items: [
       { to: "/", label: "Panel", icon: I.panel },
-      { to: "/portfoy", label: "Portföy", perm: "projects.view", icon: I.portfoy },
       { to: "/projects", label: "Projeler", perm: "projects.view", icon: I.proje },
-      { to: "/documents", label: "Dokümanlar", perm: "documents.view", icon: I.dok },
     ],
   },
+
+  // ─── PROJE ──────────────────────────────────────────────────────────
+  // Seçili projeye ait tüm iş akışları buradadır.
   {
-    title: "Finans",
+    title: "Proje",
     items: [
-      { to: "/hakedis", label: "Hakedişler", perm: "progress_payments.view", icon: I.hakedis },
-      { to: "/taseronlar", label: "Taşeronlar", perm: "contracts.view", icon: I.taseron },
-      { to: "/malzeme-onaylari", label: "Malzeme Onayları", perm: "material_approvals.view", icon: I.malzeme },
+      { to: "/proje/ozet", label: "Özet / Dashboard", perm: "projects.view", icon: I.ozet },
+      { to: "/proje/paysdaslar", label: "Proje Paydaşları", perm: "projects.view", icon: I.kullanici },
+      { to: "/proje/kesif", label: "Proje Keşfi", perm: "projects.view", icon: I.dok },
+      { to: "/hakedis/idari", label: "İdari Hakedişler", perm: "progress_payments.view", icon: I.idarihakedis },
+      { to: "/hakedis", label: "Taşeron Hakedişleri", perm: "progress_payments.view", icon: I.hakedis },
       {
-        to: "/satinalma", label: "Satınalma", perm: "procurement.view", icon: I.satinalma,
+        to: "/satinalma", label: "Satın Alma ve Tedarik", perm: "procurement.view", icon: I.satinalma,
         children: [
+          { to: "/satinalma", label: "Akış Panosu", end: true },
           { to: "/satinalma/talepler", label: "Talepler (PR)" },
           { to: "/satinalma/siparisler", label: "Siparişler (PO)" },
         ],
       },
-      { to: "/aylik-raporlar", label: "Aylık Rapor", perm: "reports.view_financial_reports", icon: I.aylik },
+      { to: "/taseronlar", label: "Taşeronlar & Tedarikçiler", perm: "contracts.view", icon: I.taseron },
+      { to: "/documents", label: "Dokümanlar", perm: "documents.view", icon: I.dok },
+      { to: "/malzeme-onaylari", label: "Malzeme Onayları", perm: "material_approvals.view", icon: I.malzeme },
+      { to: "/proje/ilerleme-raporlari", label: "İlerleme Raporları", perm: "reports.view", icon: I.rapor },
+      { to: "/aylik-raporlar", label: "Proje Maliyet Raporları", perm: "reports.view_financial_reports", icon: I.aylik },
+      { to: "/proje/personel", label: "Personel / Puantaj", perm: "reports.view", icon: I.personel },
     ],
   },
+
+  // ─── SAHA ───────────────────────────────────────────────────────────
+  // Şantiye düzeyindeki günlük operasyonlar.
   {
     title: "Saha",
     items: [
-      { to: "/saha-raporlari", label: "Saha Raporları", perm: "reports.view", icon: I.saha },
+      { to: "/saha-raporlari", label: "Günlük & Haftalık İmalat", perm: "reports.view", icon: I.saha },
+      { to: "/proje/depo", label: "Depo Raporları", perm: "reports.view", icon: I.depo },
       {
-        to: "/isg", label: "İSG", perm: "ohs.view", icon: I.isg,
+        to: "/isg", label: "İSG & OSGB", perm: "ohs.view", icon: I.isg,
         children: [
           { to: "/isg", label: "Bulgular", end: true },
           { to: "/isg/denetimler", label: "Denetimler" },
           { to: "/isg/cezalar", label: "Cezalar" },
         ],
       },
-      { to: "/gorevler", label: "Görevler", perm: "tasks.view", icon: I.gorev },
+      { to: "/proje/toplanti", label: "Toplantı Tutanakları", perm: "reports.view", icon: I.toplanti },
+      { to: "/gorevler", label: "Personel Görevleri", perm: "tasks.view", icon: I.gorev },
+      { to: "/proje/fotograflar", label: "Fotoğraflar", perm: "documents.view", icon: I.fotograf },
     ],
   },
+
+  // ─── FİNANS / YÖNETİM ──────────────────────────────────────────────
+  // Şirket geneli finansal ve idari yönetim.
   {
-    title: "Yönetim",
+    title: "Finans / Yönetim",
     items: [
+      { to: "/portfoy", label: "Portföy EVM", perm: "projects.view", icon: I.portfoy },
       { to: "/admin/users", label: "Kullanıcılar", perm: "admin.manage_users", icon: I.kullanici },
       { to: "/admin/permissions", label: "İzin Matrisi", perm: "admin.manage_permissions", icon: I.izin },
       { to: "/admin/audit", label: "Denetim İzi", perm: "admin.view_audit_log", icon: I.denetim },
+    ],
+  },
+
+  // ─── MAKİNE VE EKİPMAN YÖNETİMİ ────────────────────────────────────
+  {
+    title: "Makine & Ekipman",
+    items: [
+      { to: "/makine/araclar", label: "Tanımlı Araçlar", perm: "projects.view", icon: I.makine },
+      { to: "/makine/is-makineleri", label: "İş Makineleri", perm: "projects.view", icon: I.makine },
+      { to: "/makine/ekipmanlar", label: "Ekipmanlar", perm: "projects.view", icon: I.makine },
     ],
   },
 ];
@@ -245,7 +284,7 @@ function SideLink({ item }: { item: NavDef }) {
     <>
     <NavLink
       to={item.to}
-      end={item.to === "/" || !!item.children}
+      end={item.to === "/"}
       className={({ isActive }) =>
         "relative flex items-center gap-3 px-3 py-2.5 rounded-[9px] text-[14px] transition " +
         (isActive ? "text-white" : "hover:opacity-90")
@@ -253,11 +292,7 @@ function SideLink({ item }: { item: NavDef }) {
       style={({ isActive }) =>
         isActive
           ? { background: "var(--chrome-active)", color: "#fff" }
-          : inSection
-            // Alt sayfadayken ana başlık tamamen sönük kalmasın: modülde
-            // olunduğu belli olsun ama aktif sayfayla karışmasın.
-            ? { background: "var(--chrome-2)", color: "var(--chrome-text)" }
-            : { color: "var(--chrome-text-2)" }
+          : { color: "var(--chrome-text-2)" }
       }
     >
       {({ isActive }) => (
@@ -297,3 +332,8 @@ function SideLink({ item }: { item: NavDef }) {
     </>
   );
 }
+
+
+
+
+

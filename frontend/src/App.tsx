@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+﻿import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ThemeProvider } from "./theme/ThemeContext";
 import { AuthProvider } from "./auth/AuthContext";
 import { RequireAuth, RequirePerm } from "./auth/guards";
@@ -24,7 +24,6 @@ import WeeklyReportsPage from "./pages/reports/WeeklyReportsPage";
 import MonthlyReportsPage from "./pages/reports/MonthlyReportsPage";
 import PortfolioPage from "./pages/dashboard/PortfolioPage";
 import PurchaseRequestsPage from "./pages/procurement/PurchaseRequestsPage";
-import ProcurementBoardPage from "./pages/procurement/ProcurementBoardPage";
 import PurchaseRequestDetailPage from "./pages/procurement/PurchaseRequestDetailPage";
 import PurchaseOrdersPage from "./pages/procurement/PurchaseOrdersPage";
 import PurchaseOrderDetailPage from "./pages/procurement/PurchaseOrderDetailPage";
@@ -34,6 +33,18 @@ import InspectionsPage from "./pages/ohs/InspectionsPage";
 import InspectionFormPage from "./pages/ohs/InspectionFormPage";
 import PenaltiesPage from "./pages/ohs/PenaltiesPage";
 import ChecklistTemplatesPage from "./pages/ohs/ChecklistTemplatesPage";
+import ProjectSummaryPage from "./pages/project/ProjectSummaryPage";
+import ProjePaydaslariPage from "./pages/project/ProjePaydaslariPage";
+import ProjeKesfiPage from "./pages/project/ProjeKesfiPage";
+import IdariHakedisPage from "./pages/payments/IdariHakedisPage";
+import PersonelPage from "./pages/project/PersonelPage";
+import IleremeRaporlariPage from "./pages/project/IleremeRaporlariPage";
+import DepoPage from "./pages/project/DepoPage";
+import ToplantiPage from "./pages/project/ToplantiPage";
+import FotograflarPage from "./pages/project/FotograflarPage";
+import AraclarPage from "./pages/makine/AraclarPage";
+import IsMakineleriPage from "./pages/makine/IsMakineleriPage";
+import EkipmanlarPage from "./pages/makine/EkipmanlarPage";
 
 // Faz 1 kabuğu + Faz 2 proje/doküman modülleri. ProjectProvider AuthProvider'ın
 // içinde: seçili proje değişince izinler o kapsamda yeniden çözülür.
@@ -171,19 +182,8 @@ export default function App() {
                         }
                       />
 
-                      {/* Satınalma modülünün ana görünümü akış panosudur:
-                          modüle girildiğinde önce "işler nerede" sorusu yanıtlanır.
-                          Ayrıntılı listeler alt sekmelerdedir. */}
                       <Route
                         path="/satinalma"
-                        element={
-                          <RequirePerm perm="procurement.view">
-                            <ProcurementBoardPage />
-                          </RequirePerm>
-                        }
-                      />
-                      <Route
-                        path="/satinalma/talepler"
                         element={
                           <RequirePerm perm="procurement.view">
                             <PurchaseRequestsPage />
@@ -291,6 +291,21 @@ export default function App() {
                         }
                       />
                       <Route path="*" element={<Navigate to="/" replace />} />
+
+                      {/* ── PROJE yeni modüller ── */}
+                      <Route path="/proje/ozet" element={<RequirePerm perm="projects.view"><ProjectSummaryPage /></RequirePerm>} />
+                      <Route path="/proje/paysdaslar" element={<RequirePerm perm="projects.view"><ProjePaydaslariPage /></RequirePerm>} />
+                      <Route path="/proje/kesif" element={<RequirePerm perm="projects.view"><ProjeKesfiPage /></RequirePerm>} />
+                      <Route path="/hakedis/idari" element={<RequirePerm perm="progress_payments.view"><IdariHakedisPage /></RequirePerm>} />
+                      <Route path="/proje/personel" element={<RequirePerm perm="reports.view"><PersonelPage /></RequirePerm>} />
+                      <Route path="/proje/ilerleme-raporlari" element={<RequirePerm perm="reports.view"><IleremeRaporlariPage /></RequirePerm>} />
+                      <Route path="/proje/depo" element={<RequirePerm perm="reports.view"><DepoPage /></RequirePerm>} />
+                      <Route path="/proje/toplanti" element={<RequirePerm perm="reports.view"><ToplantiPage /></RequirePerm>} />
+                      <Route path="/proje/fotograflar" element={<RequirePerm perm="documents.view"><FotograflarPage /></RequirePerm>} />
+                      {/* ── MAKİNE & EKİPMAN ── */}
+                      <Route path="/makine/araclar" element={<RequirePerm perm="projects.view"><AraclarPage /></RequirePerm>} />
+                      <Route path="/makine/is-makineleri" element={<RequirePerm perm="projects.view"><IsMakineleriPage /></RequirePerm>} />
+                      <Route path="/makine/ekipmanlar" element={<RequirePerm perm="projects.view"><EkipmanlarPage /></RequirePerm>} />
                     </Routes>
                   </AppShell>
                 </ProjectProvider>
@@ -303,3 +318,5 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
+

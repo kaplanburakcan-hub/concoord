@@ -26,25 +26,29 @@ export default function DocumentsPage() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [sel, setSel] = useState<string | null>(null); // seçili klasör (null = tümü)
+  const [catFilter, setCatFilter] = useState<string | null>(null); // kategori filtresi
   const [err, setErr] = useState<string | null>(null);
 
   const pid = current?.id;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (cat: string | null, folder: string | null) => {
     if (!pid) return;
     setErr(null);
     try {
       const f = await api<{ folders: Folder[] }>(`/projects/${pid}/folders`, { projectId: pid });
       setFolders(f.folders);
-      const query = sel ? `?folder_id=${sel}` : "";
+      const params = new URLSearchParams();
+      if (folder) params.set("folder_id", folder);
+      if (cat) params.set("category", cat);
+      const query = params.toString() ? `?${params}` : "";
       const d = await api<{ documents: Doc[] }>(`/projects/${pid}/documents${query}`, { projectId: pid });
       setDocs(d.documents);
     } catch {
       setErr("Dokümanlar yüklenemedi ya da erişim yetkiniz yok.");
     }
-  }, [pid, sel]);
+  }, [pid]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(catFilter, sel); }, [load, catFilter, sel]);
 
   if (!current) {
     return <p className="text-beton-400">Önce üst bardan bir proje seçin veya oluşturun.</p>;
@@ -61,27 +65,40 @@ export default function DocumentsPage() {
           projectId={pid!}
           folders={folders}
           selected={sel}
-          onSelect={setSel}
+          onSelect={(id) => {
+            setSel(id);
+            setCatFilter(null);
+            load(null, id);
+          }}
+          catFilter={catFilter}
+          onCatFilter={(c) => {
+            setCatFilter(c);
+            setSel(null);
+            load(c, null); // state asenkron güncellenir; güncel değeri direkt geç
+          }}
           canManage={can("documents.manage_folders")}
-          onChanged={load}
+          onChanged={() => load(catFilter, sel)}
         />
         <DocPanel
           projectId={pid!}
           folderId={sel}
           docs={docs}
+          catFilter={catFilter}
           canUpload={can("documents.upload")}
           canDelete={can("documents.delete")}
           canDownload={can("documents.download")}
-          onChanged={load}
+          onChanged={() => load(catFilter, sel)}
         />
       </div>
     </div>
   );
 }
 
-function FolderPanel({ projectId, folders, selected, onSelect, canManage, onChanged }: {
+function FolderPanel({ projectId, folders, selected, onSelect, catFilter, onCatFilter, canManage, onChanged }: {
   projectId: string; folders: Folder[]; selected: string | null;
-  onSelect: (id: string | null) => void; canManage: boolean; onChanged: () => void;
+  onSelect: (id: string | null) => void;
+  catFilter: string | null; onCatFilter: (c: string | null) => void;
+  canManage: boolean; onChanged: () => void;
 }) {
   const [name, setName] = useState("");
   const roots = folders.filter((f) => !f.parent_id);
@@ -122,7 +139,22 @@ function FolderPanel({ projectId, folders, selected, onSelect, canManage, onChan
       >
         Tüm dokümanlar
       </button>
-      <div className="mt-1">{render(roots, 0)}</div>
+      {/* Kategoriler sabit olarak sol panelde — dropdown yerine doğrudan tıklanabilir */}
+      <div className="mt-2 border-t border-beton-800 pt-2">
+        <p className="text-[10px] uppercase tracking-wider text-beton-500 px-2 mb-1">Kategoriler</p>
+        {CATS.map((c) => (
+          <button key={c}
+            onClick={() => onCatFilter(catFilter === c ? null : c)}
+            className={"w-full text-left px-2 py-1 rounded text-sm truncate " +
+              (catFilter === c ? "bg-emniyet-500/20 text-emniyet-500" : "text-beton-300 hover:bg-beton-900")}>
+            {CAT_LABEL[c]}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 border-t border-beton-800 pt-2">
+        <p className="text-[10px] uppercase tracking-wider text-beton-500 px-2 mb-1">Klasörler</p>
+        <div>{render(roots, 0)}</div>
+      </div>
       {canManage && (
         <div className="mt-3 border-t border-beton-800 pt-2">
           <label className="block text-xs text-beton-400 mb-1">
@@ -144,12 +176,17 @@ function FolderPanel({ projectId, folders, selected, onSelect, canManage, onChan
   );
 }
 
-function DocPanel({ projectId, folderId, docs, canUpload, canDelete, canDownload, onChanged }: {
+function DocPanel({ projectId, folderId, docs, catFilter, canUpload, canDelete, canDownload, onChanged }: {
+  catFilter?: string | null;
   projectId: string; folderId: string | null; docs: Doc[];
   canUpload: boolean; canDelete: boolean; canDownload: boolean; onChanged: () => void;
 }) {
   const [showNew, setShowNew] = useState(false);
-  const [nf, setNf] = useState({ title: "", doc_category: "Contract" });
+  const [nf, setNf] = useState({ title: "", doc_category: catFilter ?? "Contract" });
+  // Kategori filtresi değişince yeni doküman formunu güncelle
+  useEffect(() => {
+    setNf(f => ({ ...f, doc_category: catFilter ?? "Contract" }));
+  }, [catFilter]);
   const [openId, setOpenId] = useState<string | null>(null);
 
   async function createDoc() {
