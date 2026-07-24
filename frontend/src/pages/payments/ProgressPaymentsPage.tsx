@@ -132,7 +132,7 @@ export default function ProgressPaymentsPage() {
           birlikte değerlendirilir. */}
       {can("progress_payments.view_financials") && (
         <div className="mt-6">
-          <RetentionPanel projectId={pid!} canRefund={can("progress_payments.finalize")} />
+          <RetentionPanel projectId={pid!} subFilter={subFilter || null} canRefund={can("progress_payments.finalize")} />
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-package payments
+﻿package payments
 
 // Faz 11 — Teminat (geçici kesinti) bakiyesi ve iade akışı.
 //
@@ -62,12 +62,29 @@ func (h *Handler) RetentionBalances(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rows, err := h.pool.Query(r.Context(), `
-		SELECT subcontractor_id, company_name,
-		       total_withheld::float8, total_refunded::float8, balance::float8
-		FROM v_retention_balance
-		WHERE project_id = $1
-		ORDER BY balance DESC, company_name`, pid)
+	subFilter := r.URL.Query().Get("subcontractor_id")
+	var rows pgx.Rows
+	var err error
+	if subFilter != "" {
+		subID, perr := uuid.Parse(subFilter)
+		if perr != nil {
+			httpx.ValidationFailed(w, r, map[string]string{"subcontractor_id": "geçersiz UUID"})
+			return
+		}
+		rows, err = h.pool.Query(r.Context(), `
+			SELECT subcontractor_id, company_name,
+			       total_withheld::float8, total_refunded::float8, balance::float8
+			FROM v_retention_balance
+			WHERE project_id = $1 AND subcontractor_id = $2
+			ORDER BY balance DESC, company_name`, pid, subID)
+	} else {
+		rows, err = h.pool.Query(r.Context(), `
+			SELECT subcontractor_id, company_name,
+			       total_withheld::float8, total_refunded::float8, balance::float8
+			FROM v_retention_balance
+			WHERE project_id = $1
+			ORDER BY balance DESC, company_name`, pid)
+	}
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -224,3 +241,4 @@ func (h *Handler) CreateRefund(w http.ResponseWriter, r *http.Request) {
 		"id": id.String(), "amount": req.Amount, "stage": req.Stage,
 	})
 }
+

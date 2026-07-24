@@ -30,9 +30,11 @@ const STAGE_LABEL: Record<string, string> = {
 
 export default function RetentionPanel({
   projectId,
+  subFilter,
   canRefund,
 }: {
   projectId: string;
+  subFilter?: string | null;
   canRefund: boolean;
 }) {
   const [balances, setBalances] = useState<Balance[]>([]);
@@ -43,9 +45,10 @@ export default function RetentionPanel({
   const [f, setF] = useState({ description: "", amount: "", stage: "ProvisionalAcceptance", note: "" });
   const [file, setFile] = useState<File | null>(null);
 
-  const loadBalances = useCallback(async () => {
+  const loadBalances = useCallback(async (filter?: string | null) => {
     try {
-      const r = await api<{ balances: Balance[] }>(`/projects/${projectId}/retention`, { projectId });
+      const q = filter ? `?subcontractor_id=${filter}` : "";
+      const r = await api<{ balances: Balance[] }>(`/projects/${projectId}/retention${q}`, { projectId });
       setBalances(r.balances ?? []);
     } catch {
       setErr("Teminat bakiyeleri yüklenemedi ya da finansal görüntüleme yetkiniz yok.");
@@ -62,7 +65,7 @@ export default function RetentionPanel({
     }
   }, [projectId]);
 
-  useEffect(() => { loadBalances(); }, [loadBalances]);
+  useEffect(() => { loadBalances(subFilter); }, [loadBalances, subFilter]);
   useEffect(() => { if (sel) loadRefunds(sel); }, [sel, loadRefunds]);
 
   const stageNeedsDoc = f.stage === "ProvisionalAcceptance" || f.stage === "FinalAcceptance";
@@ -96,7 +99,7 @@ export default function RetentionPanel({
       });
       setF({ description: "", amount: "", stage: "ProvisionalAcceptance", note: "" });
       setFile(null);
-      await loadBalances();
+      await loadBalances(subFilter);
       await loadRefunds(sel);
     } catch (e: any) {
       setErr(e?.message ?? "İade kaydedilemedi.");
