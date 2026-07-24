@@ -58,15 +58,63 @@ func TestValidatePO(t *testing.T) {
 }
 
 func TestValidateDelivery(t *testing.T) {
-	if _, errs := validateDelivery(deliveryReq{DeliveryNoteNo: "İRS-2026-0042"}); len(errs) != 0 {
+	// Faz 11: mal kabulde iki kanıt zorunlu — irsaliye ve malzeme fotoğrafı.
+	doc, mat := "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"
+	ok := deliveryReq{
+		DeliveryNoteNo:          "İRS-2026-0042",
+		DocumentID:              &doc,
+		MaterialPhotoDocumentID: &mat,
+	}
+	if _, errs := validateDelivery(ok); len(errs) != 0 {
 		t.Fatalf("geçerli teslimat reddedildi: %v", errs)
 	}
 	if _, errs := validateDelivery(deliveryReq{}); errs["delivery_note_no"] == "" {
 		t.Fatal("irsaliye no zorunluluğu yakalanmadı")
 	}
 	bad := "dün"
-	if _, errs := validateDelivery(deliveryReq{DeliveryNoteNo: "A", DeliveredAt: &bad}); errs["delivered_at"] == "" {
+	r := ok
+	r.DeliveredAt = &bad
+	if _, errs := validateDelivery(r); errs["delivered_at"] == "" {
 		t.Fatal("geçersiz teslim zamanı yakalanmadı")
+	}
+
+	// --- Faz 11 kuralları ---
+	if _, errs := validateDelivery(deliveryReq{DeliveryNoteNo: "A"}); errs["document_id"] == "" ||
+		errs["material_photo_document_id"] == "" {
+		t.Fatal("zorunlu fotoğraflar yakalanmadı")
+	}
+
+	// Uygunsuz teslimatta açıklama zorunludur.
+	short := ok
+	short.Condition = "Short"
+	if _, errs := validateDelivery(short); errs["discrepancy_note"] == "" {
+		t.Fatal("eksik teslimatta açıklama zorunluluğu yakalanmadı")
+	}
+	note := "3 palet eksik geldi, tedarikçi bilgilendirildi."
+	short.DiscrepancyNote = &note
+	if _, errs := validateDelivery(short); len(errs) != 0 {
+		t.Fatalf("açıklamalı eksik teslimat reddedildi: %v", errs)
+	}
+
+	// Kabul + red, gelen miktarı aşamaz.
+	over := ok
+	over.Items = []deliveryItemReq{
+		{MaterialName: "Çimento", ReceivedQty: 10, AcceptedQty: 8, RejectedQty: 5},
+	}
+	if _, errs := validateDelivery(over); errs["items[0].qty"] == "" {
+		t.Fatal("miktar tutarsızlığı yakalanmadı")
+	}
+
+	// Geçersiz teslim yeri ve durumu.
+	badType := ok
+	badType.ReceiptType = "Uzay"
+	if _, errs := validateDelivery(badType); errs["receipt_type"] == "" {
+		t.Fatal("geçersiz teslim yeri yakalanmadı")
+	}
+	badCond := ok
+	badCond.Condition = "Kayıp"
+	if _, errs := validateDelivery(badCond); errs["condition"] == "" {
+		t.Fatal("geçersiz teslim durumu yakalanmadı")
 	}
 }
 

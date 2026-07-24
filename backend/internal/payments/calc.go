@@ -1,4 +1,4 @@
-﻿// Package payments — Faz 3 finansal çekirdek: taşeron, sözleşme, birim fiyat
+// Package payments — Faz 3 finansal çekirdek: taşeron, sözleşme, birim fiyat
 // cetveli (work_items) ve kümülatif hakediş yönetimi (Plan §6.3, §6.4).
 //
 // Bu dosya HESAP ÇEKİRDEĞİDİR: tamamen saf (DB'siz, I/O'suz), bu yüzden birebir
@@ -337,4 +337,3 @@ func ComputeWith(inputs []CalcLineInput, grossPrev float64, terms ContractTerms,
 	res.ActualCost = round2(res.GrossThis - res.CostReducing)
 	return res
 }
-
