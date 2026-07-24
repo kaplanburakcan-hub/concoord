@@ -43,11 +43,15 @@ func TestSyntheticTwoPeriods(t *testing.T) {
 	if !approx(dedByType(p1, "Retention"), 600) { // 20.000*%3
 		t.Errorf("P1 teminat 600 bekleniyordu, %.2f", dedByType(p1, "Retention"))
 	}
-	if !approx(p1.TotalDeductions, 4600) || !approx(p1.NetPayable, 15400) {
-		t.Errorf("P1 kesinti/net hatalı: ded=%.2f net=%.2f", p1.TotalDeductions, p1.NetPayable)
+	// Faz 11 akışı: KDV DÖNEM BRÜTÜ üzerinden hesaplanır, kesintiler KDV dahil
+	// ödenebilir toplamdan düşülür.
+	//   brüt 20.000 + KDV 4.000 = 24.000 ödenebilir
+	//   − kesinti 4.600 (avans 4.000 + teminat 600) = 19.400 ödenecek
+	if !approx(p1.TotalDeductions, 4600) || !approx(p1.NetPayable, 19400) {
+		t.Errorf("P1 kesinti/ödenecek hatalı: ded=%.2f net=%.2f", p1.TotalDeductions, p1.NetPayable)
 	}
-	if !approx(p1.VatAmount, 3080) || !approx(p1.GrandTotal, 18480) {
-		t.Errorf("P1 KDV/genel toplam hatalı: kdv=%.2f gt=%.2f", p1.VatAmount, p1.GrandTotal)
+	if !approx(p1.VatAmount, 4000) || !approx(p1.PayableGross, 24000) {
+		t.Errorf("P1 KDV/ödenebilir hatalı: kdv=%.2f payable=%.2f", p1.VatAmount, p1.PayableGross)
 	}
 
 	// Dönem 1 satır taşıması: A this=100→10.000, B this=200→10.000
@@ -78,11 +82,13 @@ func TestSyntheticTwoPeriods(t *testing.T) {
 	if !approx(dedByType(p2, "Retention"), 1050) { // 35.000*%3
 		t.Errorf("P2 teminat 1050 bekleniyordu, %.2f", dedByType(p2, "Retention"))
 	}
-	if !approx(p2.TotalDeductions, 7050) || !approx(p2.NetPayable, 27950) {
-		t.Errorf("P2 kesinti/net hatalı: ded=%.2f net=%.2f", p2.TotalDeductions, p2.NetPayable)
+	//   brüt 35.000 + KDV 7.000 = 42.000 ödenebilir
+	//   − kesinti 7.050 (avans 6.000 + teminat 1.050) = 34.950 ödenecek
+	if !approx(p2.TotalDeductions, 7050) || !approx(p2.NetPayable, 34950) {
+		t.Errorf("P2 kesinti/ödenecek hatalı: ded=%.2f net=%.2f", p2.TotalDeductions, p2.NetPayable)
 	}
-	if !approx(p2.VatAmount, 5590) || !approx(p2.GrandTotal, 33540) {
-		t.Errorf("P2 KDV/genel toplam hatalı: kdv=%.2f gt=%.2f", p2.VatAmount, p2.GrandTotal)
+	if !approx(p2.VatAmount, 7000) || !approx(p2.PayableGross, 42000) {
+		t.Errorf("P2 KDV/ödenebilir hatalı: kdv=%.2f payable=%.2f", p2.VatAmount, p2.PayableGross)
 	}
 }
 
@@ -120,7 +126,15 @@ func TestAdvanceFullyRecovered(t *testing.T) {
 }
 
 func TestRound2(t *testing.T) {
-	cases := map[float64]float64{1.005: 1.01, 2.344: 2.34, 2.345: 2.35, -1.005: -1.01}
+	// Muhasebe kuralı: yarım YUKARI (sıfırdan uzağa). İkili gösterim hatası
+	// nedeniyle eşiğin iki yanına düşen değerler ayrıca sınanır: 1.005 bellekte
+	// eşiğin altında, 2.345 üstünde saklanır — ikisi de yukarı yuvarlanmalı.
+	cases := map[float64]float64{
+		1.005: 1.01, 2.344: 2.34, 2.345: 2.35, -1.005: -1.01,
+		0: 0, 0.004: 0, 0.005: 0.01, -0.005: -0.01,
+		1.014999: 1.01, 1.015: 1.02, 99.994: 99.99, 99.995: 100,
+		12345.675: 12345.68, 1000000.005: 1000000.01,
+	}
 	for in, want := range cases {
 		if got := round2(in); !approx(got, want) {
 			t.Errorf("round2(%.4f)=%.2f, beklenen %.2f", in, got, want)

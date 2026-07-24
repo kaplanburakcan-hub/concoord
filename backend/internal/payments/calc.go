@@ -1,4 +1,4 @@
-// Package payments — Faz 3 finansal çekirdek: taşeron, sözleşme, birim fiyat
+﻿// Package payments — Faz 3 finansal çekirdek: taşeron, sözleşme, birim fiyat
 // cetveli (work_items) ve kümülatif hakediş yönetimi (Plan §6.3, §6.4).
 //
 // Bu dosya HESAP ÇEKİRDEĞİDİR: tamamen saf (DB'siz, I/O'suz), bu yüzden birebir
@@ -12,11 +12,37 @@ import "math"
 // round2 — kuruş (2 ondalık) yuvarlama, sıfırdan uzağa (banker's değil) — Türk
 // hakediş uygulamasındaki alışılmış yuvarlama. Tüm ara/nihai tutarlara uygulanır
 // ki toplamlar ile satır dökümü birbirini tutsun.
+// round2 — parasal tutarları 2 ondalığa yuvarlar (muhasebe kuralı: yarım
+// YUKARI, sıfırdan uzağa).
+//
+// Neden düz math.Round yetmiyor: float64 ikili tabanlıdır ve 1.005 gibi
+// ondalık değerler tam saklanamaz. 1.005 bellekte 1.00499999999999989…
+// olarak durur; 100 ile çarpılınca 100.49999999999999 çıkar ve AŞAĞI yuvarlanır
+// (1.00). Buna karşılık 2.345 bellekte 2.34500000000000019… olduğundan doğru
+// yuvarlanır (2.35). Yani sonuç, sayının ikili gösterimde eşiğin hangi tarafına
+// düştüğüne göre DEĞİŞİR — hakedişte kuruş farkları ve mutabakat sorunları
+// doğurur.
+//
+// Çözüm: eşiğe, sayının büyüklüğüne göre ölçeklenen küçük bir tolerans eklenir
+// (4 ULP — "unit in the last place", o büyüklükteki iki komşu float arasındaki
+// mesafe). Sabit bir epsilon büyük tutarlarda etkisiz kalırdı; ULP her ölçekte
+// çalışır ve gerçek değeri değiştirecek kadar büyük değildir.
+//
+// NOT: Kalıcı çözüm parayı kuruş cinsinden tam sayı ya da ondalık tipte tutmaktır
+// (veritabanı zaten numeric(18,2) kullanıyor). Bu, Go katmanında geniş bir
+// yeniden yapılandırma gerektirir; o güne dek bu yuvarlama muhasebe kuralını
+// güvenle karşılar.
 func round2(x float64) float64 {
-	if x < 0 {
-		return -math.Round(-x*100) / 100
+	if x == 0 || math.IsNaN(x) || math.IsInf(x, 0) {
+		return x
 	}
-	return math.Round(x*100) / 100
+	sign := 1.0
+	if x < 0 {
+		sign, x = -1.0, -x
+	}
+	scaled := x * 100
+	tol := (math.Nextafter(scaled, math.Inf(1)) - scaled) * 4
+	return sign * math.Floor(scaled+0.5+tol) / 100
 }
 
 // CalcLineInput — bir poz için hesap girdisi. cum_qty = bu döneme dek KÜMÜLATİF
@@ -311,3 +337,4 @@ func ComputeWith(inputs []CalcLineInput, grossPrev float64, terms ContractTerms,
 	res.ActualCost = round2(res.GrossThis - res.CostReducing)
 	return res
 }
+
