@@ -1,4 +1,4 @@
-﻿import type { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Can } from "../auth/guards";
@@ -6,17 +6,10 @@ import { useProjects } from "../projects/ProjectContext";
 import { useTheme } from "../theme/ThemeContext";
 import NotificationBell from "./NotificationBell";
 
-// Faz 10 arayüz yenileme — "Profesyonel Proje Kontrol Arayüzü".
-// Sol lacivert (RAL 5026) kenar çubuğu (gruplu, ikonlu) + lacivert üst bar
-// (proje seçici, tema düğmesi, bildirim, kullanıcı). İçerik <main.app-canvas>
-// içinde (uçuk gökyüzü + nokta deseni). Navigasyon <Can> ile korunur.
-
-// children: modül içi alt sayfalar (ör. Satınalma → Talepler / Siparişler).
-// Sayfa içine serpiştirilmiş küçük bağlantılar yerine navigasyonda hiyerarşi
-// olarak gösterilir; alt başlıklar yalnızca o modüldeyken açılır.
+type AltKirilim = { to: string; label: string; end?: boolean };
 type NavDef = {
-  to: string; label: string; perm?: string; icon: ReactNode; badge?: number;
-  children?: { to: string; label: string; end?: boolean }[];
+  to: string; label: string; perm?: string; icon: ReactNode; badge?: number; end?: boolean;
+  children?: AltKirilim[];
 };
 type NavGroup = { title: string; items: NavDef[] };
 
@@ -44,11 +37,13 @@ const I = {
   rapor: <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>,
   personel: <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.87"/></svg>,
   depo: <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  sozlesme: <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>,
+  tasarim: <svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>,
+  ekstrem: <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>,
+  puantaj: <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>,
 };
 
 const GROUPS: NavGroup[] = [
-  // ─── GENEL ──────────────────────────────────────────────────────────
-  // Şirket geneli stratejik görünüm. Proje seçimine bağlı değil.
   {
     title: "Genel",
     items: [
@@ -56,17 +51,15 @@ const GROUPS: NavGroup[] = [
       { to: "/projects", label: "Projeler", perm: "projects.view", icon: I.proje },
     ],
   },
-
-  // ─── PROJE ──────────────────────────────────────────────────────────
-  // Seçili projeye ait tüm iş akışları buradadır.
   {
     title: "Proje",
     items: [
       { to: "/proje/ozet", label: "Özet / Dashboard", perm: "projects.view", icon: I.ozet },
       { to: "/proje/paysdaslar", label: "Proje Paydaşları", perm: "projects.view", icon: I.kullanici },
       { to: "/proje/kesif", label: "Proje Keşfi", perm: "projects.view", icon: I.dok },
-      { to: "/hakedis/idari", label: "İdari Hakedişler", perm: "progress_payments.view", icon: I.idarihakedis },
-      { to: "/hakedis", label: "Taşeron Hakedişleri", perm: "progress_payments.view", icon: I.hakedis },
+      { to: "/proje/ana-sozlesme", label: "Ana Sözleşme", perm: "projects.view", icon: I.sozlesme },
+      { to: "/proje/tasarim-projeler", label: "Tasarım ve Projeler", perm: "projects.view", icon: I.tasarim },
+      { to: "/hakedis/idari", label: "İdari Hakedişler", perm: "progress_payments.view", icon: I.idarihakedis, end: true },
       {
         to: "/satinalma", label: "Satın Alma ve Tedarik", perm: "procurement.view", icon: I.satinalma,
         children: [
@@ -75,21 +68,27 @@ const GROUPS: NavGroup[] = [
           { to: "/satinalma/siparisler", label: "Siparişler (PO)" },
         ],
       },
-      { to: "/taseronlar", label: "Taşeronlar & Tedarikçiler", perm: "contracts.view", icon: I.taseron },
-      { to: "/documents", label: "Dokümanlar", perm: "documents.view", icon: I.dok },
       { to: "/malzeme-onaylari", label: "Malzeme Onayları", perm: "material_approvals.view", icon: I.malzeme },
-      { to: "/proje/ilerleme-raporlari", label: "İlerleme Raporları", perm: "reports.view", icon: I.rapor },
-      { to: "/aylik-raporlar", label: "Proje Maliyet Raporları", perm: "reports.view_financial_reports", icon: I.aylik },
-      { to: "/proje/personel", label: "Personel / Puantaj", perm: "reports.view", icon: I.personel },
+      { to: "/proje/ilerleme-raporlari", label: "Proje İzleme Raporları", perm: "reports.view", icon: I.rapor },
+      { to: "/aylik-raporlar/imalat", label: "İmalat Raporları", perm: "reports.view_financial_reports", icon: I.aylik },
+      { to: "/proje/personel", label: "Personel Yönetimi", perm: "reports.view", icon: I.personel },
     ],
   },
-
-  // ─── SAHA ───────────────────────────────────────────────────────────
-  // Şantiye düzeyindeki günlük operasyonlar.
+  {
+    title: "Taşeron ve Tedarikçi Yönetimi",
+    items: [
+      { to: "/taseronlar", label: "Taşeronlar & Tedarikçiler", perm: "contracts.view", icon: I.taseron },
+      { to: "/documents", label: "Dokümanlar", perm: "documents.view", icon: I.dok },
+      { to: "/hakedis", label: "Taşeron Hakedişleri", perm: "progress_payments.view", icon: I.hakedis, end: true },
+      { to: "/tedarikci-ekstreler", label: "Tedarikçi Ekstreler", perm: "contracts.view", icon: I.ekstrem },
+    ],
+  },
   {
     title: "Saha",
     items: [
-      { to: "/saha-raporlari", label: "Günlük & Haftalık İmalat", perm: "reports.view", icon: I.saha },
+      { to: "/saha-raporlari", label: "Günlük Rapor Girişi", perm: "reports.view", icon: I.saha },
+      { to: "/saha/tutanaklar", label: "Saha Tutanakları", perm: "reports.view", icon: I.rapor },
+      { to: "/proje/personel-puantaj", label: "Personel & Puantaj Girişi", perm: "reports.view", icon: I.puantaj },
       { to: "/proje/depo", label: "Depo Raporları", perm: "reports.view", icon: I.depo },
       {
         to: "/isg", label: "İSG & OSGB", perm: "ohs.view", icon: I.isg,
@@ -104,9 +103,6 @@ const GROUPS: NavGroup[] = [
       { to: "/proje/fotograflar", label: "Fotoğraflar", perm: "documents.view", icon: I.fotograf },
     ],
   },
-
-  // ─── FİNANS / YÖNETİM ──────────────────────────────────────────────
-  // Şirket geneli finansal ve idari yönetim.
   {
     title: "Finans / Yönetim",
     items: [
@@ -116,8 +112,6 @@ const GROUPS: NavGroup[] = [
       { to: "/admin/audit", label: "Denetim İzi", perm: "admin.view_audit_log", icon: I.denetim },
     ],
   },
-
-  // ─── MAKİNE VE EKİPMAN YÖNETİMİ ────────────────────────────────────
   {
     title: "Makine & Ekipman",
     items: [
@@ -144,24 +138,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen grid grid-cols-1 md:grid-cols-[250px_1fr]">
-      {/* ---------------- Sidebar (RAL 5026) ---------------- */}
       <aside
         className="hidden md:flex flex-col sticky top-0 h-screen border-r"
         style={{ background: "var(--chrome)", color: "var(--chrome-text)", borderColor: "var(--chrome-border)" }}
       >
-        <div className="flex items-center gap-3 px-5 pt-5 pb-4">
-          <div
-            className="w-9 h-9 rounded-[10px] grid place-items-center text-white font-medium text-[15px]"
-            style={{ background: "linear-gradient(135deg,var(--accent),var(--accent-sky))" }}
-          >
-            İP
-          </div>
-          <div className="leading-tight">
-            <div className="text-white font-medium text-[17px] tracking-wide">İPKS</div>
-            <div className="text-[10.5px] tracking-[0.16em]" style={{ color: "var(--chrome-text-3)" }}>
-              v1.0.0 · kontrol
-            </div>
-          </div>
+        <div className="flex items-center justify-center px-5 h-16 border-b" style={{ borderColor: "#F5A800" }}>
+          <img src="/logo.png" alt="ConCoord" className="h-12 w-auto object-contain" />
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 pb-3">
@@ -202,14 +184,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      {/* ---------------- Main ---------------- */}
       <div className="flex flex-col min-w-0 app-canvas">
         <header
           className="h-16 flex items-center gap-3 px-5 sticky top-0 z-10 border-b"
           style={{ background: "var(--chrome)", color: "var(--chrome-text)", borderColor: "var(--chrome-border)" }}
         >
-          {/* mobil marka */}
-          <span className="md:hidden text-white font-medium tracking-wide">İPKS</span>
+          <span className="md:hidden text-white font-medium tracking-wide">ConCoord</span>
 
           {projects.length > 0 && (
             <label
@@ -274,66 +254,60 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
 function SideLink({ item }: { item: NavDef }) {
   const { pathname } = useLocation();
-  // Alt başlıklar yalnızca ilgili modüldeyken görünür: sidebar kısa kalır,
-  // kullanıcı bulunduğu modülün bölümlerini bir bakışta görür.
   const inSection =
     !!item.children &&
-    (pathname === item.to || pathname.startsWith(item.to.replace(/\/$/, "") + "/"));
+    (pathname === item.to || pathname.startsWith(item.to.replace(/\/$/, "") + "/")) &&
+    !(item.end && pathname !== item.to);
 
   return (
     <>
-    <NavLink
-      to={item.to}
-      end={item.to === "/"}
-      className={({ isActive }) =>
-        "relative flex items-center gap-3 px-3 py-2.5 rounded-[9px] text-[14px] transition " +
-        (isActive ? "text-white" : "hover:opacity-90")
-      }
-      style={({ isActive }) =>
-        isActive
-          ? { background: "var(--chrome-active)", color: "#fff" }
-          : { color: "var(--chrome-text-2)" }
-      }
-    >
-      {({ isActive }) => (
-        <>
-          <span
-            className="flex-none [&>svg]:w-[18px] [&>svg]:h-[18px] [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-width:1.7]"
-            style={{ color: isActive ? "var(--accent-sky)" : "currentColor" }}
-          >
-            {item.icon}
-          </span>
-          <span className="flex-1">{item.label}</span>
-          {isActive && (
+      <NavLink
+        to={item.to}
+        end={item.to === "/" || !!item.end}
+        className={({ isActive }) =>
+          "relative flex items-center gap-3 px-3 py-2.5 rounded-[9px] text-[14px] transition " +
+          (isActive ? "text-white" : "hover:opacity-90")
+        }
+        style={({ isActive }) =>
+          isActive
+            ? { background: "var(--chrome-active)", color: "#fff" }
+            : { color: "var(--chrome-text-2)" }
+        }
+      >
+        {({ isActive }) => (
+          <>
             <span
-              className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r"
-              style={{ background: "var(--accent-sky)" }}
-            />
-          )}
-        </>
-      )}
-    </NavLink>
+              className="flex-none [&>svg]:w-[18px] [&>svg]:h-[18px] [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-width:1.7]"
+              style={{ color: isActive ? "var(--accent-sky)" : "currentColor" }}
+            >
+              {item.icon}
+            </span>
+            <span className="flex-1">{item.label}</span>
+            {isActive && (
+              <span
+                className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r"
+                style={{ background: "var(--accent-sky)" }}
+              />
+            )}
+          </>
+        )}
+      </NavLink>
 
-    {inSection && (
-      <div className="mb-1 ml-[30px] border-l pl-3" style={{ borderColor: "var(--chrome-border)" }}>
-        {item.children!.map((c) => (
-          <NavLink
-            key={c.to}
-            to={c.to}
-            end={c.end}
-            className="block py-1.5 text-[13px] transition"
-            style={({ isActive }) => ({ color: isActive ? "var(--accent-sky)" : "var(--chrome-text-2)" })}
-          >
-            {c.label}
-          </NavLink>
-        ))}
-      </div>
-    )}
+      {inSection && (
+        <div className="mb-1 ml-[30px] border-l pl-3" style={{ borderColor: "var(--chrome-border)" }}>
+          {item.children!.map((c) => (
+            <NavLink
+              key={c.to}
+              to={c.to}
+              end={c.end}
+              className="block py-1.5 text-[13px] transition"
+              style={({ isActive }) => ({ color: isActive ? "var(--accent-sky)" : "var(--chrome-text-2)" })}
+            >
+              {c.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
     </>
   );
 }
-
-
-
-
-

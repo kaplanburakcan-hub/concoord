@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, apiDownload, RequestError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../../projects/ProjectContext";
 
-// Faz 6 — Haftalık İlerleme Raporları.
+// Faz 6 – Haftalık İlerleme Raporları.
 // "Tek tıkla PDF": kullanıcı haftayı seçer, API snapshot'ı dondurur ve işi
 // kuyruğa atar; worker PDF'i üretince satır Ready olur ve indirilebilir.
 // Pending kayıtlar kısa aralıkla yoklanır (worker genelde saniyeler içinde biter).
@@ -107,7 +108,17 @@ export default function WeeklyReportsPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      <h1 className="font-display font-extrabold text-xl text-white">Haftalık İlerleme Raporları</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="font-display font-extrabold text-xl text-white">Haftalık İlerleme Raporları</h1>
+        {can("reports.view") && (
+          <Link
+            to="/saha-raporlari"
+            className="rounded-md border border-beton-700 px-3 py-2 text-sm text-beton-200 hover:border-emniyet-500"
+          >
+            ← Günlük Raporlar
+          </Link>
+        )}
+      </div>
 
       {can("reports.generate_weekly") && (
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 flex items-end gap-3 flex-wrap">
@@ -155,7 +166,7 @@ export default function WeeklyReportsPage() {
               <div className="text-xs text-beton-400 mt-1">
                 Üreten: {w.generated_by_name}
                 {w.status === "Failed" && w.error && (
-                  <span className="text-red-400"> — {w.error}</span>
+                  <span className="text-red-400"> – {w.error}</span>
                 )}
               </div>
             </div>
