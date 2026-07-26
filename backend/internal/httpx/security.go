@@ -32,7 +32,7 @@ func CORS(allowed []string) func(http.Handler) http.Handler {
 					h.Set("Vary", "Origin")
 					h.Set("Access-Control-Allow-Credentials", "true")
 					h.Set("Access-Control-Allow-Methods", "GET,POST,PATCH,PUT,DELETE,OPTIONS")
-					h.Set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Request-Id")
+					h.Set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Request-Id,X-Project-Id")
 					h.Set("Access-Control-Max-Age", "600")
 				}
 			}
