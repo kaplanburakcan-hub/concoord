@@ -5,12 +5,13 @@ COPY . .
 RUN go mod tidy
 RUN CGO_ENABLED=0 go build -o /out/api ./cmd/api \
  && CGO_ENABLED=0 go build -o /out/worker ./cmd/worker
-
 # ---- runtime ----
 FROM alpine:3.20
 RUN adduser -D -u 10001 ipks && apk add --no-cache ca-certificates curl tzdata
+COPY --from=build /out/api /out/worker /app/
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 USER ipks
 WORKDIR /app
-COPY --from=build /out/api /out/worker /app/
 EXPOSE 8080
-ENTRYPOINT ["/app/api"]
+ENTRYPOINT ["/app/start.sh"]
