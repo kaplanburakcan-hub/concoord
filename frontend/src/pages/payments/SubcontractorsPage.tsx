@@ -13,11 +13,31 @@ type WorkItem = {
   contract_qty: number; unit_price?: number; contract_amount?: number; row_version: number;
 };
 
+// Tedarikçi tipi (localStorage'da saklanır)
+type Tedarikci = {
+  id: string; company_name: string; trade?: string; contact_person?: string;
+  phone?: string; email?: string; tax_no?: string;
+};
+
+function tedarikcilerKey(pid: string) { return `ipks_tedarikciler_${pid}`; }
+
+function loadTedarikciler(pid: string): Tedarikci[] {
+  try { return JSON.parse(localStorage.getItem(tedarikcilerKey(pid)) || "[]"); } catch { return []; }
+}
+
+function saveTedarikciler(pid: string, data: Tedarikci[]) {
+  localStorage.setItem(tedarikcilerKey(pid), JSON.stringify(data));
+}
+
+type ActiveType = "taseron" | "tedarikci";
+
 export default function SubcontractorsPage() {
   const { current } = useProjects();
   const { can } = useAuth();
   const [subs, setSubs] = useState<Sub[]>([]);
+  const [tedarikciler, setTedarikciler] = useState<Tedarikci[]>([]);
   const [sel, setSel] = useState<string | null>(null);
+  const [activeType, setActiveType] = useState<ActiveType>("taseron");
   const [err, setErr] = useState<string | null>(null);
   const pid = current?.id;
 
@@ -27,31 +47,64 @@ export default function SubcontractorsPage() {
     try {
       const r = await api<{ subcontractors: Sub[] }>(`/projects/${pid}/subcontractors`, { projectId: pid });
       setSubs(r.subcontractors);
-      if (!sel && r.subcontractors.length) setSel(r.subcontractors[0].id);
+      if (activeType === "taseron" && !sel && r.subcontractors.length) setSel(r.subcontractors[0].id);
     } catch {
       setErr("Taşeronlar yüklenemedi ya da erişim yetkiniz yok.");
     }
-  }, [pid, sel]);
+    setTedarikciler(loadTedarikciler(pid));
+  }, [pid, sel, activeType]);
 
   useEffect(() => { load(); }, [load]);
 
+  function handleSelectTaseron(id: string) {
+    setActiveType("taseron");
+    setSel(id);
+  }
+
+  function handleSelectTedarikci(id: string) {
+    setActiveType("tedarikci");
+    setSel(id);
+  }
+
+  function onTedarikciChanged(data: Tedarikci[]) {
+    if (!pid) return;
+    saveTedarikciler(pid, data);
+    setTedarikciler(data);
+  }
+
   if (!current) return <p className="text-beton-400">Önce üst bardan bir proje seçin.</p>;
+
+  const selTedarikci = activeType === "tedarikci" ? tedarikciler.find(t => t.id === sel) : null;
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-extrabold text-white">Taşeronlar</h1>
-      <p className="text-sm text-beton-400 mt-1">{current.name} — taşeron kartları ve birim fiyat cetvelleri.</p>
+      <h1 className="font-display text-2xl font-extrabold text-white">Taşeronlar & Tedarikçiler</h1>
+      <p className="text-sm text-beton-400 mt-1">{current.name} — firma kartları ve sözleşme bilgileri.</p>
       {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
 
       <div className="mt-4 grid gap-4 md:grid-cols-[300px_1fr]">
-        <SubPanel
-          projectId={pid!} subs={subs} selected={sel} onSelect={setSel}
-          canManage={can("contracts.upload")} onChanged={load}
-        />
-        {sel ? (
+        {/* Sol panel — iki grup */}
+        <div className="space-y-3">
+          {/* Taşeronlar */}
+          <SubPanel
+            projectId={pid!} subs={subs}
+            selected={activeType === "taseron" ? sel : null}
+            onSelect={handleSelectTaseron}
+            canManage={can("contracts.upload")} onChanged={load}
+          />
+          {/* Tedarikçiler */}
+          <TedarikciPanel
+            tedarikciler={tedarikciler}
+            selected={activeType === "tedarikci" ? sel : null}
+            onSelect={handleSelectTedarikci}
+            canManage={can("contracts.upload")}
+            onChanged={onTedarikciChanged}
+          />
+        </div>
+
+        {/* Sağ panel */}
+        {activeType === "taseron" && sel ? (
           <div className="space-y-4">
-            {/* Faz 11 — sözleşme paneli: avans/teminat/stopaj ve süre bilgileri
-                hakediş hesabını ve dönem kontrollerini besler. */}
             <ContractPanel
               projectId={pid!} subId={sel}
               canManage={can("contracts.upload")}
@@ -63,9 +116,19 @@ export default function SubcontractorsPage() {
               canFin={can("progress_payments.view_financials")}
             />
           </div>
+        ) : activeType === "tedarikci" && selTedarikci ? (
+          <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 space-y-3">
+            <h2 className="font-display font-bold text-white text-lg">{selTedarikci.company_name}</h2>
+            {selTedarikci.trade && <p className="text-beton-400 text-sm">Branş: {selTedarikci.trade}</p>}
+            {selTedarikci.contact_person && <p className="text-beton-400 text-sm">İletişim: {selTedarikci.contact_person}</p>}
+            {selTedarikci.phone && <p className="text-beton-400 text-sm">Tel: {selTedarikci.phone}</p>}
+            {selTedarikci.email && <p className="text-beton-400 text-sm">E-posta: {selTedarikci.email}</p>}
+            {selTedarikci.tax_no && <p className="text-beton-400 text-sm">Vergi No: {selTedarikci.tax_no}</p>}
+            <p className="text-xs text-beton-500 mt-4">Tedarikçi sözleşme ve ekstreler yakında eklenecek.</p>
+          </div>
         ) : (
           <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 text-beton-400 text-sm">
-            Soldan bir taşeron seçin.
+            Soldan bir taşeron veya tedarikçi seçin.
           </div>
         )}
       </div>
@@ -73,6 +136,7 @@ export default function SubcontractorsPage() {
   );
 }
 
+// ── Taşeron Paneli ────────────────────────────────────────────────────
 function SubPanel({ projectId, subs, selected, onSelect, canManage, onChanged }: {
   projectId: string; subs: Sub[]; selected: string | null;
   onSelect: (id: string) => void; canManage: boolean; onChanged: () => void;
@@ -95,8 +159,8 @@ function SubPanel({ projectId, subs, selected, onSelect, canManage, onChanged }:
 
   return (
     <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
-      <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide">Firmalar</h2>
-      <ul className="mt-2 space-y-1">
+      <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide mb-2">🏗️ Taşeronlar</h2>
+      <ul className="space-y-1">
         {subs.map((s) => (
           <li key={s.id}>
             <button
@@ -135,6 +199,77 @@ function SubPanel({ projectId, subs, selected, onSelect, canManage, onChanged }:
   );
 }
 
+// ── Tedarikçi Paneli ──────────────────────────────────────────────────
+function TedarikciPanel({ tedarikciler, selected, onSelect, canManage, onChanged }: {
+  tedarikciler: Tedarikci[]; selected: string | null;
+  onSelect: (id: string) => void; canManage: boolean;
+  onChanged: (data: Tedarikci[]) => void;
+}) {
+  const [name, setName] = useState("");
+  const [trade, setTrade] = useState("");
+
+  function add() {
+    if (!name.trim()) return;
+    const newT: Tedarikci = {
+      id: Math.random().toString(36).slice(2, 10),
+      company_name: name.trim(),
+      trade: trade.trim() || undefined,
+    };
+    onChanged([...tedarikciler, newT]);
+    setName(""); setTrade("");
+  }
+
+  function sil(id: string) {
+    if (!confirm("Bu tedarikçiyi silmek istediğinize emin misiniz?")) return;
+    onChanged(tedarikciler.filter(t => t.id !== id));
+  }
+
+  return (
+    <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
+      <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide mb-2">📦 Tedarikçiler</h2>
+      <ul className="space-y-1">
+        {tedarikciler.map((t) => (
+          <li key={t.id} className="flex items-center gap-1">
+            <button
+              onClick={() => onSelect(t.id)}
+              className={`flex-1 text-left rounded px-2 py-1.5 text-sm ${
+                selected === t.id ? "bg-emniyet-500 text-beton-950 font-semibold" : "text-beton-200 hover:bg-beton-800"
+              }`}
+            >
+              {t.company_name}
+              {t.trade && <span className="block text-xs opacity-70">{t.trade}</span>}
+            </button>
+            {canManage && (
+              <button onClick={() => sil(t.id)} className="text-red-400 hover:text-red-300 text-xs px-1">✕</button>
+            )}
+          </li>
+        ))}
+        {!tedarikciler.length && <li className="text-beton-400 text-sm px-2 py-1">Henüz tedarikçi yok.</li>}
+      </ul>
+
+      {canManage && (
+        <div className="mt-3 border-t border-beton-800 pt-3 space-y-2">
+          <input
+            value={name} onChange={(e) => setName(e.target.value)} placeholder="Firma adı"
+            className="w-full rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-white"
+          />
+          <input
+            value={trade} onChange={(e) => setTrade(e.target.value)} placeholder="Branş / Ürün grubu"
+            className="w-full rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-white"
+          />
+          <button
+            onClick={add}
+            className="w-full rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-1.5"
+          >
+            Tedarikçi Ekle
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── İş Kalemi Paneli ──────────────────────────────────────────────────
 function WorkItemPanel({ projectId, subId, canManage, canDelete, canFin }: {
   projectId: string; subId: string; canManage: boolean; canDelete: boolean; canFin: boolean;
 }) {
@@ -213,7 +348,7 @@ function WorkItemPanel({ projectId, subId, canManage, canDelete, canFin }: {
             <th className="py-1 pr-2">Poz</th>
             <th className="py-1 pr-2">Açıklama</th>
             <th className="py-1 pr-2">Birim</th>
-            <th className="py-1 pr-2 text-right">Sözl. Mik.</th>
+            <th className="py-1 pr-2 text-right">Söz. Mik.</th>
             {canFin && <th className="py-1 pr-2 text-right">B. Fiyat</th>}
             {canFin && <th className="py-1 pr-2 text-right">Tutar</th>}
             {canDelete && <th></th>}
