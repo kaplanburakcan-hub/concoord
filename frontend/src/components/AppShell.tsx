@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Can } from "../auth/guards";
 import { useProjects } from "../projects/ProjectContext";
@@ -142,9 +142,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
         className="hidden md:flex flex-col sticky top-0 h-screen border-r"
         style={{ background: "var(--chrome)", color: "var(--chrome-text)", borderColor: "var(--chrome-border)" }}
       >
-        <div className="flex items-center justify-center px-5 h-16 border-b" style={{ borderColor: "#F5A800" }}>
-          <img src="/logo.png" alt="ConCoord" className="h-12 w-auto object-contain" />
-        </div>
+        <Link
+          to="/"
+          className="flex items-center justify-center px-4 h-16 border-b"
+          style={{ borderColor: "#F5A800" }}
+        >
+          <img src="/logo.png" alt="ConCoord" className="h-full w-full object-contain py-2" />
+        </Link>
 
         <nav className="flex-1 overflow-y-auto px-3 pb-3">
           {GROUPS.map((g) => (
