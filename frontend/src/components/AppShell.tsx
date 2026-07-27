@@ -144,10 +144,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
       >
         <Link
           to="/"
-          className="flex items-center justify-center px-4 h-16 border-b"
-          style={{ borderColor: "#F5A800" }}
+          className="flex items-center justify-center px-2 border-b shrink-0"
+          style={{
+            height: "100px",
+            borderColor: "#F5A800",
+            background: "linear-gradient(175deg, #0e3268 0%, #00142e 100%)",
+            boxShadow: "0 3px 10px rgba(0,0,0,0.45)",
+          }}
         >
-          <img src="/logo.png" alt="ConCoord" className="h-full w-full object-contain py-2" />
+          <img src="/logo.png" alt="ConCoord" className="w-full h-full object-contain" />
         </Link>
 
         <nav className="flex-1 overflow-y-auto px-3 pb-3">
