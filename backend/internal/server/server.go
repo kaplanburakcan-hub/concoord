@@ -14,6 +14,11 @@ import (
 	"github.com/ipks/ipks/backend/internal/audit"
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/config"
+	"github.com/ipks/ipks/backend/internal/contracts"
+	"github.com/ipks/ipks/backend/internal/design"
+	"github.com/ipks/ipks/backend/internal/personnel"
+	"github.com/ipks/ipks/backend/internal/statements"
+	"github.com/ipks/ipks/backend/internal/survey"
 	"github.com/ipks/ipks/backend/internal/dashboard"
 	"github.com/ipks/ipks/backend/internal/documents"
 	"github.com/ipks/ipks/backend/internal/httpx"
@@ -96,6 +101,21 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 	// --- Faz 9 bağımlılıkları (dashboard, EVM, aylık yönetim raporu) ---
 	dashH := dashboard.NewHandler(pool, eval, recorder, notifySvc, store, log)
+
+	// --- Faz 18: Ana Sözleşme ---
+	contractH := contracts.NewHandler(pool)
+
+	// --- Faz 19: Proje Keşfi ---
+	surveyH := survey.NewHandler(pool)
+
+	// --- Faz 20: Tasarım ve Projeler ---
+	designH := design.NewHandler(pool)
+
+	// --- Faz 21: Personel & Puantaj ---
+	personnelH := personnel.NewHandler(pool)
+
+	// --- Faz 22: Tedarikçi Ekstreler ---
+	statementsH := statements.NewHandler(pool)
 
 	// Liveness — süreç ayakta mı?
 	r.Get("/healthz", func(w http.ResponseWriter, req *http.Request) {
@@ -385,6 +405,51 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 				mw.RequirePermission("reports.generate_weekly")).Post("/projects/{projectID}/monthly-reports", dashH.GenerateMonthly)
 			pr.With(mw.RequirePermission("reports.view_financial_reports")).Get("/projects/{projectID}/monthly-reports/{id}", dashH.GetMonthly)
 			pr.With(mw.RequirePermission("reports.view_financial_reports")).Get("/projects/{projectID}/monthly-reports/{id}/download", dashH.DownloadMonthly)
+		})
+
+		// ---- Faz 18: Ana Sözleşme (işveren-yüklenici) ----
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/main-contract", contractH.Get)
+			pr.With(mw.RequirePermission("projects.edit")).Put("/projects/{projectID}/main-contract", contractH.Upsert)
+		})
+
+		// ---- Faz 19: Proje Keşfi ----
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/survey-items", surveyH.List)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/survey-items", surveyH.Create)
+			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/survey-items/{id}", surveyH.Update)
+			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/survey-items/{id}", surveyH.Delete)
+		})
+
+		// ---- Faz 20: Tasarım ve Projeler ----
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/design-docs", designH.List)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/design-docs", designH.Create)
+			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/design-docs/{id}", designH.Update)
+			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/design-docs/{id}", designH.Delete)
+		})
+
+		// ---- Faz 21: Personel & Puantaj ----
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/personnel", personnelH.ListPersonel)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/personnel", personnelH.CreatePersonel)
+			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/personnel/{id}", personnelH.UpdatePersonel)
+			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/personnel/{id}", personnelH.DeletePersonel)
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/puantaj", personnelH.GetPuantaj)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/puantaj", personnelH.UpsertPuantaj)
+		})
+
+		// ---- Faz 22: Tedarikçi Ekstreler ----
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("contracts.view")).Get("/projects/{projectID}/supplier-statements", statementsH.List)
+			pr.With(mw.RequirePermission("contracts.upload")).Post("/projects/{projectID}/supplier-statements", statementsH.Create)
+			pr.With(mw.RequirePermission("contracts.upload")).Patch("/projects/{projectID}/supplier-statements/{id}", statementsH.Update)
+			pr.With(mw.RequirePermission("contracts.delete")).Delete("/projects/{projectID}/supplier-statements/{id}", statementsH.Delete)
 		})
 
 		// ---- Faz 4: Görevler (Kanban) + Bildirimler ----

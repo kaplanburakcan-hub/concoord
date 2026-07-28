@@ -49,6 +49,10 @@ import IsMakineleriPage from "./pages/makine/IsMakineleriPage";
 import EkipmanlarPage from "./pages/makine/EkipmanlarPage";
 import ComingSoon from "./components/ComingSoon";
 import SahaTutanaklariPage from "./pages/project/SahaTutanaklariPage";
+import AnaSozlesmePage from "./pages/project/AnaSozlesmePage";
+import TasarimVeProjelerPage from "./pages/project/TasarimVeProjelerPage";
+import PersonelPuantajPage from "./pages/project/PersonelPuantajPage";
+import TedarikciEkstrerlerPage from "./pages/payments/TedarikciEkstrerlerPage";
 
 // Basit ComingSoon sarmalayıcı — yeni sayfalar için geçici placeholder
 function ComingSoonPage({ title, description }: { title: string; description: string }) {
@@ -324,10 +328,10 @@ export default function App() {
                       <Route path="/proje/depo" element={<RequirePerm perm="reports.view"><DepoPage /></RequirePerm>} />
                       <Route path="/proje/toplanti" element={<RequirePerm perm="reports.view"><ToplantiPage /></RequirePerm>} />
                       <Route path="/proje/fotograflar" element={<RequirePerm perm="documents.view"><FotograflarPage /></RequirePerm>} />
-                      <Route path="/proje/ana-sozlesme" element={<RequirePerm perm="projects.view"><ComingSoonPage title="Ana Sözleşme" description="Proje ana sözleşmesi ve ekleri." /></RequirePerm>} />
-                      <Route path="/proje/tasarim-projeler" element={<RequirePerm perm="projects.view"><ComingSoonPage title="Tasarım ve Projeler" description="Mimari, statik ve teknik projeler." /></RequirePerm>} />
-                      <Route path="/tedarikci-ekstreler" element={<RequirePerm perm="contracts.view"><ComingSoonPage title="Tedarikçi Ekstreler" description="Tedarikçi ekstreler ve ödemeler." /></RequirePerm>} />
-                      <Route path="/proje/personel-puantaj" element={<RequirePerm perm="reports.view"><ComingSoonPage title="Personel & Puantaj Girişi" description="Günlük personel ve puantaj girişi." /></RequirePerm>} />
+                      <Route path="/proje/ana-sozlesme" element={<RequirePerm perm="projects.view"><AnaSozlesmePage /></RequirePerm>} />
+                      <Route path="/proje/tasarim-projeler" element={<RequirePerm perm="projects.view"><TasarimVeProjelerPage /></RequirePerm>} />
+                      <Route path="/tedarikci-ekstreler" element={<RequirePerm perm="contracts.view"><TedarikciEkstrerlerPage /></RequirePerm>} />
+                      <Route path="/proje/personel-puantaj" element={<RequirePerm perm="reports.view"><PersonelPuantajPage /></RequirePerm>} />
                       <Route path="/saha/tutanaklar" element={<RequirePerm perm="reports.view"><SahaTutanaklariPage /></RequirePerm>} />
                       {/* ── MAKİNE & EKİPMAN ── */}
                       <Route path="/makine/araclar" element={<RequirePerm perm="projects.view"><AraclarPage /></RequirePerm>} />
