@@ -1,7 +1,7 @@
 -- Faz 19 — Proje Keşfi (İmalat Kalemleri)
 -- Proje bazlı keşif kalemleri; kategori + sıra numarası ile gruplama destekli.
 
-CREATE TABLE project_survey_items (
+CREATE TABLE IF NOT EXISTS project_survey_items (
     id             UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id     UUID         NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 
@@ -19,5 +19,5 @@ CREATE TABLE project_survey_items (
     updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_psi_project   ON project_survey_items(project_id);
-CREATE INDEX idx_psi_kategori  ON project_survey_items(project_id, kategori);
+CREATE INDEX IF NOT EXISTS idx_psi_project   ON project_survey_items(project_id);
+CREATE INDEX IF NOT EXISTS idx_psi_kategori  ON project_survey_items(project_id, kategori);

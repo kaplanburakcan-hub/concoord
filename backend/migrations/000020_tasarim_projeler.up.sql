@@ -1,4 +1,4 @@
-CREATE TABLE project_design_docs (
+CREATE TABLE IF NOT EXISTS project_design_docs (
     id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID        NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     disiplin   TEXT        NOT NULL,
@@ -15,4 +15,4 @@ CREATE TABLE project_design_docs (
         CHECK (durum IN ('taslak','incelemede','onaylı','revizyon_gerekli','iptal'))
 );
 
-CREATE INDEX ON project_design_docs(project_id);
+CREATE INDEX IF NOT EXISTS idx_pdd_project ON project_design_docs(project_id);

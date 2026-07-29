@@ -1,7 +1,7 @@
 -- Faz 18 — Ana Sözleşme (İşveren-Yüklenici sözleşmesi temel bilgileri)
 -- Her proje için tek bir ana sözleşme kaydı tutulur (UNIQUE project_id).
 
-CREATE TABLE project_main_contracts (
+CREATE TABLE IF NOT EXISTS project_main_contracts (
     id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id              UUID        NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 
@@ -47,4 +47,4 @@ CREATE TABLE project_main_contracts (
     UNIQUE (project_id)
 );
 
-CREATE INDEX idx_pmc_project ON project_main_contracts(project_id);
+CREATE INDEX IF NOT EXISTS idx_pmc_project ON project_main_contracts(project_id);

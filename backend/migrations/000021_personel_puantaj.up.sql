@@ -1,4 +1,4 @@
-CREATE TABLE project_personnel (
+CREATE TABLE IF NOT EXISTS project_personnel (
     id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID        NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     ad_soyad   TEXT        NOT NULL,
@@ -9,9 +9,9 @@ CREATE TABLE project_personnel (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX ON project_personnel(project_id);
+CREATE INDEX IF NOT EXISTS idx_pp_project ON project_personnel(project_id);
 
-CREATE TABLE project_puantaj (
+CREATE TABLE IF NOT EXISTS project_puantaj (
     id          UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id  UUID           NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     personel_id UUID           NOT NULL REFERENCES project_personnel(id) ON DELETE CASCADE,
@@ -25,4 +25,4 @@ CREATE TABLE project_puantaj (
     CONSTRAINT project_puantaj_durum_check
         CHECK (durum IN ('mevcut','devamsiz','izinli','raporlu'))
 );
-CREATE INDEX ON project_puantaj(project_id, tarih);
+CREATE INDEX IF NOT EXISTS idx_ppq_project_tarih ON project_puantaj(project_id, tarih);
