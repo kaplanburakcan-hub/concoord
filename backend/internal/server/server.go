@@ -16,9 +16,11 @@ import (
 	"github.com/ipks/ipks/backend/internal/config"
 	"github.com/ipks/ipks/backend/internal/contracts"
 	"github.com/ipks/ipks/backend/internal/design"
+	"github.com/ipks/ipks/backend/internal/meetings"
 	"github.com/ipks/ipks/backend/internal/personnel"
 	"github.com/ipks/ipks/backend/internal/statements"
 	"github.com/ipks/ipks/backend/internal/survey"
+	"github.com/ipks/ipks/backend/internal/warehouse"
 	"github.com/ipks/ipks/backend/internal/dashboard"
 	"github.com/ipks/ipks/backend/internal/documents"
 	"github.com/ipks/ipks/backend/internal/httpx"
@@ -110,6 +112,8 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 	// --- Faz 20: Tasarım ve Projeler ---
 	designH := design.NewHandler(pool)
+	warehouseH := warehouse.NewHandler(pool)
+	meetingsH := meetings.NewHandler(pool)
 
 	// --- Faz 21: Personel & Puantaj ---
 	personnelH := personnel.NewHandler(pool)
@@ -478,6 +482,27 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.Post("/notifications/{id}/read", notifyH.MarkRead)
 			pr.Get("/notification-preferences", notifyH.GetPreferences)
 			pr.Put("/notification-preferences", notifyH.SetPreference)
+		})
+
+		// Faz 24 — Depo
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/warehouse-items", warehouseH.ListItems)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/warehouse-items", warehouseH.CreateItem)
+			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/warehouse-items/{id}", warehouseH.UpdateItem)
+			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/warehouse-items/{id}", warehouseH.DeleteItem)
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/warehouse-movements", warehouseH.ListMovements)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/warehouse-movements", warehouseH.CreateMovement)
+			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/warehouse-movements/{id}", warehouseH.DeleteMovement)
+		})
+
+		// Faz 25 — Toplantı Tutanakları
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/meetings", meetingsH.List)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/meetings", meetingsH.Create)
+			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/meetings/{id}", meetingsH.Update)
+			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/meetings/{id}", meetingsH.Delete)
 		})
 
 		api.NotFound(func(w http.ResponseWriter, req *http.Request) {
