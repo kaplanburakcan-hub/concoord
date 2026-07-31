@@ -27,11 +27,10 @@ const STATUS_CLS: Record<string, string> = {
   Archived: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
 };
 const MS_STATUS: Record<string, { label: string; dot: string }> = {
-  pending:     { label: "Bekliyor",     dot: "bg-gray-400" },
-  in_progress: { label: "Devam Ediyor", dot: "bg-blue-500" },
-  completed:   { label: "Tamamlandı",   dot: "bg-green-500" },
-  delayed:     { label: "Gecikmiş",     dot: "bg-red-500" },
-  cancelled:   { label: "İptal",        dot: "bg-gray-300" },
+  Planned:    { label: "Bekliyor",     dot: "bg-gray-400" },
+  InProgress: { label: "Devam Ediyor", dot: "bg-blue-500" },
+  Completed:  { label: "Tamamlandı",   dot: "bg-green-500" },
+  Delayed:    { label: "Gecikmiş",     dot: "bg-red-500" },
 };
 
 function fmt(n?: number, cur = "TRY") {
@@ -64,7 +63,7 @@ function KPICard({ label, value, sub, accent }: { label: string; value: string; 
 }
 
 function MilestoneRow({ ms }: { ms: Milestone }) {
-  const meta = MS_STATUS[ms.status] ?? MS_STATUS.pending;
+  const meta = MS_STATUS[ms.status] ?? MS_STATUS["Planned"];
   return (
     <div className="flex items-center gap-3 py-2 border-b border-[var(--border)] last:border-0">
       <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${meta.dot}`} />
@@ -73,9 +72,9 @@ function MilestoneRow({ ms }: { ms: Milestone }) {
         {ms.planned_date ? fmtDate(ms.planned_date) : "—"}
       </span>
       <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
-        ms.status === "completed"   ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" :
-        ms.status === "delayed"     ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" :
-        ms.status === "in_progress" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" :
+        ms.status === "Completed"  ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" :
+        ms.status === "Delayed"    ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" :
+        ms.status === "InProgress" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" :
         "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
       }`}>{meta.label}</span>
     </div>
@@ -115,17 +114,17 @@ export default function ProjectSummaryPage() {
   if (error || !project) return <div className="p-8 text-red-500">Veriler yüklenemedi.</div>;
 
   const timePct = progressPct(project.start_date?.slice(0, 10), project.end_date?.slice(0, 10));
-  const msCompleted = milestones.filter(m => m.status === "completed").length;
+  const msCompleted = milestones.filter(m => m.status === "Completed").length;
   const msTotal     = milestones.length;
   const msPct       = msTotal > 0 ? Math.round((msCompleted / msTotal) * 100) : 0;
 
   const taskByStatus: Record<string, number> = {};
   tasks.forEach(t => { taskByStatus[t.status] = (taskByStatus[t.status] ?? 0) + 1; });
   const taskOverdue = tasks.filter(t =>
-    t.due_date && t.status !== "done" && t.status !== "cancelled" &&
+    t.due_date && t.status !== "Done" && t.status !== "Backlog" &&
     new Date(t.due_date) < new Date()
   ).length;
-  const msDelayed = milestones.filter(m => m.status === "delayed").length;
+  const msDelayed = milestones.filter(m => m.status === "Delayed").length;
 
   const spiNum = timePct > 0 ? msPct / timePct : null;
   const spi    = spiNum != null ? spiNum.toFixed(2) : "—";
@@ -210,7 +209,7 @@ export default function ProjectSummaryPage() {
         />
         <KPICard
           label="Açık Görevler"
-          value={String((taskByStatus["todo"] ?? 0) + (taskByStatus["doing"] ?? 0))}
+          value={String((taskByStatus["Todo"] ?? 0) + (taskByStatus["InProgress"] ?? 0))}
           sub={taskOverdue > 0 ? `${taskOverdue} gecikmiş` : "Gecikme yok"}
           accent={taskOverdue > 0 ? "text-red-600" : "text-[var(--text)]"}
         />
@@ -241,10 +240,10 @@ export default function ProjectSummaryPage() {
             ) : (
               <div className="space-y-2">
                 {[
-                  { key: "todo",   label: "Yapılacak",  cls: "bg-gray-400" },
-                  { key: "doing",  label: "Devam Eden", cls: "bg-blue-500" },
-                  { key: "review", label: "İncelemede", cls: "bg-yellow-500" },
-                  { key: "done",   label: "Tamamlandı", cls: "bg-green-500" },
+                  { key: "Todo",       label: "Yapılacak",  cls: "bg-gray-400" },
+                  { key: "InProgress", label: "Devam Eden", cls: "bg-blue-500" },
+                  { key: "Review",     label: "İncelemede", cls: "bg-yellow-500" },
+                  { key: "Done",       label: "Tamamlandı", cls: "bg-green-500" },
                 ].map(({ key, label, cls }) => {
                   const count = taskByStatus[key] ?? 0;
                   const pct   = Math.round((count / tasks.length) * 100);
