@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
+import { api } from "../../api/client";
 import { useProjects } from "../../projects/ProjectContext";
 
 // ── Kategori & Alt Kırılım Tanımları ──────────────────────────────────────
@@ -22,22 +23,19 @@ const KATEGORILER: Kategori[] = [
       { id: "yk_mavi", label: "Mavi Yaka, İşçi, Usta" },
     ],
   },
-  {
-    id: "alt_yuklenici", label: "Alt Yüklenici ve Personelleri", icon: "🔧",
-    altKirilimlar: [
-      { id: "ay_pm", label: "Proje Yönetim Personeli – PM, Ş.Şefi ve Mühendisler" },
-      { id: "ay_idari", label: "İdari Personel – Muhasebe, Finans, Depo, Satınalma, Kamp Pers." },
-      { id: "ay_mavi", label: "Mavi Yaka, İşçi, Usta" },
-      { id: "ay_isg", label: "İSG Uzmanı" },
-      { id: "ay_kefil", label: "Mali Kefil (Şahsi Kefalet Durumunda)" },
-    ],
-  },
+  { id: "alt_yuklenici", label: "Taşeron ve Personelleri", icon: "🔧" },
   { id: "yapi_denetim", label: "Yapı Denetim Firması (Resmi Atanmışsa)", icon: "🔍" },
   { id: "muellif", label: "Proje Müellifi", icon: "✏️" },
   { id: "danismanlar", label: "Danışmanlar (Teknik / İdari / Zorunlu)", icon: "💼" },
   { id: "isg_osgb", label: "İSG – OSGB Firmaları", icon: "⛑️" },
   { id: "tedarikciler", label: "Tedarikçiler", icon: "📦" },
 ];
+
+// ── API tipleri ───────────────────────────────────────────────────────────
+type Sub = {
+  id: string; company_name: string; tax_no?: string; contact_person?: string;
+  phone?: string; email?: string; trade?: string;
+};
 
 // ── Tip Tanımları ─────────────────────────────────────────────────────────
 type Paydas = {
@@ -238,10 +236,21 @@ export default function ProjePaydaslariPage() {
   const [form, setForm] = useState<Omit<Paydas, "id">>({ ...BOŞ_FORM });
   const [duzenleId, setDuzenleId] = useState<string | null>(null);
   const [arama, setArama] = useState("");
+  const [taseronlar, setTaseronlar] = useState<Sub[]>([]);
+  const [subsBusy, setSubsBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  async function loadTaseronlar(p: string) {
+    if (!p || p === "demo") return;
+    try {
+      const r = await api<{ subcontractors: Sub[] }>(`/projects/${p}/subcontractors`, { projectId: p });
+      setTaseronlar(r.subcontractors);
+    } catch { /* sessiz hata */ }
+  }
 
   useEffect(() => {
     setPaydaslar(loadFromStorage(pid));
+    loadTaseronlar(pid);
   }, [pid]);
 
   function kaydet(data: Paydas[]) {
@@ -249,8 +258,31 @@ export default function ProjePaydaslariPage() {
     saveToStorage(pid, data);
   }
 
-  function formGonder() {
+  async function formGonder() {
     if (!form.ad && !form.firmaAdi) return;
+
+    // Taşeron firma → API
+    if (form.kategoriId === "alt_yuklenici" && form.tip === "firma") {
+      setSubsBusy(true);
+      try {
+        await api(`/projects/${pid}/subcontractors`, {
+          method: "POST", projectId: pid,
+          body: {
+            company_name: form.firmaAdi?.trim() || form.ad.trim(),
+            trade: form.unvan?.trim() || null,
+            phone: form.telefon?.trim() || null,
+            email: form.email?.trim() || null,
+          },
+        });
+        await loadTaseronlar(pid);
+        setForm({ ...BOŞ_FORM, kategoriId: "alt_yuklenici" });
+        setFormAcik(false);
+      } catch { /* hata kullanıcıya gösterilmez — SubcontractorsPage gibi */ }
+      finally { setSubsBusy(false); }
+      return;
+    }
+
+    // Diğer kategoriler → localStorage
     if (duzenleId) {
       kaydet(paydaslar.map((p) => (p.id === duzenleId ? { ...form, id: duzenleId } : p)));
       setDuzenleId(null);
@@ -259,6 +291,23 @@ export default function ProjePaydaslariPage() {
     }
     setForm({ ...BOŞ_FORM, kategoriId: form.kategoriId });
     setFormAcik(false);
+  }
+
+  async function silSub(subId: string) {
+    if (!confirm("Bu taşeronu ve altındaki personelleri silmek istiyor musunuz?")) return;
+    try {
+      await api(`/projects/${pid}/subcontractors/${subId}`, { method: "DELETE", projectId: pid });
+      await loadTaseronlar(pid);
+      // Bağlı localStorage personellerini de temizle
+      kaydet(paydaslar.filter(p => !(p.kategoriId === "alt_yuklenici" && p.altKirilimId === subId)));
+    } catch { /* sessiz */ }
+  }
+
+  function yeniEklePersonel(subId: string) {
+    setForm({ ...BOŞ_FORM, kategoriId: "alt_yuklenici", tip: "kisi", altKirilimId: subId });
+    setDuzenleId(null);
+    setAktifKat("alt_yuklenici");
+    setFormAcik(true);
   }
 
   function sil(id: string) {
@@ -371,8 +420,12 @@ export default function ProjePaydaslariPage() {
       {/* Kategori Kartları */}
       <div className="space-y-3">
         {KATEGORILER.map((kat) => {
+          const isTaseron = kat.id === "alt_yuklenici";
           const katPaydaslar = filtreliPaydaslar.filter((p) => p.kategoriId === kat.id);
           const acik = aktifKat === kat.id;
+          const badge = isTaseron
+            ? taseronlar.length + katPaydaslar.filter(p => p.tip === "kisi").length
+            : katPaydaslar.length;
 
           return (
             <div key={kat.id} className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
@@ -384,66 +437,160 @@ export default function ProjePaydaslariPage() {
                 <div className="flex items-center gap-3">
                   <span className="text-lg">{kat.icon}</span>
                   <span className="font-medium text-white text-sm">{kat.label}</span>
-                  {katPaydaslar.length > 0 && (
+                  {badge > 0 && (
                     <span className="rounded-full bg-emniyet-500/20 text-emniyet-500 text-xs px-2 py-0.5">
-                      {katPaydaslar.length}
+                      {badge}
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); yeniEkle(kat.id); }}
-                    className="rounded-md bg-emniyet-500 px-3 py-1 text-xs font-medium text-beton-950 hover:brightness-110"
-                  >
-                    + Ekle
-                  </button>
+                  {!isTaseron && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); yeniEkle(kat.id); }}
+                      className="rounded-md bg-emniyet-500 px-3 py-1 text-xs font-medium text-beton-950 hover:brightness-110"
+                    >
+                      + Ekle
+                    </button>
+                  )}
+                  {isTaseron && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setForm({ ...BOŞ_FORM, kategoriId: "alt_yuklenici", tip: "firma" });
+                        setDuzenleId(null);
+                        setAktifKat("alt_yuklenici");
+                        setFormAcik(true);
+                      }}
+                      className="rounded-md bg-emniyet-500 px-3 py-1 text-xs font-medium text-beton-950 hover:brightness-110"
+                    >
+                      + Firma Ekle
+                    </button>
+                  )}
                   <span className="text-beton-400 text-xs">{acik ? "▲" : "▼"}</span>
                 </div>
               </div>
 
-              {/* Paydaş Listesi */}
+              {/* İçerik */}
               {acik && (
                 <div className="border-t border-beton-800">
-                  {katPaydaslar.length === 0 ? (
-                    <p className="px-4 py-3 text-beton-400 text-sm">Henüz paydaş eklenmemiş.</p>
+                  {/* ── Taşeron & Personelleri: Hiyerarşik görünüm ── */}
+                  {isTaseron ? (
+                    <div>
+                      {taseronlar.length === 0 && katPaydaslar.length === 0 ? (
+                        <p className="px-4 py-3 text-beton-400 text-sm">Henüz taşeron eklenmemiş.</p>
+                      ) : (
+                        <>
+                          {taseronlar.map((sub) => {
+                            const personeller = katPaydaslar.filter(
+                              p => p.tip === "kisi" && p.altKirilimId === sub.id
+                            );
+                            const q = arama.toLowerCase();
+                            const subVisible = !q || sub.company_name.toLowerCase().includes(q)
+                              || (sub.trade ?? "").toLowerCase().includes(q);
+                            if (!subVisible && personeller.length === 0) return null;
+                            return (
+                              <div key={sub.id} className="border-b border-beton-800/60">
+                                {/* Taşeron firma satırı */}
+                                <div className="flex items-center justify-between px-4 py-2 bg-beton-800/30">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-beton-300 text-xs">🏢</span>
+                                    <span className="font-semibold text-white text-sm">{sub.company_name}</span>
+                                    {sub.trade && <span className="text-beton-400 text-xs">— {sub.trade}</span>}
+                                    {sub.phone && <span className="text-beton-400 text-xs ml-2">{sub.phone}</span>}
+                                  </div>
+                                  <div className="flex gap-3">
+                                    <button
+                                      onClick={() => yeniEklePersonel(sub.id)}
+                                      className="text-emniyet-500 hover:underline text-xs"
+                                    >
+                                      + Personel
+                                    </button>
+                                    <button
+                                      onClick={() => silSub(sub.id)}
+                                      className="text-red-400 hover:underline text-xs"
+                                    >
+                                      Sil
+                                    </button>
+                                  </div>
+                                </div>
+                                {/* Bu taşeronun personelleri */}
+                                {personeller.map(p => (
+                                  <div key={p.id} className="flex items-center gap-4 px-4 pl-10 py-1.5 text-sm border-b border-beton-800/30 last:border-0">
+                                    <span className="text-beton-200 w-36 truncate">{p.ad} {p.soyad}</span>
+                                    <span className="text-beton-400 flex-1 truncate">{p.unvan}</span>
+                                    <span className="text-beton-400 text-xs w-28 truncate">{p.telefon}</span>
+                                    <div className="flex gap-3 shrink-0">
+                                      <button onClick={() => duzenle(p)} className="text-emniyet-500 hover:underline text-xs">Düzenle</button>
+                                      <button onClick={() => sil(p.id)} className="text-red-400 hover:underline text-xs">Sil</button>
+                                    </div>
+                                  </div>
+                                ))}
+                                {personeller.length === 0 && (
+                                  <p className="pl-10 px-4 py-1.5 text-beton-500 text-xs italic">Personel eklenmemiş.</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {/* Taşerona bağlı olmayan kişi kayıtları */}
+                          {katPaydaslar.filter(p => p.tip === "kisi" && !taseronlar.some(s => s.id === p.altKirilimId)).map(p => (
+                            <div key={p.id} className="flex items-center gap-4 px-4 py-1.5 text-sm border-b border-beton-800/30">
+                              <span className="text-beton-200 w-36 truncate">{p.ad} {p.soyad}</span>
+                              <span className="text-beton-400 flex-1 truncate">{p.unvan}</span>
+                              <span className="text-beton-400 text-xs w-28 truncate">{p.telefon}</span>
+                              <div className="flex gap-3 shrink-0">
+                                <button onClick={() => duzenle(p)} className="text-emniyet-500 hover:underline text-xs">Düzenle</button>
+                                <button onClick={() => sil(p.id)} className="text-red-400 hover:underline text-xs">Sil</button>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
                   ) : (
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-beton-400 text-left border-b border-beton-800 text-xs">
-                          <th className="px-4 py-2">Ad Soyad / Firma</th>
-                          <th className="px-4 py-2">Ünvan</th>
-                          {kat.altKirilimlar && <th className="px-4 py-2">Alt Kırılım</th>}
-                          <th className="px-4 py-2">Telefon</th>
-                          <th className="px-4 py-2">E-posta</th>
-                          <th className="px-4 py-2"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {katPaydaslar.map((p) => (
-                          <tr key={p.id} className="border-b border-beton-800/50 text-beton-200">
-                            <td className="px-4 py-2">
-                              {p.tip === "firma" ? (
-                                <span className="font-medium">{p.firmaAdi}</span>
-                              ) : (
-                                <span>{p.ad} {p.soyad}</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2 text-beton-400">{p.unvan}</td>
-                            {kat.altKirilimlar && (
-                              <td className="px-4 py-2 text-beton-400 text-xs">
-                                {altKirilimLabel(p.kategoriId, p.altKirilimId)}
-                              </td>
-                            )}
-                            <td className="px-4 py-2 text-beton-400">{p.telefon}</td>
-                            <td className="px-4 py-2 text-beton-400">{p.email}</td>
-                            <td className="px-4 py-2 text-right">
-                              <button onClick={() => duzenle(p)} className="text-emniyet-500 hover:underline text-xs mr-3">Düzenle</button>
-                              <button onClick={() => sil(p.id)} className="text-red-400 hover:underline text-xs">Sil</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    /* ── Standart tablo ── */
+                    <>
+                      {katPaydaslar.length === 0 ? (
+                        <p className="px-4 py-3 text-beton-400 text-sm">Henüz paydaş eklenmemiş.</p>
+                      ) : (
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-beton-400 text-left border-b border-beton-800 text-xs">
+                              <th className="px-4 py-2">Ad Soyad / Firma</th>
+                              <th className="px-4 py-2">Ünvan</th>
+                              {kat.altKirilimlar && <th className="px-4 py-2">Alt Kırılım</th>}
+                              <th className="px-4 py-2">Telefon</th>
+                              <th className="px-4 py-2">E-posta</th>
+                              <th className="px-4 py-2"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {katPaydaslar.map((p) => (
+                              <tr key={p.id} className="border-b border-beton-800/50 text-beton-200">
+                                <td className="px-4 py-2">
+                                  {p.tip === "firma" ? (
+                                    <span className="font-medium">{p.firmaAdi}</span>
+                                  ) : (
+                                    <span>{p.ad} {p.soyad}</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2 text-beton-400">{p.unvan}</td>
+                                {kat.altKirilimlar && (
+                                  <td className="px-4 py-2 text-beton-400 text-xs">
+                                    {altKirilimLabel(p.kategoriId, p.altKirilimId)}
+                                  </td>
+                                )}
+                                <td className="px-4 py-2 text-beton-400">{p.telefon}</td>
+                                <td className="px-4 py-2 text-beton-400">{p.email}</td>
+                                <td className="px-4 py-2 text-right">
+                                  <button onClick={() => duzenle(p)} className="text-emniyet-500 hover:underline text-xs mr-3">Düzenle</button>
+                                  <button onClick={() => sil(p.id)} className="text-red-400 hover:underline text-xs">Sil</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -478,7 +625,7 @@ export default function ProjePaydaslariPage() {
               </select>
             </div>
 
-            {/* Alt Kırılım (varsa) */}
+            {/* Alt Kırılım — statik kategoriler */}
             {secilenKat?.altKirilimlar && (
               <div>
                 <label className="block text-xs text-beton-400 mb-1">Alt Kırılım</label>
@@ -490,6 +637,25 @@ export default function ProjePaydaslariPage() {
                   <option value="">Alt kırılım seçin...</option>
                   {secilenKat.altKirilimlar.map((ak) => (
                     <option key={ak.id} value={ak.id}>{ak.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Taşeron seçimi — alt_yuklenici + kisi */}
+            {form.kategoriId === "alt_yuklenici" && form.tip === "kisi" && (
+              <div>
+                <label className="block text-xs text-beton-400 mb-1">Bağlı Taşeron</label>
+                <select
+                  value={form.altKirilimId}
+                  onChange={(e) => setForm({ ...form, altKirilimId: e.target.value })}
+                  className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+                >
+                  <option value="">Taşeron seçin...</option>
+                  {taseronlar.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.company_name}{s.trade ? ` — ${s.trade}` : ""}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -604,10 +770,10 @@ export default function ProjePaydaslariPage() {
               </button>
               <button
                 onClick={formGonder}
-                disabled={!form.kategoriId || (!form.ad && !form.firmaAdi)}
+                disabled={subsBusy || !form.kategoriId || (!form.ad && !form.firmaAdi)}
                 className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50"
               >
-                {duzenleId ? "Güncelle" : "Kaydet"}
+                {subsBusy ? "Kaydediliyor…" : duzenleId ? "Güncelle" : "Kaydet"}
               </button>
             </div>
           </div>
