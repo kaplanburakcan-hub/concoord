@@ -13,6 +13,7 @@ import ProjectsPage from "./pages/projects/ProjectsPage";
 import ProjectDetailPage from "./pages/projects/ProjectDetailPage";
 import DocumentsPage from "./pages/documents/DocumentsPage";
 import SubcontractorsPage from "./pages/payments/SubcontractorsPage";
+import TaseronDashboardPage from "./pages/payments/TaseronDashboardPage";
 import ProgressPaymentsPage from "./pages/payments/ProgressPaymentsPage";
 import ProgressPaymentDetailPage from "./pages/payments/ProgressPaymentDetailPage";
 import TasksPage from "./pages/tasks/TasksPage";
@@ -116,6 +117,14 @@ export default function App() {
                         }
                       />
 
+                      <Route
+                        path="/taseronlar/dashboard"
+                        element={
+                          <RequirePerm perm="contracts.view">
+                            <TaseronDashboardPage />
+                          </RequirePerm>
+                        }
+                      />
                       <Route
                         path="/taseronlar"
                         element={

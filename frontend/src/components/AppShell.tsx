@@ -77,7 +77,8 @@ const GROUPS: NavGroup[] = [
   {
     title: "Taşeron ve Tedarikçi Yönetimi",
     items: [
-      { to: "/taseronlar", label: "Taşeronlar & Tedarikçiler", perm: "contracts.view", icon: I.taseron },
+      { to: "/taseronlar/dashboard", label: "Dashboard", perm: "contracts.view", icon: I.panel },
+      { to: "/taseronlar", label: "Taşeron-Tedarikçi Sözleşmeleri", perm: "contracts.view", icon: I.taseron, end: true },
       { to: "/documents", label: "Dokümanlar", perm: "documents.view", icon: I.dok },
       { to: "/hakedis", label: "Taşeron Hakedişleri", perm: "progress_payments.view", icon: I.hakedis, end: true },
       { to: "/tedarikci-ekstreler", label: "Tedarikçi Ekstreler", perm: "contracts.view", icon: I.ekstrem },
