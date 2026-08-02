@@ -16,6 +16,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/config"
 	"github.com/ipks/ipks/backend/internal/contracts"
 	"github.com/ipks/ipks/backend/internal/design"
+	"github.com/ipks/ipks/backend/internal/machines"
 	"github.com/ipks/ipks/backend/internal/meetings"
 	"github.com/ipks/ipks/backend/internal/personnel"
 	"github.com/ipks/ipks/backend/internal/statements"
@@ -120,6 +121,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 	// --- Faz 22: Tedarikçi Ekstreler ---
 	statementsH := statements.NewHandler(pool)
+
+	// --- Faz 26: Makine & Ekipman ---
+	machinesH := machines.NewHandler(pool)
 
 	// Liveness — süreç ayakta mı?
 	r.Get("/healthz", func(w http.ResponseWriter, req *http.Request) {
@@ -503,6 +507,18 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/meetings", meetingsH.Create)
 			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/meetings/{id}", meetingsH.Update)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/meetings/{id}", meetingsH.Delete)
+		})
+
+		// Faz 26 — Makine & Ekipman
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/machines", machinesH.ListMachines)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/machines", machinesH.CreateMachine)
+			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/machines/{id}", machinesH.UpdateMachine)
+			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/machines/{id}", machinesH.DeleteMachine)
+			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/machines/{machineID}/logs", machinesH.ListLogs)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/machines/{machineID}/logs", machinesH.CreateLog)
+			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/machines/{machineID}/logs/{id}", machinesH.DeleteLog)
 		})
 
 		api.NotFound(func(w http.ResponseWriter, req *http.Request) {
