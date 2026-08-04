@@ -118,6 +118,8 @@ export default function MachinePage({
   // Filter
   const [filterDurum, setFilterDurum] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!pid) return;
@@ -149,6 +151,7 @@ export default function MachinePage({
     if (!pid) return;
     if (!form.ad?.trim()) return;
     setSaving(true);
+    setSaveError(null);
     try {
       if (editId) {
         const r = await api<{ machine: Machine }>(`/projects/${pid}/machines/${editId}`, {
@@ -163,7 +166,7 @@ export default function MachinePage({
       }
       setFormOpen(false);
     } catch {
-      alert("Kaydedilemedi.");
+      setSaveError("Kaydedilemedi. Lütfen tekrar deneyin.");
     } finally {
       setSaving(false);
     }
@@ -171,9 +174,9 @@ export default function MachinePage({
 
   async function deleteMachine(id: string) {
     if (!pid) return;
-    if (!confirm("Bu makineyi silmek istediğinizden emin misiniz?")) return;
     await api(`/projects/${pid}/machines/${id}`, { method: "DELETE", projectId: pid });
     setMachines(prev => prev.filter(m => m.id !== id));
+    setConfirmDeleteId(null);
     if (expandedId === id) setExpandedId(null);
   }
 
@@ -348,27 +351,47 @@ export default function MachinePage({
                   </span>
 
                   {/* Actions */}
-                  <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-                    <button
-                      onClick={() => openEdit(m)}
-                      className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text)]"
-                      title="Düzenle"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => deleteMachine(m.id)}
-                      className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-[var(--text-muted)] hover:text-red-600"
-                      title="Sil"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-                        <path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
-                      </svg>
-                    </button>
+                  <div className="flex gap-1 shrink-0 items-center" onClick={e => e.stopPropagation()}>
+                    {confirmDeleteId === m.id ? (
+                      <>
+                        <span className="text-xs text-red-600 font-medium mr-1">Emin misiniz?</span>
+                        <button
+                          onClick={() => deleteMachine(m.id)}
+                          className="px-2 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
+                        >
+                          Sil
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="px-2 py-0.5 rounded border border-[var(--border)] text-xs text-[var(--text)] hover:bg-[var(--bg-hover)]"
+                        >
+                          İptal
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => openEdit(m)}
+                          className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text)]"
+                          title="Düzenle"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(m.id)}
+                          className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-[var(--text-muted)] hover:text-red-600"
+                          title="Sil"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                            <path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+                          </svg>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -674,9 +697,12 @@ export default function MachinePage({
               </div>
             </div>
 
+            {saveError && (
+              <p className="text-sm text-red-600 dark:text-red-400">{saveError}</p>
+            )}
             <div className="flex justify-end gap-2 pt-1">
               <button
-                onClick={() => setFormOpen(false)}
+                onClick={() => { setFormOpen(false); setSaveError(null); }}
                 className="px-4 py-1.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text)] hover:bg-[var(--bg-hover)]"
               >
                 İptal
