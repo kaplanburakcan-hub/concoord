@@ -529,55 +529,55 @@ export default function MachinePage({
 
       {/* Machine form modal */}
       {formOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-4">
-            <h2 className="text-lg font-bold text-[var(--text)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto space-y-4">
+            <h2 className="text-lg font-bold text-beton-100">
               {editId ? "Makineyi Düzenle" : `${tipLabel === "Ekipmanlar" ? "Ekipman" : tipLabel === "İş Makineleri" ? "Makine" : "Araç"} Ekle`}
             </h2>
 
             <div className="grid grid-cols-2 gap-3">
               {/* Ad */}
               <div className="col-span-2 flex flex-col gap-1">
-                <label className="text-xs font-medium text-[var(--text-muted)]">Ad / İsim *</label>
+                <label className="text-xs font-medium text-beton-400">Ad / İsim *</label>
                 <input
                   placeholder="Örn: Ekskavatör, Kamyon 1, Jeneratör"
                   value={form.ad ?? ""}
                   onChange={e => setForm(f => ({ ...f, ad: e.target.value }))}
-                  className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                 />
               </div>
 
               {/* Marka */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-[var(--text-muted)]">Marka</label>
+                <label className="text-xs font-medium text-beton-400">Marka</label>
                 <input
                   placeholder="Caterpillar, Volvo…"
                   value={form.marka ?? ""}
                   onChange={e => setForm(f => ({ ...f, marka: e.target.value }))}
-                  className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                 />
               </div>
 
               {/* Model */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-[var(--text-muted)]">Model</label>
+                <label className="text-xs font-medium text-beton-400">Model</label>
                 <input
                   placeholder="320D, FMX 460…"
                   value={form.model ?? ""}
                   onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
-                  className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                 />
               </div>
 
               {/* Plaka (araç) */}
               {showPlaka && (
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[var(--text-muted)]">Plaka</label>
+                  <label className="text-xs font-medium text-beton-400">Plaka</label>
                   <input
                     placeholder="34 AB 1234"
                     value={form.plaka ?? ""}
                     onChange={e => setForm(f => ({ ...f, plaka: e.target.value }))}
-                    className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+                    className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                   />
                 </div>
               )}
@@ -585,19 +585,19 @@ export default function MachinePage({
               {/* Seri No (ekipman) */}
               {showSeriNo && (
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[var(--text-muted)]">Seri No</label>
+                  <label className="text-xs font-medium text-beton-400">Seri No</label>
                   <input
                     placeholder="SN-123456"
                     value={form.seri_no ?? ""}
                     onChange={e => setForm(f => ({ ...f, seri_no: e.target.value }))}
-                    className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+                    className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                   />
                 </div>
               )}
 
               {/* Üretim Yılı */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-[var(--text-muted)]">Üretim Yılı</label>
+                <label className="text-xs font-medium text-beton-400">Üretim Yılı</label>
                 <input
                   type="number"
                   placeholder="2020"
@@ -605,17 +605,17 @@ export default function MachinePage({
                   max="2030"
                   value={form.uretim_yili ?? ""}
                   onChange={e => setForm(f => ({ ...f, uretim_yili: e.target.value ? parseInt(e.target.value) : undefined }))}
-                  className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                 />
               </div>
 
               {/* Sahiplik */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-[var(--text-muted)]">Sahiplik</label>
+                <label className="text-xs font-medium text-beton-400">Sahiplik</label>
                 <select
                   value={form.sahiplik ?? "ozmal"}
                   onChange={e => setForm(f => ({ ...f, sahiplik: e.target.value }))}
-                  className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                 >
                   <option value="ozmal">Öz mal</option>
                   <option value="kiralik">Kiralık</option>
@@ -624,35 +624,35 @@ export default function MachinePage({
 
               {/* Tedarikçi */}
               <div className={`flex flex-col gap-1${!showPlaka && !showSeriNo ? " col-span-2" : ""}`}>
-                <label className="text-xs font-medium text-[var(--text-muted)]">Tedarikçi / Kiralık Firma</label>
+                <label className="text-xs font-medium text-beton-400">Tedarikçi / Kiralık Firma</label>
                 <input
                   placeholder="Firma adı"
                   value={form.tedarikci ?? ""}
                   onChange={e => setForm(f => ({ ...f, tedarikci: e.target.value }))}
-                  className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                 />
               </div>
 
               {/* Günlük Ücret */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-[var(--text-muted)]">Günlük Ücret (₺)</label>
+                <label className="text-xs font-medium text-beton-400">Günlük Ücret (₺)</label>
                 <input
                   type="number"
                   placeholder="0"
                   min="0"
                   value={form.gunluk_ucret ?? ""}
                   onChange={e => setForm(f => ({ ...f, gunluk_ucret: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                  className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                 />
               </div>
 
               {/* Durum */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-[var(--text-muted)]">Durum</label>
+                <label className="text-xs font-medium text-beton-400">Durum</label>
                 <select
                   value={form.durum ?? "aktif"}
                   onChange={e => setForm(f => ({ ...f, durum: e.target.value }))}
-                  className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                 >
                   <option value="aktif">Aktif</option>
                   <option value="bakim">Bakımda</option>
@@ -664,21 +664,21 @@ export default function MachinePage({
               {showBakim && (
                 <div className="col-span-2 grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-[var(--text-muted)]">Son Bakım Tarihi</label>
+                    <label className="text-xs font-medium text-beton-400">Son Bakım Tarihi</label>
                     <input
                       type="date"
                       value={form.son_bakim_tarihi ?? ""}
                       onChange={e => setForm(f => ({ ...f, son_bakim_tarihi: e.target.value || undefined }))}
-                      className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+                      className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-[var(--text-muted)]">Sıradaki Bakım Tarihi</label>
+                    <label className="text-xs font-medium text-beton-400">Sıradaki Bakım Tarihi</label>
                     <input
                       type="date"
                       value={form.sonraki_bakim_tarihi ?? ""}
                       onChange={e => setForm(f => ({ ...f, sonraki_bakim_tarihi: e.target.value || undefined }))}
-                      className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+                      className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                     />
                   </div>
                 </div>
@@ -686,24 +686,24 @@ export default function MachinePage({
 
               {/* Açıklama */}
               <div className="col-span-2 flex flex-col gap-1">
-                <label className="text-xs font-medium text-[var(--text-muted)]">Açıklama</label>
+                <label className="text-xs font-medium text-beton-400">Açıklama</label>
                 <textarea
                   rows={2}
                   placeholder="İsteğe bağlı notlar…"
                   value={form.aciklama ?? ""}
                   onChange={e => setForm(f => ({ ...f, aciklama: e.target.value }))}
-                  className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)] resize-none"
+                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500 resize-none"
                 />
               </div>
             </div>
 
             {saveError && (
-              <p className="text-sm text-red-600 dark:text-red-400">{saveError}</p>
+              <p className="text-sm text-red-400">{saveError}</p>
             )}
             <div className="flex justify-end gap-2 pt-1">
               <button
                 onClick={() => { setFormOpen(false); setSaveError(null); }}
-                className="px-4 py-1.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text)] hover:bg-[var(--bg-hover)]"
+                className="px-4 py-1.5 rounded-lg border border-beton-700 text-sm text-beton-300 hover:bg-beton-800"
               >
                 İptal
               </button>
