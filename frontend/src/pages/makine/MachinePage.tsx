@@ -646,8 +646,8 @@ export default function MachinePage({
                 />
               </div>
 
-              {/* Durum — tam satır alır, bakım alanları kendi satırında yanyana gelsin */}
-              <div className={showBakim ? "col-span-2 flex flex-col gap-1" : "flex flex-col gap-1"}>
+              {/* Durum */}
+              <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-[var(--text-muted)]">Durum</label>
                 <select
                   value={form.durum ?? "aktif"}
@@ -660,9 +660,9 @@ export default function MachinePage({
                 </select>
               </div>
 
-              {/* Bakım tarihleri — her zaman yanyana */}
+              {/* Bakım tarihleri — col-span-2 wrapper ile her zaman yanyana */}
               {showBakim && (
-                <>
+                <div className="col-span-2 grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
                     <label className="text-xs font-medium text-[var(--text-muted)]">Son Bakım Tarihi</label>
                     <input
@@ -681,7 +681,7 @@ export default function MachinePage({
                       className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
                     />
                   </div>
-                </>
+                </div>
               )}
 
               {/* Açıklama */}
