@@ -73,7 +73,12 @@ function mondayOf(d: Date): Date {
   m.setDate(d.getDate() - (wd - 1));
   return m;
 }
-function fmtISO(d: Date)   { return d.toISOString().slice(0, 10); }
+function fmtISO(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 function fmtTR(iso: string) {
   const [y, mo, day] = iso.split("-");
   return `${day}.${mo}.${y}`;
@@ -532,20 +537,20 @@ export default function WeeklyReportsPage() {
                   <p className="px-4 pb-3 text-xs text-red-400">{r.error}</p>
                 )}
 
-                {r.status === "Pending" && isOpen && (
-                  <div className="px-4 pb-4">
-                    <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3">
-                      <svg className="w-4 h-4 animate-spin text-yellow-400 shrink-0" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                      </svg>
-                      <span className="text-sm text-yellow-300">Rapor hazırlanıyor, lütfen bekleyin…</span>
-                    </div>
-                  </div>
-                )}
-
-                {isOpen && r.status !== "Pending" && (
-                  <div className="px-4 pb-4">
+                {isOpen && r.status !== "Failed" && (
+                  <div className="px-4 pb-4 space-y-2">
+                    {r.status === "Pending" && (
+                      <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3">
+                        <svg className="w-4 h-4 animate-spin text-yellow-400 shrink-0" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                        </svg>
+                        <span className="text-sm text-yellow-300">Rapor verisi derleniyor…</span>
+                      </div>
+                    )}
+                    {r.status === "Ready" && !r.has_pdf && (
+                      <p className="text-[11px] text-beton-500">PDF hazırlanıyor — veriler aşağıda görüntülenebilir.</p>
+                    )}
                     {loadingSnap === r.id ? (
                       <p className="text-sm text-beton-500 py-3">Yükleniyor…</p>
                     ) : sn ? (

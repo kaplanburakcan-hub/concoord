@@ -481,7 +481,7 @@ func (h *Handler) GenerateWeekly(w http.ResponseWriter, r *http.Request) {
 	err = h.pool.QueryRow(r.Context(), `
 		INSERT INTO weekly_reports (project_id, week_no, period_start, period_end,
 		                            status, snapshot, generated_by)
-		VALUES ($1,$2,$3::date,$4::date,'Pending',$5,$6)
+		VALUES ($1,$2,$3::date,$4::date,'Ready',$5,$6)
 		RETURNING id`,
 		pid, sn.WeekNo, sn.PeriodStart, sn.PeriodEnd, snapJSON, uid).Scan(&id)
 	if err != nil {
@@ -573,10 +573,12 @@ func ProcessWeeklyPDF(ctx context.Context, pool *pgxpool.Pool, store *storage.Cl
 
 	var pid, genBy uuid.UUID
 	var snapJSON []byte
-	var status string
+	var hasPDF bool
 	err = pool.QueryRow(ctx, `
-		SELECT project_id, generated_by, snapshot, status FROM weekly_reports
-		WHERE id=$1 AND deleted_at IS NULL`, id).Scan(&pid, &genBy, &snapJSON, &status)
+		SELECT project_id, generated_by, snapshot,
+		       (generated_pdf_file_id IS NOT NULL)
+		FROM weekly_reports
+		WHERE id=$1 AND deleted_at IS NULL`, id).Scan(&pid, &genBy, &snapJSON, &hasPDF)
 	if errors.Is(err, pgx.ErrNoRows) {
 		log.Warn("haftalık PDF işi: kayıt yok, atlanıyor", "id", id)
 		return nil
@@ -584,8 +586,8 @@ func ProcessWeeklyPDF(ctx context.Context, pool *pgxpool.Pool, store *storage.Cl
 	if err != nil {
 		return err // geçici DB hatası → yeniden dene
 	}
-	if status == "Ready" {
-		return nil // idempotentlik: zaten üretilmiş
+	if hasPDF {
+		return nil // idempotentlik: PDF zaten üretilmiş
 	}
 
 	var sn Snapshot
