@@ -54,6 +54,8 @@ import AnaSozlesmePage from "./pages/project/AnaSozlesmePage";
 import TasarimVeProjelerPage from "./pages/project/TasarimVeProjelerPage";
 import PersonelPuantajPage from "./pages/project/PersonelPuantajPage";
 import TedarikciEkstrerlerPage from "./pages/payments/TedarikciEkstrerlerPage";
+import GelenEvrakPage from "./pages/project/GelenEvrakPage";
+import GidenEvrakPage from "./pages/project/GidenEvrakPage";
 
 // Basit ComingSoon sarmalayıcı — yeni sayfalar için geçici placeholder
 function ComingSoonPage({ title, description }: { title: string; description: string }) {
@@ -342,6 +344,10 @@ export default function App() {
                       <Route path="/tedarikci-ekstreler" element={<RequirePerm perm="contracts.view"><TedarikciEkstrerlerPage /></RequirePerm>} />
                       <Route path="/proje/personel-puantaj" element={<RequirePerm perm="reports.view"><PersonelPuantajPage /></RequirePerm>} />
                       <Route path="/saha/tutanaklar" element={<RequirePerm perm="reports.view"><SahaTutanaklariPage /></RequirePerm>} />
+                      {/* ── YAZIŞMALAR ── */}
+                      <Route path="/yazismalar" element={<Navigate to="/yazismalar/gelen" replace />} />
+                      <Route path="/yazismalar/gelen" element={<RequirePerm perm="projects.view"><GelenEvrakPage /></RequirePerm>} />
+                      <Route path="/yazismalar/giden" element={<RequirePerm perm="projects.view"><GidenEvrakPage /></RequirePerm>} />
                       {/* ── MAKİNE & EKİPMAN ── */}
                       <Route path="/makine/araclar" element={<RequirePerm perm="projects.view"><AraclarPage /></RequirePerm>} />
                       <Route path="/makine/is-makineleri" element={<RequirePerm perm="projects.view"><IsMakineleriPage /></RequirePerm>} />

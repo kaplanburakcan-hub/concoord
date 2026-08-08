@@ -31,6 +31,7 @@ const I = {
   denetim: <svg viewBox="0 0 24 24"><path d="M12 8v4l3 2" /><circle cx="12" cy="12" r="9" /></svg>,
   toplanti: <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
   fotograf: <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
+  evrak: <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
   makine: <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>,
   ozet: <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>,
   idarihakedis: <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>,
@@ -59,6 +60,13 @@ const GROUPS: NavGroup[] = [
       { to: "/proje/kesif", label: "Proje Keşfi", perm: "projects.view", icon: I.dok },
       { to: "/proje/ana-sozlesme", label: "Ana Sözleşme", perm: "projects.view", icon: I.sozlesme },
       { to: "/proje/tasarim-projeler", label: "Tasarım ve Projeler", perm: "projects.view", icon: I.tasarim },
+      {
+        to: "/yazismalar", label: "Yazışmalar", perm: "projects.view", icon: I.evrak,
+        children: [
+          { to: "/yazismalar/gelen", label: "Gelen Evrak" },
+          { to: "/yazismalar/giden", label: "Giden Evrak" },
+        ],
+      },
       { to: "/hakedis/idari", label: "İdari Hakedişler", perm: "progress_payments.view", icon: I.idarihakedis, end: true },
       {
         to: "/satinalma", label: "Satın Alma ve Tedarik", perm: "procurement.view", icon: I.satinalma,
