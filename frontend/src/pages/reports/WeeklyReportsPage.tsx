@@ -377,6 +377,7 @@ export default function WeeklyReportsPage() {
   const [loadingSnap, setLoadingSnap] = useState<string | null>(null);
   const [generating,  setGenerating]  = useState(false);
   const [genWeek,     setGenWeek]     = useState(() => fmtISO(mondayOf(new Date())));
+  const [showGen,     setShowGen]     = useState(false);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -422,7 +423,7 @@ export default function WeeklyReportsPage() {
       );
       await load();
       setExpanded(res.id);
-      // Snapshot'ı hemen yükle (rapor artık 'Ready' olarak oluşturulur).
+      setShowGen(false);
       try {
         const snap = await api<{ snapshot: Snapshot }>(
           `/projects/${pid}/weekly-reports/${res.id}`,
@@ -448,50 +449,54 @@ export default function WeeklyReportsPage() {
         <div>
           <h1 className="font-display font-extrabold text-xl text-white">Haftalık İlerleme Raporları</h1>
           <p className="text-xs text-beton-500 mt-0.5">
-            Günlük raporlar, teslimatlar ve depo verilerinden otomatik derlenir.
+            Günlük raporlar, teslimatlar ve depo verilerinden otomatik derlenen haftalık özetler.
           </p>
         </div>
-        <Link
-          to="/saha-raporlari"
-          className="rounded-md border border-beton-700 px-3 py-2 text-sm text-beton-200 hover:border-emniyet-500"
-        >
-          Günlük Raporlar
-        </Link>
+        <div className="flex items-center gap-2">
+          {can("reports.generate_weekly") && (
+            <button
+              onClick={() => setShowGen((v) => !v)}
+              className="rounded-md border border-beton-700 px-3 py-2 text-sm text-beton-200 hover:border-emniyet-500 transition-colors"
+            >
+              + Rapor Üret
+            </button>
+          )}
+          <Link
+            to="/saha-raporlari"
+            className="rounded-md border border-beton-700 px-3 py-2 text-sm text-beton-200 hover:border-beton-500 transition-colors"
+          >
+            Günlük Raporlar
+          </Link>
+        </div>
       </div>
 
       {err && <p className="text-red-400 text-sm">{err}</p>}
 
-      {can("reports.generate_weekly") && (
-        <div className="rounded-lg border border-beton-800 bg-beton-900 p-4">
-          <p className="text-sm font-medium text-beton-100 mb-3">Yeni Haftalık Rapor Oluştur</p>
-          <div className="flex gap-2 flex-wrap">
-            <div className="flex-1 min-w-[180px]">
-              <label className="block text-[10.5px] uppercase tracking-wider text-beton-500 mb-1">
-                Hafta Başlangıcı (Pazartesi)
-              </label>
-              <input
-                type="date"
-                value={genWeek}
-                onChange={(e) => {
-                  const d = new Date(e.target.value);
-                  if (!isNaN(d.getTime())) setGenWeek(fmtISO(mondayOf(d)));
-                }}
-                className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
-              />
-            </div>
-            <div className="flex items-end">
-              <button
-                onClick={generate}
-                disabled={generating}
-                className="rounded-md bg-emniyet-500 px-5 py-2 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50"
-              >
-                {generating ? "Oluşturuluyor…" : "Oluştur"}
-              </button>
-            </div>
-          </div>
-          <p className="text-[10.5px] text-beton-500 mt-2">
-            Seçilen haftanın günlük raporları, teslimatları ve depo hareketleri otomatik derlenir.
-          </p>
+      {showGen && can("reports.generate_weekly") && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900/60 px-4 py-3 flex items-center gap-3 flex-wrap">
+          <label className="text-xs text-beton-400 shrink-0">Hafta başlangıcı (Pazartesi):</label>
+          <input
+            type="date"
+            value={genWeek}
+            onChange={(e) => {
+              const d = new Date(e.target.value);
+              if (!isNaN(d.getTime())) setGenWeek(fmtISO(mondayOf(d)));
+            }}
+            className="rounded-md bg-beton-950 border border-beton-800 px-3 py-1.5 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+          />
+          <button
+            onClick={generate}
+            disabled={generating}
+            className="rounded-md bg-emniyet-500 px-4 py-1.5 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50"
+          >
+            {generating ? "Oluşturuluyor…" : "Oluştur"}
+          </button>
+          <button
+            onClick={() => setShowGen(false)}
+            className="text-xs text-beton-500 hover:text-beton-300 transition-colors ml-auto"
+          >
+            İptal
+          </button>
         </div>
       )}
 

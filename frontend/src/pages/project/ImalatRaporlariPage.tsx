@@ -28,7 +28,7 @@ const REPORT_TYPES: ReportType[] = [
     id: "weekly",
     label: "Haftalık Rapor",
     desc: "Haftalık imalat özeti, plana göre ilerleme ve kritik kalemler.",
-    path: "/saha-raporlari",
+    path: "/saha-raporlari/haftalik",
     color: "border-blue-500/40 bg-blue-500/5",
     default: true,
   },
