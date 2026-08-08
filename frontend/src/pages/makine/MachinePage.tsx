@@ -623,7 +623,7 @@ export default function MachinePage({
               </div>
 
               {/* Tedarikçi */}
-              <div className="flex flex-col gap-1">
+              <div className={`flex flex-col gap-1${!showPlaka && !showSeriNo ? " col-span-2" : ""}`}>
                 <label className="text-xs font-medium text-[var(--text-muted)]">Tedarikçi / Kiralık Firma</label>
                 <input
                   placeholder="Firma adı"
