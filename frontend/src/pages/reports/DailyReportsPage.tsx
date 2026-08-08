@@ -67,7 +67,7 @@ export default function DailyReportsPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="font-display font-extrabold text-xl text-white">Günlük Saha Raporları</h1>
         <div className="flex items-center gap-2">
-          {can("reports.view") && (
+          {can("reports.generate_weekly") && (
             <Link
               to="/saha-raporlari/haftalik"
               className="rounded-md border border-beton-700 px-3 py-2 text-sm text-beton-200 hover:border-emniyet-500"
