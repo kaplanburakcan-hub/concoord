@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState, useEffect } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Can } from "../auth/guards";
@@ -123,11 +123,45 @@ const GROUPS: NavGroup[] = [
   },
 ];
 
+const STORAGE_KEY = "ipks.sidebar.collapsed";
+
+function loadCollapsed(): Record<string, boolean> {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+function groupHasActiveRoute(group: NavGroup, pathname: string): boolean {
+  return group.items.some((it) => {
+    if (it.to === "/" && pathname === "/") return true;
+    if (it.to !== "/" && pathname.startsWith(it.to)) return true;
+    return false;
+  });
+}
+
 export default function AppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const { projects, current, select } = useProjects();
   const { theme, toggle } = useTheme();
   const nav = useNavigate();
+  const { pathname } = useLocation();
+
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(collapsed));
+  }, [collapsed]);
+
+  function toggleGroup(title: string) {
+    setCollapsed((prev) => ({ ...prev, [title]: !prev[title] }));
+  }
+
+  function isGroupOpen(group: NavGroup): boolean {
+    if (groupHasActiveRoute(group, pathname)) return true;
+    return !collapsed[group.title];
+  }
 
   async function doLogout() {
     await logout();
@@ -156,25 +190,36 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </Link>
 
         <nav className="flex-1 overflow-y-auto px-3 pb-3">
-          {GROUPS.map((g) => (
-            <div key={g.title}>
-              <div
-                className="mt-4 mb-1.5 px-3 text-[10.5px] font-medium uppercase tracking-[0.15em]"
-                style={{ color: "var(--chrome-text-3)" }}
-              >
-                {g.title}
+          {GROUPS.map((g) => {
+            const open = isGroupOpen(g);
+            return (
+              <div key={g.title}>
+                <button
+                  onClick={() => toggleGroup(g.title)}
+                  className="w-full flex items-center justify-between mt-4 mb-1.5 px-3 py-0.5 rounded hover:opacity-80 transition-opacity"
+                  style={{ color: "var(--chrome-text-3)" }}
+                >
+                  <span className="text-[10.5px] font-medium uppercase tracking-[0.15em]">{g.title}</span>
+                  <svg
+                    width="11" height="11" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2.5"
+                    style={{ transition: "transform .2s", transform: open ? "rotate(0deg)" : "rotate(-90deg)", flexShrink: 0 }}
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+                {open && g.items.map((it) =>
+                  it.perm ? (
+                    <Can key={it.to} perm={it.perm}>
+                      <SideLink item={it} />
+                    </Can>
+                  ) : (
+                    <SideLink key={it.to} item={it} />
+                  )
+                )}
               </div>
-              {g.items.map((it) =>
-                it.perm ? (
-                  <Can key={it.to} perm={it.perm}>
-                    <SideLink item={it} />
-                  </Can>
-                ) : (
-                  <SideLink key={it.to} item={it} />
-                )
-              )}
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-3 px-4 py-3 border-t" style={{ borderColor: "var(--chrome-border)" }}>
