@@ -692,3 +692,97 @@ func nullJSON(raw json.RawMessage) interface{} {
 	}
 	return raw
 }
+
+// ── DailyContext — günlük rapor yardımcı verileri ─────────────────────────────
+// GET /projects/{projectID}/daily-report-context?date=YYYY-MM-DD
+// Rapor formuna eklenen Depo-Stok özeti ve Bekleyen Aktiviteler için gerekli
+// verileri tek istekte döner. reports.view yetkisi yeterli.
+
+type DailyContextWarehouse struct {
+	MalzemeAdi string  `json:"malzeme_adi"`
+	Kategori   string  `json:"kategori"`
+	Birim      string  `json:"birim"`
+	Giris      float64 `json:"giris"`
+	Cikis      float64 `json:"cikis"`
+	NetDelta   float64 `json:"net_delta"`
+}
+
+type DailyContextResponse struct {
+	WarehouseDelta []DailyContextWarehouse `json:"warehouse_delta"`
+	PendingMARs    int                     `json:"pending_mars"`
+	PendingPOs     int                     `json:"pending_pos"`
+	OpenTasks      int                     `json:"open_tasks"`
+}
+
+func (h *Handler) DailyContext(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	dateStr := strings.TrimSpace(r.URL.Query().Get("date"))
+	if dateStr == "" {
+		dateStr = time.Now().Format("2006-01-02")
+	}
+	if _, err := time.Parse("2006-01-02", dateStr); err != nil {
+		httpx.ValidationFailed(w, r, map[string]string{"date": "geçerli bir tarih (YYYY-MM-DD) girin"})
+		return
+	}
+	ctx := r.Context()
+	var out DailyContextResponse
+
+	// Depo hareketleri özeti (sadece o güne ait giris/cikis).
+	rows, err := h.pool.Query(ctx, `
+		SELECT i.malzeme_adi, i.kategori, i.birim,
+		       COALESCE(SUM(m.miktar::float8) FILTER (WHERE m.hareket_turu='giris'),  0),
+		       COALESCE(SUM(m.miktar::float8) FILTER (WHERE m.hareket_turu='cikis'),  0)
+		FROM site_warehouse_items i
+		JOIN site_warehouse_movements m ON m.item_id=i.id AND m.tarih=$2::date
+		WHERE i.project_id=$1
+		GROUP BY i.id, i.malzeme_adi, i.kategori, i.birim
+		HAVING SUM(m.miktar::float8) > 0
+		ORDER BY i.kategori, i.malzeme_adi`, pid, dateStr)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	out.WarehouseDelta = []DailyContextWarehouse{}
+	for rows.Next() {
+		var wh DailyContextWarehouse
+		if err := rows.Scan(&wh.MalzemeAdi, &wh.Kategori, &wh.Birim, &wh.Giris, &wh.Cikis); err != nil {
+			rows.Close()
+			httpx.Internal(w, r)
+			return
+		}
+		wh.NetDelta = wh.Giris - wh.Cikis
+		out.WarehouseDelta = append(out.WarehouseDelta, wh)
+	}
+	rows.Close()
+
+	// Bekleyen MAR sayısı.
+	if err := h.pool.QueryRow(ctx, `
+		SELECT count(*) FROM material_approvals
+		WHERE project_id=$1 AND deleted_at IS NULL
+		  AND status IN ('Submitted','UnderReview')`, pid).Scan(&out.PendingMARs); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+
+	// Bekleyen/açık PO sayısı.
+	if err := h.pool.QueryRow(ctx, `
+		SELECT count(*) FROM purchase_orders
+		WHERE project_id=$1 AND deleted_at IS NULL
+		  AND status IN ('Ordered','PartiallyDelivered')`, pid).Scan(&out.PendingPOs); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+
+	// Açık görev sayısı.
+	if err := h.pool.QueryRow(ctx, `
+		SELECT count(*) FROM tasks
+		WHERE project_id=$1 AND deleted_at IS NULL AND status <> 'Done'`, pid).Scan(&out.OpenTasks); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+
+	httpx.JSON(w, http.StatusOK, out)
+}

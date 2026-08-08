@@ -35,6 +35,17 @@ type Detail = {
 type Sub = { id: string; company_name: string };
 type WorkItem = { id: string; poz_no: string; description: string; unit: string };
 
+type WarehouseDelta = {
+  malzeme_adi: string; kategori: string; birim: string;
+  giris: number; cikis: number; net_delta: number;
+};
+type DailyCtx = {
+  warehouse_delta: WarehouseDelta[];
+  pending_mars: number;
+  pending_pos: number;
+  open_tasks: number;
+};
+
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 export default function DailyReportFormPage() {
@@ -60,8 +71,9 @@ export default function DailyReportFormPage() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [entries, setEntries] = useState<WorkEntry[]>([]);
 
-  const [subs, setSubs] = useState<Sub[]>([]);
+  const [subs, setSubs]   = useState<Sub[]>([]);
   const [items, setItems] = useState<WorkItem[]>([]);
+  const [ctx,  setCtx]   = useState<DailyCtx | null>(null);
 
   const readOnly = !!detail && detail.status === "Submitted";
   const canEdit = can("reports.create_daily");
@@ -100,6 +112,15 @@ export default function DailyReportFormPage() {
       .then((r) => setSubs(r.subcontractors))
       .catch(() => {});
   }, [pid]);
+  // Depo-stok özeti ve bekleyen aktiviteler — tarih değiştiğinde yenile.
+  useEffect(() => {
+    if (!pid || !reportDate) return;
+    api<DailyCtx>(
+      `/projects/${pid}/daily-report-context?date=${reportDate}`,
+      { projectId: pid }
+    ).then(setCtx).catch(() => {});
+  }, [pid, reportDate]);
+
   useEffect(() => {
     if (!pid || subs.length === 0) return;
     // Poz listesi: tüm taşeronların birleşimi (imalat girdisi bağlamak için).
@@ -245,6 +266,7 @@ export default function DailyReportFormPage() {
         busy={busy}
         canEdit={canEdit}
         err={err}
+        ctx={ctx}
         onRevise={revise}
       />
     );
@@ -456,6 +478,54 @@ export default function DailyReportFormPage() {
           onChange={(e) => setNotes(e.target.value)} />
       </div>
 
+      {/* Depo-Stok Özeti */}
+      {ctx && ctx.warehouse_delta.length > 0 && (
+        <div className={section}>
+          <h2 className="font-medium text-white text-sm">Depo-Stok Özeti</h2>
+          <p className="text-xs text-beton-500">{formatDateTR(reportDate)} tarihli depo hareketleri</p>
+          <div className="space-y-1.5">
+            {ctx.warehouse_delta.map((wh, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm flex-wrap">
+                <span className="flex-1 min-w-0 truncate text-beton-100">{wh.malzeme_adi}</span>
+                <span className="text-[11px] text-beton-500">{wh.kategori}</span>
+                {wh.giris > 0 && <span className="text-green-400 tabular-nums text-xs">+{wh.giris} {wh.birim}</span>}
+                {wh.cikis > 0 && <span className="text-red-400 tabular-nums text-xs">−{wh.cikis} {wh.birim}</span>}
+                <span className={`font-semibold tabular-nums text-xs ${wh.net_delta >= 0 ? "text-green-300" : "text-red-300"}`}>
+                  Net: {wh.net_delta >= 0 ? "+" : ""}{wh.net_delta} {wh.birim}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bekleyen Aktiviteler */}
+      {ctx && (ctx.pending_mars > 0 || ctx.pending_pos > 0 || ctx.open_tasks > 0) && (
+        <div className={section}>
+          <h2 className="font-medium text-white text-sm">Bekleyen Aktiviteler</h2>
+          <div className="flex flex-wrap gap-3">
+            {ctx.pending_mars > 0 && (
+              <div className="rounded-md border border-beton-700 bg-beton-950 px-3 py-2 text-center min-w-[90px]">
+                <div className="text-lg font-bold text-beton-100 tabular-nums">{ctx.pending_mars}</div>
+                <div className="text-[10px] uppercase tracking-wider text-beton-500 mt-0.5">Bekleyen MAR</div>
+              </div>
+            )}
+            {ctx.pending_pos > 0 && (
+              <div className="rounded-md border border-beton-700 bg-beton-950 px-3 py-2 text-center min-w-[90px]">
+                <div className="text-lg font-bold text-beton-100 tabular-nums">{ctx.pending_pos}</div>
+                <div className="text-[10px] uppercase tracking-wider text-beton-500 mt-0.5">Açık Sipariş</div>
+              </div>
+            )}
+            {ctx.open_tasks > 0 && (
+              <div className="rounded-md border border-beton-700 bg-beton-950 px-3 py-2 text-center min-w-[90px]">
+                <div className="text-lg font-bold text-beton-100 tabular-nums">{ctx.open_tasks}</div>
+                <div className="text-[10px] uppercase tracking-wider text-beton-500 mt-0.5">Açık Görev</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Aksiyon çubuğu (mobilde alta sabit) */}
       <div className="fixed bottom-0 inset-x-0 border-t border-beton-800 bg-beton-900/95 backdrop-blur p-3">
         <div className="max-w-2xl mx-auto flex gap-2">
@@ -518,12 +588,13 @@ const roTd = "py-2 pr-3 text-[12.5px] text-beton-100 border-b border-beton-800/6
 const roTdM = "py-2 pr-3 text-[12.5px] text-beton-400 border-b border-beton-800/60 align-middle";
 
 function ReadOnlyView({
-  detail, busy, canEdit, err, onRevise,
+  detail, busy, canEdit, err, ctx, onRevise,
 }: {
   detail: Detail;
   busy: boolean;
   canEdit: boolean;
   err: string | null;
+  ctx: DailyCtx | null;
   onRevise: () => void;
 }) {
   const totalPersonnel = (detail.manpower ?? []).reduce((s, m) => s + m.headcount, 0);
@@ -675,6 +746,53 @@ function ReadOnlyView({
         <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
           <SecHeader color="#4e6a87" title="Notlar & Açıklamalar" />
           <p className="px-4 py-3 text-sm text-beton-300 leading-relaxed">{detail.notes}</p>
+        </div>
+      )}
+
+      {/* Depo-Stok Özeti */}
+      {ctx && ctx.warehouse_delta.length > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#f59e0b" title="Depo-Stok Özeti" />
+          <div className="px-4 py-3 space-y-2">
+            {ctx.warehouse_delta.map((wh, i) => (
+              <div key={i} className="flex items-center gap-2 flex-wrap text-[12.5px]">
+                <span className="flex-1 min-w-0 text-beton-100">{wh.malzeme_adi}</span>
+                <span className="text-beton-500 text-[11px]">{wh.kategori}</span>
+                {wh.giris > 0 && <span className="text-green-400 tabular-nums">+{wh.giris} {wh.birim}</span>}
+                {wh.cikis > 0 && <span className="text-red-400 tabular-nums">−{wh.cikis} {wh.birim}</span>}
+                <span className={`font-semibold tabular-nums ${wh.net_delta >= 0 ? "text-green-300" : "text-red-300"}`}>
+                  Net: {wh.net_delta >= 0 ? "+" : ""}{wh.net_delta} {wh.birim}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bekleyen Aktiviteler */}
+      {ctx && (ctx.pending_mars > 0 || ctx.pending_pos > 0 || ctx.open_tasks > 0) && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#4e6a87" title="Bekleyen Aktiviteler" />
+          <div className="px-4 py-3 flex flex-wrap gap-3">
+            {ctx.pending_mars > 0 && (
+              <div className="rounded-md border border-beton-700 bg-beton-950 px-3 py-2 text-center min-w-[90px]">
+                <div className="text-lg font-bold text-beton-100 tabular-nums">{ctx.pending_mars}</div>
+                <div className="text-[10px] uppercase tracking-wider text-beton-500 mt-0.5">Bekleyen MAR</div>
+              </div>
+            )}
+            {ctx.pending_pos > 0 && (
+              <div className="rounded-md border border-beton-700 bg-beton-950 px-3 py-2 text-center min-w-[90px]">
+                <div className="text-lg font-bold text-beton-100 tabular-nums">{ctx.pending_pos}</div>
+                <div className="text-[10px] uppercase tracking-wider text-beton-500 mt-0.5">Açık Sipariş</div>
+              </div>
+            )}
+            {ctx.open_tasks > 0 && (
+              <div className="rounded-md border border-beton-700 bg-beton-950 px-3 py-2 text-center min-w-[90px]">
+                <div className="text-lg font-bold text-beton-100 tabular-nums">{ctx.open_tasks}</div>
+                <div className="text-[10px] uppercase tracking-wider text-beton-500 mt-0.5">Açık Görev</div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -39,6 +39,8 @@ var registry = []Step{
 	// Faz 2: sözlük büyüdü (projects.create/delete). Upsert idempotent olduğundan
 	// mevcut kurulumlar bu adımla yeni izinleri ve rol bağlarını alır.
 	{Name: "0006_faz2_izin_sync", Run: stepFaz2PermSync},
+	// Faz 6: SiteManager rolü eklendi; SiteEngineer'dan reports.generate_weekly kaldırıldı.
+	{Name: "0007_site_manager_rol", Run: stepSiteManager},
 }
 
 // stepFaz2PermSync — izin sözlüğünü ve rol varsayılanlarını yeniden senkronlar.
@@ -57,6 +59,24 @@ func stepFaz2PermSync(ctx context.Context, tx pgx.Tx, opts Options, log *slog.Lo
 		FROM users u, permissions p
 		WHERE u.email=$1 AND u.deleted_at IS NULL
 		ON CONFLICT DO NOTHING`, opts.AdminEmail)
+	return err
+}
+
+// stepSiteManager — SiteManager rolünü upsert eder, varsayılan izinlerini bağlar
+// ve SiteEngineer'dan reports.generate_weekly iznini kaldırır.
+func stepSiteManager(ctx context.Context, tx pgx.Tx, opts Options, log *slog.Logger) error {
+	// Rolleri ve rol-izin bağlarını yeniden senkronla (idempotent upsert).
+	if err := stepRoles(ctx, tx, opts, log); err != nil {
+		return err
+	}
+	if err := stepRolePermissions(ctx, tx, opts, log); err != nil {
+		return err
+	}
+	// SiteEngineer'dan reports.generate_weekly varsayılan iznini kaldır.
+	_, err := tx.Exec(ctx, `
+		DELETE FROM role_permissions
+		WHERE role_id    = (SELECT id FROM roles WHERE code='SiteEngineer')
+		  AND permission_id = (SELECT id FROM permissions WHERE code='reports.generate_weekly')`)
 	return err
 }
 

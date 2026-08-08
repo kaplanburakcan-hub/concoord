@@ -89,6 +89,7 @@ type RoleDef struct {
 var Roles = []RoleDef{
 	{"Admin", "Sistem Yöneticisi"},
 	{"ProjectManager", "Proje Yöneticisi"},
+	{"SiteManager", "Şantiye Şefi / İnşaat Müdürü"},
 	{"SiteEngineer", "Saha Mühendisi"},
 	{"SubcontractorRep", "Taşeron Temsilcisi"},
 	{"Client", "İşveren / Müşteri"},
@@ -114,6 +115,18 @@ var roleDefaults = map[string][]string{
 		"ohs.view", "ohs.issue_penalty", "ohs.manage_checklists",
 		"admin.view_audit_log",
 	},
+	"SiteManager": {
+		"projects.view",
+		"contracts.view",
+		"progress_payments.view", "progress_payments.approve", "progress_payments.view_financials",
+		"material_approvals.view", "material_approvals.create", "material_approvals.review", "material_approvals.decide",
+		"documents.view", "documents.upload", "documents.download",
+		"tasks.view", "tasks.create", "tasks.edit_own", "tasks.edit_all", "tasks.assign",
+		"reports.view", "reports.create_daily", "reports.generate_weekly", "reports.view_financial_reports",
+		"procurement.view", "procurement.create_pr", "procurement.approve_pr",
+		"ohs.view", "ohs.perform_inspection", "ohs.issue_penalty",
+		"admin.view_audit_log",
+	},
 	"SiteEngineer": {
 		"projects.view",
 		"contracts.view",
@@ -121,11 +134,11 @@ var roleDefaults = map[string][]string{
 		"material_approvals.view", "material_approvals.create", "material_approvals.review",
 		"documents.view", "documents.upload", "documents.download",
 		"tasks.view", "tasks.create", "tasks.edit_own", "tasks.edit_all", "tasks.assign",
-		"reports.view", "reports.create_daily", "reports.generate_weekly",
+		"reports.view", "reports.create_daily",
 		"procurement.view", "procurement.create_pr",
 		"ohs.view", "ohs.perform_inspection",
-		// Not: view_financials VARSAYILAN DEĞİL — saha müh. metrajı görür,
-		// birim fiyat/tutarı görmeyebilir (Plan §4 finansal görünürlük ayrımı).
+		// Not: view_financials ve generate_weekly VARSAYILAN DEĞİL —
+		// saha mühendisi günlük rapor girer, haftalık raporu göremez/üretemez.
 	},
 	"SubcontractorRep": {
 		"projects.view",

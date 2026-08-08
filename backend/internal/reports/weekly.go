@@ -74,6 +74,42 @@ type SnapTotals struct {
 	WorkEntryCount int     `json:"work_entry_count"`
 }
 
+// SnapDeliveryItem — tek teslimat kaleminin özeti.
+type SnapDeliveryItem struct {
+	MaterialName string  `json:"material_name"`
+	Unit         string  `json:"unit"`
+	Qty          float64 `json:"qty"`
+}
+
+// SnapDelivery — haftada gelen bir irsaliye/teslimat.
+type SnapDelivery struct {
+	PONo        string             `json:"po_no"`
+	Supplier    string             `json:"supplier"`
+	NoteNo      string             `json:"delivery_note_no"`
+	DeliveredAt string             `json:"delivered_at"`
+	Items       []SnapDeliveryItem `json:"items"`
+}
+
+// SnapStockItem — hafta sonu stok + haftalık giriş/çıkış özeti.
+type SnapStockItem struct {
+	MalzemeAdi   string  `json:"malzeme_adi"`
+	Kategori     string  `json:"kategori"`
+	Birim        string  `json:"birim"`
+	MevcutMiktar float64 `json:"mevcut_miktar"`
+	MinStok      float64 `json:"min_stok"`
+	WeekGiris    float64 `json:"week_giris"`
+	WeekCikis    float64 `json:"week_cikis"`
+	BelowMin     bool    `json:"below_min"`
+}
+
+// SnapPendingPO — teslim edilmemiş veya geciken sipariş.
+type SnapPendingPO struct {
+	PONo         string  `json:"po_no"`
+	Supplier     string  `json:"supplier"`
+	ExpectedDate *string `json:"expected_date,omitempty"`
+	Overdue      bool    `json:"overdue"`
+}
+
 type Snapshot struct {
 	GeneratedAt time.Time `json:"generated_at"`
 	ProjectName string    `json:"project_name"`
@@ -85,12 +121,18 @@ type Snapshot struct {
 	Days   []SnapDay  `json:"days"`
 	Totals SnapTotals `json:"totals"`
 
-	// Haftalık kontrol ritmi özetleri (Plan §7):
-	PendingPayments []SnapPayment `json:"pending_payments"` // Finalized olmayan hakedişler
-	OpenTasks       int           `json:"open_tasks"`
-	TasksDueWeek    int           `json:"tasks_due_this_week"`
-	PendingMARs     int           `json:"pending_mars"` // Submitted|UnderReview
-	// İSG özeti Faz 8'de bu snapshot'a eklenir (alan şimdiden ayrık):
+	// Teslimat ve depo.
+	Deliveries []SnapDelivery  `json:"deliveries"`
+	Stock      []SnapStockItem `json:"stock"`
+
+	// Bekleyen aktiviteler.
+	PendingPayments []SnapPayment  `json:"pending_payments"`
+	PendingPOs      []SnapPendingPO `json:"pending_pos"`
+	OpenTasks       int             `json:"open_tasks"`
+	TasksDueWeek    int             `json:"tasks_due_this_week"`
+	PendingMARs     int             `json:"pending_mars"`
+
+	// İSG özeti Faz 8'de eklenir:
 	OHSNote string `json:"ohs_note,omitempty"`
 }
 
@@ -209,6 +251,100 @@ func (h *Handler) buildSnapshot(ctx context.Context, pid uuid.UUID, start, end t
 		  AND status IN ('Submitted','UnderReview')`, pid).Scan(&sn.PendingMARs); err != nil {
 		return nil, err
 	}
+
+	// ── Teslimatlar (irsaliye) ─────────────────────────────────────────────────
+	drows, err := h.pool.Query(ctx, `
+		SELECT o.po_no, o.supplier_name,
+		       d.delivery_note_no, TO_CHAR(d.delivered_at,'YYYY-MM-DD'), d.id
+		FROM deliveries d
+		JOIN purchase_orders o ON o.id = d.po_id
+		WHERE o.project_id=$1
+		  AND d.delivered_at BETWEEN $2::date AND $3::date
+		ORDER BY d.delivered_at, d.created_at`,
+		pid, sn.PeriodStart, sn.PeriodEnd)
+	if err != nil {
+		return nil, fmt.Errorf("teslimatlar okunamadı: %w", err)
+	}
+	for drows.Next() {
+		var sd SnapDelivery
+		var delivID string
+		if err := drows.Scan(&sd.PONo, &sd.Supplier, &sd.NoteNo, &sd.DeliveredAt, &delivID); err != nil {
+			drows.Close()
+			return nil, err
+		}
+		// Teslimat kalemleri.
+		irows, err := h.pool.Query(ctx, `
+			SELECT material_name, unit, delivered_qty::float8
+			FROM delivery_items WHERE delivery_id=$1 ORDER BY created_at`, delivID)
+		if err != nil {
+			drows.Close()
+			return nil, err
+		}
+		for irows.Next() {
+			var it SnapDeliveryItem
+			if err := irows.Scan(&it.MaterialName, &it.Unit, &it.Qty); err != nil {
+				irows.Close()
+				drows.Close()
+				return nil, err
+			}
+			sd.Items = append(sd.Items, it)
+		}
+		irows.Close()
+		sn.Deliveries = append(sn.Deliveries, sd)
+	}
+	drows.Close()
+
+	// ── Depo stok ve haftalık hareketler ──────────────────────────────────────
+	srows, err := h.pool.Query(ctx, `
+		SELECT i.malzeme_adi, i.kategori, i.birim,
+		       i.mevcut_miktar::float8, i.min_stok::float8,
+		       COALESCE(SUM(m.miktar::float8) FILTER (WHERE m.hareket_turu='giris'),  0),
+		       COALESCE(SUM(m.miktar::float8) FILTER (WHERE m.hareket_turu='cikis'),  0)
+		FROM site_warehouse_items i
+		LEFT JOIN site_warehouse_movements m
+		       ON m.item_id = i.id
+		      AND m.tarih BETWEEN $2::date AND $3::date
+		WHERE i.project_id=$1
+		GROUP BY i.id, i.malzeme_adi, i.kategori, i.birim, i.mevcut_miktar, i.min_stok
+		ORDER BY i.kategori, i.sira, i.malzeme_adi`,
+		pid, sn.PeriodStart, sn.PeriodEnd)
+	if err != nil {
+		return nil, fmt.Errorf("stok okunamadı: %w", err)
+	}
+	for srows.Next() {
+		var st SnapStockItem
+		if err := srows.Scan(&st.MalzemeAdi, &st.Kategori, &st.Birim,
+			&st.MevcutMiktar, &st.MinStok, &st.WeekGiris, &st.WeekCikis); err != nil {
+			srows.Close()
+			return nil, err
+		}
+		st.BelowMin = st.MevcutMiktar < st.MinStok
+		sn.Stock = append(sn.Stock, st)
+	}
+	srows.Close()
+
+	// ── Bekleyen / geciken siparişler (PO) ────────────────────────────────────
+	prows, err := h.pool.Query(ctx, `
+		SELECT po_no, supplier_name,
+		       TO_CHAR(expected_date,'YYYY-MM-DD'),
+		       (expected_date IS NOT NULL AND expected_date < $2::date)
+		FROM purchase_orders
+		WHERE project_id=$1 AND deleted_at IS NULL
+		  AND status IN ('Ordered','PartiallyDelivered')
+		ORDER BY expected_date NULLS LAST, po_no`,
+		pid, sn.PeriodEnd)
+	if err != nil {
+		return nil, fmt.Errorf("siparişler okunamadı: %w", err)
+	}
+	for prows.Next() {
+		var p SnapPendingPO
+		if err := prows.Scan(&p.PONo, &p.Supplier, &p.ExpectedDate, &p.Overdue); err != nil {
+			prows.Close()
+			return nil, err
+		}
+		sn.PendingPOs = append(sn.PendingPOs, p)
+	}
+	prows.Close()
 
 	sn.OHSNote = "İSG özeti Faz 8 ile eklenecektir."
 	return sn, nil

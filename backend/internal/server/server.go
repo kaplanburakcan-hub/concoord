@@ -308,6 +308,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 		api.Group(func(pr chi.Router) {
 			pr.Use(mw.Authenticate)
 
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/daily-report-context", reportH.DailyContext)
 			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/daily-reports", reportH.ListDaily)
 			pr.With(mw.RequirePermission("reports.create_daily")).Post("/projects/{projectID}/daily-reports", reportH.CreateDaily)
 			// Hava durumu ön doldurma (opsiyonel; IPKS_WEATHER_ENABLED)
@@ -319,10 +320,10 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("reports.create_daily")).Delete("/projects/{projectID}/daily-reports/{id}", reportH.DeleteDaily)
 
 			// Haftalık rapor: snapshot API'de dondurulur, PDF worker'da üretilir.
-			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/weekly-reports", reportH.ListWeekly)
+			pr.With(mw.RequirePermission("reports.generate_weekly")).Get("/projects/{projectID}/weekly-reports", reportH.ListWeekly)
 			pr.With(mw.RequirePermission("reports.generate_weekly")).Post("/projects/{projectID}/weekly-reports", reportH.GenerateWeekly)
-			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/weekly-reports/{id}", reportH.GetWeekly)
-			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/weekly-reports/{id}/download", reportH.DownloadWeekly)
+			pr.With(mw.RequirePermission("reports.generate_weekly")).Get("/projects/{projectID}/weekly-reports/{id}", reportH.GetWeekly)
+			pr.With(mw.RequirePermission("reports.generate_weekly")).Get("/projects/{projectID}/weekly-reports/{id}/download", reportH.DownloadWeekly)
 		})
 
 		// ---- Faz 7: Satınalma ve Tedarik Zinciri ----
