@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
@@ -371,7 +371,6 @@ export default function WeeklyReportsPage() {
   const [loadingSnap, setLoadingSnap] = useState<string | null>(null);
   const [generating,  setGenerating]  = useState(false);
   const [genWeek,     setGenWeek]     = useState(() => fmtISO(mondayOf(new Date())));
-  const pollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -417,26 +416,20 @@ export default function WeeklyReportsPage() {
       );
       await load();
       setExpanded(res.id);
-      if (pollerRef.current) clearInterval(pollerRef.current);
-      pollerRef.current = setInterval(async () => {
-        await load();
-        setReports((prev) => {
-          const r = prev.find((x) => x.id === res.id);
-          if (r && r.status !== "Pending") {
-            clearInterval(pollerRef.current!);
-            pollerRef.current = null;
-          }
-          return prev;
-        });
-      }, 5000);
+      // Snapshot'ı hemen yükle (rapor artık 'Ready' olarak oluşturulur).
+      try {
+        const snap = await api<{ snapshot: Snapshot }>(
+          `/projects/${pid}/weekly-reports/${res.id}`,
+          { projectId: pid }
+        );
+        setSnapshots((prev) => ({ ...prev, [res.id]: snap.snapshot }));
+      } catch { /* sessiz — "Veri yüklenemedi." görünür */ }
     } catch {
       setErr("Rapor oluşturulamadı.");
     } finally {
       setGenerating(false);
     }
   }, [pid, generating, genWeek, load]);
-
-  useEffect(() => () => { if (pollerRef.current) clearInterval(pollerRef.current); }, []);
 
   if (!pid) {
     return <p className="text-beton-400 text-sm">Önce üst bardan bir proje seçin.</p>;
