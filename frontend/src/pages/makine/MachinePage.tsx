@@ -120,6 +120,7 @@ export default function MachinePage({
   const [search, setSearch] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [logError, setLogError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!pid) return;
@@ -183,10 +184,12 @@ export default function MachinePage({
   function toggleExpand(id: string) {
     if (expandedId === id) {
       setExpandedId(null);
+      setLogError(null);
       return;
     }
     setExpandedId(id);
     setLogForm(emptyLog());
+    setLogError(null);
     loadLogs(id);
   }
 
@@ -209,8 +212,9 @@ export default function MachinePage({
       });
       setLogs(prev => [r.log, ...prev]);
       setLogForm(emptyLog());
+      setLogError(null);
     } catch {
-      alert("Puantaj eklenemedi.");
+      setLogError("Puantaj eklenemedi.");
     } finally {
       setLogSaving(false);
     }
@@ -468,6 +472,9 @@ export default function MachinePage({
                         {logSaving ? "…" : "Ekle"}
                       </button>
                     </div>
+                    {logError && (
+                      <p className="text-xs text-red-500">{logError}</p>
+                    )}
 
                     {/* Log list */}
                     {logsBusy ? (
