@@ -646,8 +646,8 @@ export default function MachinePage({
                 />
               </div>
 
-              {/* Durum */}
-              <div className="flex flex-col gap-1">
+              {/* Durum — tam satır alır, bakım alanları kendi satırında yanyana gelsin */}
+              <div className={showBakim ? "col-span-2 flex flex-col gap-1" : "flex flex-col gap-1"}>
                 <label className="text-xs font-medium text-[var(--text-muted)]">Durum</label>
                 <select
                   value={form.durum ?? "aktif"}
@@ -660,7 +660,7 @@ export default function MachinePage({
                 </select>
               </div>
 
-              {/* Bakım tarihleri */}
+              {/* Bakım tarihleri — her zaman yanyana */}
               {showBakim && (
                 <>
                   <div className="flex flex-col gap-1">
