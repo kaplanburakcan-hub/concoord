@@ -237,6 +237,19 @@ export default function DailyReportFormPage() {
 
   if (!pid) return <p className="text-beton-400 text-sm">Önce üst bardan bir proje seçin.</p>;
 
+  // ── Read-only (Submitted) view ──────────────────────────────────────────
+  if (readOnly && detail) {
+    return (
+      <ReadOnlyView
+        detail={detail}
+        busy={busy}
+        canEdit={canEdit}
+        err={err}
+        onRevise={revise}
+      />
+    );
+  }
+
   const input =
     "w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500 disabled:opacity-60";
   const label = "block text-xs text-beton-400 mb-1";
@@ -472,4 +485,216 @@ export default function DailyReportFormPage() {
 
 function upd<T>(arr: T[], i: number, patch: Partial<T>): T[] {
   return arr.map((x, j) => (j === i ? { ...x, ...patch } : x));
+}
+
+// ── Read-only card view (Submitted reports) ────────────────────────────────
+
+function weatherIcon(condition?: string): string {
+  if (!condition) return "🌡️";
+  const c = condition.toLowerCase();
+  if (c.includes("fırtına")) return "⛈️";
+  if (c.includes("yağmur") || c.includes("yağış")) return "🌧️";
+  if (c.includes("kar")) return "❄️";
+  if (c.includes("parçalı") || c.includes("bulut")) return "⛅";
+  if (c.includes("açık") || c.includes("güneş")) return "☀️";
+  if (c.includes("sisli") || c.includes("sis")) return "🌫️";
+  return "🌡️";
+}
+
+function SecHeader({ color, title, count }: { color: string; title: string; count?: number }) {
+  return (
+    <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-beton-800">
+      <div className="w-[3px] h-3.5 rounded shrink-0" style={{ background: color }} />
+      <span className="text-[11px] font-bold uppercase tracking-widest text-beton-100">{title}</span>
+      {count != null && (
+        <span className="ml-auto text-[10.5px] text-beton-400">{count} kayıt</span>
+      )}
+    </div>
+  );
+}
+
+const roTh = "text-left text-[10px] font-bold uppercase tracking-wider text-beton-400 pb-2 pr-3 whitespace-nowrap";
+const roTd = "py-2 pr-3 text-[12.5px] text-beton-100 border-b border-beton-800/60 align-middle";
+const roTdM = "py-2 pr-3 text-[12.5px] text-beton-400 border-b border-beton-800/60 align-middle";
+
+function ReadOnlyView({
+  detail, busy, canEdit, err, onRevise,
+}: {
+  detail: Detail;
+  busy: boolean;
+  canEdit: boolean;
+  err: string | null;
+  onRevise: () => void;
+}) {
+  const totalPersonnel = (detail.manpower ?? []).reduce((s, m) => s + m.headcount, 0);
+
+  return (
+    <div className="max-w-3xl mx-auto pb-24 space-y-3">
+
+      {/* Header */}
+      <div className="rounded-lg border border-beton-800 bg-beton-900 p-4">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <h1 className="font-display font-extrabold text-xl text-white">
+              Günlük Saha Raporu
+              {detail.revision_no > 1 && (
+                <span className="ml-2 text-sm font-normal text-emniyet-500">rev {detail.revision_no}</span>
+              )}
+            </h1>
+            <p className="text-sm text-beton-400 mt-0.5">{formatDateTR(detail.report_date)}</p>
+          </div>
+          <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${DR_STATUS_STYLE[detail.status]}`}>
+            {DR_STATUS_LABEL[detail.status]}
+          </span>
+        </div>
+        <div className="flex gap-6 flex-wrap">
+          <div><p className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mb-0.5">Hazırlayan</p><p className="text-sm text-beton-100">{detail.author_name}</p></div>
+          <div><p className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mb-0.5">Toplam Personel</p><p className="text-sm text-beton-100 tabular-nums">{totalPersonnel} kişi</p></div>
+        </div>
+      </div>
+
+      {err && <p className="text-red-400 text-sm">{err}</p>}
+
+      {/* Hava Durumu */}
+      {(detail.weather?.condition || detail.temperature_min != null || detail.temperature_max != null) && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#3b7fd4" title="Hava Durumu" />
+          <div className="p-3 flex gap-3 flex-wrap">
+            {detail.weather?.condition && (
+              <div className="rounded-lg border border-beton-800 bg-beton-950 px-4 py-3 text-center min-w-[80px]">
+                <div className="text-2xl mb-1">{weatherIcon(detail.weather.condition)}</div>
+                <div className="text-xs font-medium text-beton-200">{detail.weather.condition}</div>
+                <div className="text-[9.5px] uppercase tracking-wider text-beton-500 mt-0.5">Durum</div>
+              </div>
+            )}
+            {detail.temperature_min != null && (
+              <div className="rounded-lg border border-beton-800 bg-beton-950 px-4 py-3 text-center min-w-[72px]">
+                <div className="text-xl font-bold text-beton-100 tabular-nums">{detail.temperature_min}°</div>
+                <div className="text-[9.5px] uppercase tracking-wider text-beton-500 mt-1">Min</div>
+              </div>
+            )}
+            {detail.temperature_max != null && (
+              <div className="rounded-lg border border-beton-800 bg-beton-950 px-4 py-3 text-center min-w-[72px]">
+                <div className="text-xl font-bold text-beton-100 tabular-nums">{detail.temperature_max}°</div>
+                <div className="text-[9.5px] uppercase tracking-wider text-beton-500 mt-1">Maks</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Şantiye Mevcudu */}
+      {(detail.manpower ?? []).length > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#22c55e" title="Şantiye Mevcudu" count={totalPersonnel} />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[400px]">
+              <thead className="px-4">
+                <tr className="px-4">
+                  <th className={`${roTh} pl-4`}>Taşeron</th>
+                  <th className={roTh}>Branş / Meslek</th>
+                  <th className={`${roTh} text-right`}>Kişi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(detail.manpower ?? []).map((m, i) => (
+                  <tr key={i} className="hover:bg-beton-800/30 transition-colors">
+                    <td className={`${roTd} pl-4`}>{m.subcontractor_name ?? "Ana Yüklenici"}</td>
+                    <td className={roTdM}>{m.trade || "—"}</td>
+                    <td className={`${roTd} text-right font-semibold pr-4 tabular-nums`}>{m.headcount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Günlük İmalat */}
+      {(detail.work_entries ?? []).length > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#3b7fd4" title="Günlük İmalat" count={(detail.work_entries ?? []).length} />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[500px]">
+              <thead>
+                <tr>
+                  <th className={`${roTh} pl-4`}>Poz No</th>
+                  <th className={roTh}>Açıklama</th>
+                  <th className={roTh}>Konum</th>
+                  <th className={`${roTh} text-right`}>Miktar</th>
+                  <th className={`${roTh} pr-4`}>Birim</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(detail.work_entries ?? []).map((w, i) => (
+                  <tr key={i} className="hover:bg-beton-800/30 transition-colors">
+                    <td className={`${roTdM} pl-4 tabular-nums`}>{w.work_item_poz ?? "—"}</td>
+                    <td className={roTd}>{w.description}</td>
+                    <td className={roTdM}>{w.location ?? "—"}</td>
+                    <td className={`${roTd} text-right tabular-nums`}>{w.qty != null ? w.qty : "—"}</td>
+                    <td className={`${roTdM} pr-4`}>{w.unit ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Makine & Ekipman */}
+      {(detail.equipment ?? []).length > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#f59e0b" title="Makine & Ekipman" count={(detail.equipment ?? []).length} />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[420px]">
+              <thead>
+                <tr>
+                  <th className={`${roTh} pl-4`}>Ekipman</th>
+                  <th className={`${roTh} text-right`}>Adet</th>
+                  <th className={`${roTh} text-right`}>Çalışma (sa)</th>
+                  <th className={`${roTh} pr-4`}>Bekleme Nedeni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(detail.equipment ?? []).map((e, i) => (
+                  <tr key={i} className="hover:bg-beton-800/30 transition-colors">
+                    <td className={`${roTd} pl-4`}>{e.equipment_name}</td>
+                    <td className={`${roTd} text-right tabular-nums`}>{e.count}</td>
+                    <td className={`${roTd} text-right tabular-nums`}>{e.working_hours ?? "—"}</td>
+                    <td className={`${roTdM} pr-4`}>{e.idle_reason ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Notlar */}
+      {detail.notes && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#4e6a87" title="Notlar & Açıklamalar" />
+          <p className="px-4 py-3 text-sm text-beton-300 leading-relaxed">{detail.notes}</p>
+        </div>
+      )}
+
+      {/* Action bar */}
+      <div className="fixed bottom-0 inset-x-0 border-t border-beton-800 bg-beton-900/95 backdrop-blur p-3">
+        <div className="max-w-3xl mx-auto flex gap-2">
+          <p className="flex-1 text-xs text-beton-500 self-center">
+            Gönderilmiş rapor değiştirilemez. Düzeltme gerekiyorsa yeni revizyon açın.
+          </p>
+          {canEdit && (
+            <button
+              onClick={onRevise}
+              disabled={busy}
+              className="rounded-md bg-emniyet-500 px-5 py-2.5 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50"
+            >
+              Revizyon aç
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
