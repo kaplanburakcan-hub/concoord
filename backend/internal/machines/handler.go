@@ -321,12 +321,17 @@ func (h *Handler) CreateLog(w http.ResponseWriter, r *http.Request) {
 	}
 	var lg MachineLog
 	err := h.pool.QueryRow(r.Context(),
-		`INSERT INTO project_machine_logs
-		    (project_id, machine_id, tarih, calisma_miktari, calisma_birimi, operator, aciklama)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7)
-		 RETURNING id, project_id, machine_id, machine_id,
-		           TO_CHAR(tarih,'YYYY-MM-DD'), calisma_miktari::float8,
-		           calisma_birimi, operator, aciklama, created_at`,
+		`WITH ins AS (
+		   INSERT INTO project_machine_logs
+		       (project_id, machine_id, tarih, calisma_miktari, calisma_birimi, operator, aciklama)
+		   VALUES ($1,$2,$3,$4,$5,$6,$7)
+		   RETURNING id, project_id, machine_id, tarih, calisma_miktari,
+		             calisma_birimi, operator, aciklama, created_at
+		 )
+		 SELECT ins.id, ins.project_id, ins.machine_id, m.ad,
+		        TO_CHAR(ins.tarih,'YYYY-MM-DD'), ins.calisma_miktari::float8,
+		        ins.calisma_birimi, ins.operator, ins.aciklama, ins.created_at
+		 FROM ins JOIN project_machines m ON m.id = ins.machine_id`,
 		pid, machineID, b.Tarih, b.CalismaMiktari, b.CalismaBirimi, b.Operator, b.Aciklama,
 	).Scan(&lg.ID, &lg.ProjectID, &lg.MachineID, &lg.MachineAd,
 		&lg.Tarih, &lg.CalismaMiktari, &lg.CalismaBirimi, &lg.Operator,
