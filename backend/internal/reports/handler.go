@@ -14,11 +14,16 @@
 package reports
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -84,21 +89,22 @@ type workEntryDTO struct {
 }
 
 type dailyDTO struct {
-	ID             uuid.UUID       `json:"id"`
-	ProjectID      uuid.UUID       `json:"project_id"`
-	ReportDate     string          `json:"report_date"` // YYYY-MM-DD
-	RevisionNo     int             `json:"revision_no"`
-	ParentReportID *uuid.UUID      `json:"parent_report_id,omitempty"`
-	Weather        json.RawMessage `json:"weather,omitempty"`
-	TempMin        *float64        `json:"temperature_min,omitempty"`
-	TempMax        *float64        `json:"temperature_max,omitempty"`
-	Notes          *string         `json:"notes,omitempty"`
-	Status         string          `json:"status"`
-	AuthorID       uuid.UUID       `json:"author_id"`
-	AuthorName     string          `json:"author_name"`
-	SubmittedAt    *time.Time      `json:"submitted_at,omitempty"`
-	RowVersion     int             `json:"row_version"`
-	CreatedAt      time.Time       `json:"created_at"`
+	ID                uuid.UUID       `json:"id"`
+	ProjectID         uuid.UUID       `json:"project_id"`
+	ReportDate        string          `json:"report_date"` // YYYY-MM-DD
+	RevisionNo        int             `json:"revision_no"`
+	ParentReportID    *uuid.UUID      `json:"parent_report_id,omitempty"`
+	Weather           json.RawMessage `json:"weather,omitempty"`
+	TempMin           *float64        `json:"temperature_min,omitempty"`
+	TempMax           *float64        `json:"temperature_max,omitempty"`
+	Notes             *string         `json:"notes,omitempty"`
+	Status            string          `json:"status"`
+	AuthorID          uuid.UUID       `json:"author_id"`
+	AuthorName        string          `json:"author_name"`
+	SubmittedAt       *time.Time      `json:"submitted_at,omitempty"`
+	RowVersion        int             `json:"row_version"`
+	CreatedAt         time.Time       `json:"created_at"`
+	CoverPhotoFileID  *uuid.UUID      `json:"cover_photo_file_id,omitempty"`
 
 	Manpower    []manpowerDTO  `json:"manpower,omitempty"`
 	Equipment   []equipmentDTO `json:"equipment,omitempty"`
@@ -159,14 +165,14 @@ const drSelect = `
 	SELECT dr.id, dr.project_id, to_char(dr.report_date,'YYYY-MM-DD'), dr.revision_no,
 	       dr.parent_report_id, dr.weather, dr.temperature_min, dr.temperature_max,
 	       dr.notes, dr.status, dr.author_id, u.full_name, dr.submitted_at,
-	       dr.row_version, dr.created_at
+	       dr.row_version, dr.created_at, dr.cover_photo_file_id
 	FROM daily_reports dr
 	JOIN users u ON u.id = dr.author_id`
 
 func scanDaily(row pgx.Row, d *dailyDTO) error {
 	return row.Scan(&d.ID, &d.ProjectID, &d.ReportDate, &d.RevisionNo, &d.ParentReportID,
 		&d.Weather, &d.TempMin, &d.TempMax, &d.Notes, &d.Status,
-		&d.AuthorID, &d.AuthorName, &d.SubmittedAt, &d.RowVersion, &d.CreatedAt)
+		&d.AuthorID, &d.AuthorName, &d.SubmittedAt, &d.RowVersion, &d.CreatedAt, &d.CoverPhotoFileID)
 }
 
 // loadLines — bir raporun satırlarını doldurur.
@@ -683,6 +689,165 @@ func (h *Handler) DeleteDaily(w http.ResponseWriter, r *http.Request) {
 		IP: m.IP, ReqID: m.ReqID,
 	})
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// SetCoverPhoto — günlük rapora kapak fotoğrafı ekler / günceller.
+// POST /projects/{projectID}/daily-reports/{id}/cover-photo
+// Body: { "photo": "data:image/jpeg;base64,..." }
+func (h *Handler) SetCoverPhoto(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	id, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+	uid, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	var body struct {
+		Photo string `json:"photo"`
+	}
+	if !httpx.DecodeJSON(w, r, &body) {
+		return
+	}
+	if body.Photo == "" {
+		httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "Fotoğraf verisi boş.", nil)
+		return
+	}
+
+	// Veri URL'sini çöz.
+	if !strings.HasPrefix(body.Photo, "data:") {
+		httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "Geçersiz fotoğraf formatı.", nil)
+		return
+	}
+	rest := body.Photo[len("data:"):]
+	semi := strings.Index(rest, ";base64,")
+	if semi < 0 {
+		httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "Geçersiz fotoğraf formatı.", nil)
+		return
+	}
+	mimeType := rest[:semi]
+	if !strings.HasPrefix(mimeType, "image/") {
+		httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "Yalnızca resim dosyaları kabul edilir.", nil)
+		return
+	}
+	raw, err := base64.StdEncoding.DecodeString(rest[semi+len(";base64,"):])
+	if err != nil {
+		httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "Fotoğraf verisi çözümlenemedi.", nil)
+		return
+	}
+	const maxSize = 8 << 20 // 8 MB
+	if len(raw) > maxSize {
+		httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "Fotoğraf 8 MB sınırını aşıyor.", nil)
+		return
+	}
+
+	safeMime, verr := h.store.CheckUpload(bytes.NewReader(raw), "cover.jpg")
+	if verr != nil {
+		httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "Dosya güvenlik kontrolü başarısız.", nil)
+		return
+	}
+	mimeType = safeMime
+
+	sum := sha256Hex(raw)
+	ext := "jpg"
+	if strings.Contains(mimeType, "png") {
+		ext = "png"
+	} else if strings.Contains(mimeType, "webp") {
+		ext = "webp"
+	}
+	key := fmt.Sprintf("project/%s/daily-reports/%s/cover.%s", pid, id, ext)
+
+	if err := h.store.PutObject(r.Context(), key, mimeType, bytes.NewReader(raw), int64(len(raw)), sum); err != nil {
+		h.log.Error("kapak fotoğrafı yüklenemedi", "err", err)
+		httpx.Error(w, r, http.StatusBadGateway, httpx.CodeInternal, "Fotoğraf depolama alanına yüklenemedi.", nil)
+		return
+	}
+
+	tx, err := h.pool.Begin(r.Context())
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var fileID uuid.UUID
+	if err := tx.QueryRow(r.Context(), `
+		INSERT INTO files (storage_key, original_name, mime, size_bytes, sha256, uploaded_by)
+		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+		key, "cover."+ext, mimeType, len(raw), sum, uid).Scan(&fileID); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	ct, err := tx.Exec(r.Context(), `
+		UPDATE daily_reports SET cover_photo_file_id=$3, row_version=row_version+1
+		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, id, pid, fileID)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	if ct.RowsAffected() == 0 {
+		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Günlük rapor bulunamadı.", nil)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"cover_photo_file_id": fileID.String()})
+}
+
+// GetCoverPhoto — kapak fotoğrafını doğrudan akışla döner.
+// GET /projects/{projectID}/daily-reports/{id}/cover-photo
+func (h *Handler) GetCoverPhoto(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	id, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+
+	var key, mimeType string
+	var size int64
+	err := h.pool.QueryRow(r.Context(), `
+		SELECT f.storage_key, f.mime, f.size_bytes
+		FROM daily_reports dr
+		JOIN files f ON f.id = dr.cover_photo_file_id
+		WHERE dr.id=$1 AND dr.project_id=$2 AND dr.deleted_at IS NULL`, id, pid).
+		Scan(&key, &mimeType, &size)
+	if errors.Is(err, pgx.ErrNoRows) {
+		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Kapak fotoğrafı bulunamadı.", nil)
+		return
+	}
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+
+	obj, err := h.store.GetObject(r.Context(), key)
+	if err != nil {
+		h.log.Error("kapak fotoğrafı okunamadı", "err", err, "key", key)
+		httpx.Error(w, r, http.StatusBadGateway, httpx.CodeInternal, "Dosya deposundan okunamadı.", nil)
+		return
+	}
+	defer obj.Body.Close()
+
+	if mimeType == "" {
+		mimeType = obj.ContentType
+	}
+	w.Header().Set("Content-Type", mimeType)
+	w.Header().Set("Cache-Control", "private, max-age=3600")
+	if size > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, obj.Body)
 }
 
 func nullJSON(raw json.RawMessage) interface{} {

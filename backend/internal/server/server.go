@@ -318,6 +318,8 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("reports.create_daily")).Post("/projects/{projectID}/daily-reports/{id}/submit", reportH.SubmitDaily)
 			pr.With(mw.RequirePermission("reports.create_daily")).Post("/projects/{projectID}/daily-reports/{id}/revise", reportH.ReviseDaily)
 			pr.With(mw.RequirePermission("reports.create_daily")).Delete("/projects/{projectID}/daily-reports/{id}", reportH.DeleteDaily)
+			pr.With(mw.RequirePermission("reports.create_daily")).Post("/projects/{projectID}/daily-reports/{id}/cover-photo", reportH.SetCoverPhoto)
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/daily-reports/{id}/cover-photo", reportH.GetCoverPhoto)
 
 			// Haftalık rapor: snapshot API'de dondurulur, PDF worker'da üretilir.
 			pr.With(mw.RequirePermission("reports.generate_weekly")).Get("/projects/{projectID}/weekly-reports", reportH.ListWeekly)

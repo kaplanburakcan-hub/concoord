@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, RequestError } from "../../api/client";
+import { api, apiFetchBlob, RequestError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../../projects/ProjectContext";
 import { apiWithOfflineFallback } from "../../offline/queue";
@@ -27,6 +27,7 @@ type Detail = {
   temperature_max?: number;
   notes?: string;
   author_name: string;
+  cover_photo_file_id?: string;
   manpower?: (Manpower & { subcontractor_name?: string })[];
   equipment?: Equipment[];
   work_entries?: (WorkEntry & { work_item_poz?: string })[];
@@ -268,6 +269,8 @@ export default function DailyReportFormPage() {
         err={err}
         ctx={ctx}
         onRevise={revise}
+        project={current}
+        pid={pid}
       />
     );
   }
@@ -587,8 +590,14 @@ const roTh = "text-left text-[10px] font-bold uppercase tracking-wider text-beto
 const roTd = "py-2 pr-3 text-[12.5px] text-beton-100 border-b border-beton-800/60 align-middle";
 const roTdM = "py-2 pr-3 text-[12.5px] text-beton-400 border-b border-beton-800/60 align-middle";
 
+type TutanakMin = { id: string; tip: string; baslik: string; tarih: string; tutar?: number; birim?: string };
+
+function daysBetween(a: string, b: string): number {
+  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
+}
+
 function ReadOnlyView({
-  detail, busy, canEdit, err, ctx, onRevise,
+  detail, busy, canEdit, err, ctx, onRevise, project, pid,
 }: {
   detail: Detail;
   busy: boolean;
@@ -596,63 +605,175 @@ function ReadOnlyView({
   err: string | null;
   ctx: DailyCtx | null;
   onRevise: () => void;
+  project?: { start_date?: string; end_date?: string } | null;
+  pid?: string;
 }) {
   const totalPersonnel = (detail.manpower ?? []).reduce((s, m) => s + m.headcount, 0);
+
+  // Proje günü hesabı
+  const dayNo = project?.start_date
+    ? daysBetween(project.start_date, detail.report_date) + 1
+    : null;
+  const remaining = project?.end_date
+    ? daysBetween(detail.report_date, project.end_date)
+    : null;
+
+  // Tutanaklar (localStorage)
+  const tutanaklar: TutanakMin[] = (() => {
+    if (!pid) return [];
+    try {
+      const all: TutanakMin[] = JSON.parse(localStorage.getItem(`ipks_saha_tutanaklar_${pid}`) || "[]");
+      return all.filter((t) => t.tarih === detail.report_date);
+    } catch { return []; }
+  })();
+
+  // Kapak fotoğrafı
+  const [photoSrc, setPhotoSrc] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoErr, setPhotoErr] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const prevFileID = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!pid || !detail.cover_photo_file_id) { setPhotoSrc(null); return; }
+    if (detail.cover_photo_file_id === prevFileID.current) return;
+    prevFileID.current = detail.cover_photo_file_id;
+    apiFetchBlob(`/projects/${pid}/daily-reports/${detail.id}/cover-photo`)
+      .then(setPhotoSrc)
+      .catch(() => setPhotoSrc(null));
+  }, [pid, detail.id, detail.cover_photo_file_id]);
+
+  async function handlePhotoFile(file: File) {
+    if (file.size > 8 * 1024 * 1024) { setPhotoErr("Fotoğraf 8 MB sınırını aşıyor."); return; }
+    setPhotoUploading(true);
+    setPhotoErr(null);
+    try {
+      const dataUrl = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result as string);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      await api(`/projects/${pid}/daily-reports/${detail.id}/cover-photo`, {
+        method: "POST",
+        body: { photo: dataUrl },
+        projectId: pid,
+      });
+      // Blob URL'yi hemen güncelle (sayfa yenilemeye gerek yok)
+      setPhotoSrc(dataUrl);
+    } catch {
+      setPhotoErr("Fotoğraf yüklenemedi.");
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
 
   return (
     <div className="max-w-3xl mx-auto pb-24 space-y-3">
 
-      {/* Header */}
+      {/* Header + kapak fotoğrafı yan yana */}
       <div className="rounded-lg border border-beton-800 bg-beton-900 p-4">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div>
-            <h1 className="font-display font-extrabold text-xl text-white">
-              Günlük Saha Raporu
-              {detail.revision_no > 1 && (
-                <span className="ml-2 text-sm font-normal text-emniyet-500">rev {detail.revision_no}</span>
+        <div className="flex gap-3">
+          {/* Sol: başlık bilgileri */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div>
+                <h1 className="font-display font-extrabold text-xl text-white leading-tight">
+                  Günlük Saha Raporu
+                  {detail.revision_no > 1 && (
+                    <span className="ml-2 text-sm font-normal text-emniyet-500">rev {detail.revision_no}</span>
+                  )}
+                </h1>
+                <p className="text-sm text-beton-400 mt-0.5">{formatDateTR(detail.report_date)}</p>
+              </div>
+              <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${DR_STATUS_STYLE[detail.status]}`}>
+                {DR_STATUS_LABEL[detail.status]}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mb-0.5">Hazırlayan</p>
+                <p className="text-sm text-beton-100">{detail.author_name}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mb-0.5">Toplam Personel</p>
+                <p className="text-sm text-beton-100 tabular-nums">{totalPersonnel} kişi</p>
+              </div>
+              {dayNo != null && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mb-0.5">Proje Günü</p>
+                  <p className="text-sm text-beton-100 tabular-nums">{dayNo}. gün</p>
+                </div>
               )}
-            </h1>
-            <p className="text-sm text-beton-400 mt-0.5">{formatDateTR(detail.report_date)}</p>
+              {remaining != null && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mb-0.5">Kalan Gün</p>
+                  <p className={`text-sm tabular-nums font-semibold ${remaining < 0 ? "text-red-400" : remaining < 14 ? "text-amber-400" : "text-beton-100"}`}>
+                    {remaining < 0 ? `${Math.abs(remaining)} gün gecikme` : `${remaining} gün`}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Hava durumu — kompakt satır */}
+            {(detail.weather?.condition || detail.temperature_min != null || detail.temperature_max != null) && (
+              <div className="mt-2.5 flex items-center gap-2 rounded-md bg-beton-950 border border-beton-800 px-3 py-2">
+                {detail.weather?.condition && (
+                  <>
+                    <span className="text-lg leading-none">{weatherIcon(detail.weather.condition)}</span>
+                    <span className="text-sm text-beton-200">{detail.weather.condition}</span>
+                  </>
+                )}
+                {(detail.temperature_min != null || detail.temperature_max != null) && (
+                  <span className="ml-auto text-sm text-beton-100 tabular-nums font-medium">
+                    {detail.temperature_min != null ? `${detail.temperature_min}°` : "–"}
+                    {" / "}
+                    {detail.temperature_max != null ? `${detail.temperature_max}°` : "–"}
+                    {" C"}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
-          <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${DR_STATUS_STYLE[detail.status]}`}>
-            {DR_STATUS_LABEL[detail.status]}
-          </span>
+
+          {/* Sağ: kapak fotoğrafı (5cm × 8cm ≈ w-[120px] h-[192px]) */}
+          <div
+            className="shrink-0 relative rounded-md overflow-hidden border border-dashed border-beton-700 bg-beton-950 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-emniyet-500 transition-colors"
+            style={{ width: "120px", height: "192px" }}
+            onClick={() => canEdit && !photoUploading && fileRef.current?.click()}
+            title={canEdit ? "Fotoğraf ekle / değiştir" : "Kapak fotoğrafı"}
+          >
+            {photoSrc ? (
+              <img src={photoSrc} alt="Kapak fotoğrafı" className="w-full h-full object-cover" />
+            ) : (
+              <>
+                <span className="text-2xl text-beton-600">📷</span>
+                {canEdit && (
+                  <span className="text-[10px] text-beton-500 text-center px-1 leading-tight">
+                    {photoUploading ? "Yükleniyor..." : "Fotoğraf ekle"}
+                  </span>
+                )}
+              </>
+            )}
+            {canEdit && photoSrc && (
+              <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                <span className="text-[11px] text-white font-medium">Değiştir</span>
+              </div>
+            )}
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = ""; }}
+          />
         </div>
-        <div className="flex gap-6 flex-wrap">
-          <div><p className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mb-0.5">Hazırlayan</p><p className="text-sm text-beton-100">{detail.author_name}</p></div>
-          <div><p className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mb-0.5">Toplam Personel</p><p className="text-sm text-beton-100 tabular-nums">{totalPersonnel} kişi</p></div>
-        </div>
+        {photoErr && <p className="mt-1.5 text-xs text-red-400">{photoErr}</p>}
       </div>
 
       {err && <p className="text-red-400 text-sm">{err}</p>}
-
-      {/* Hava Durumu */}
-      {(detail.weather?.condition || detail.temperature_min != null || detail.temperature_max != null) && (
-        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
-          <SecHeader color="#3b7fd4" title="Hava Durumu" />
-          <div className="p-3 flex gap-3 flex-wrap">
-            {detail.weather?.condition && (
-              <div className="rounded-lg border border-beton-800 bg-beton-950 px-4 py-3 text-center min-w-[80px]">
-                <div className="text-2xl mb-1">{weatherIcon(detail.weather.condition)}</div>
-                <div className="text-xs font-medium text-beton-200">{detail.weather.condition}</div>
-                <div className="text-[9.5px] uppercase tracking-wider text-beton-500 mt-0.5">Durum</div>
-              </div>
-            )}
-            {detail.temperature_min != null && (
-              <div className="rounded-lg border border-beton-800 bg-beton-950 px-4 py-3 text-center min-w-[72px]">
-                <div className="text-xl font-bold text-beton-100 tabular-nums">{detail.temperature_min}°</div>
-                <div className="text-[9.5px] uppercase tracking-wider text-beton-500 mt-1">Min</div>
-              </div>
-            )}
-            {detail.temperature_max != null && (
-              <div className="rounded-lg border border-beton-800 bg-beton-950 px-4 py-3 text-center min-w-[72px]">
-                <div className="text-xl font-bold text-beton-100 tabular-nums">{detail.temperature_max}°</div>
-                <div className="text-[9.5px] uppercase tracking-wider text-beton-500 mt-1">Maks</div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Şantiye Mevcudu */}
       {(detail.manpower ?? []).length > 0 && (
@@ -660,11 +781,11 @@ function ReadOnlyView({
           <SecHeader color="#22c55e" title="Şantiye Mevcudu" count={totalPersonnel} />
           <div className="overflow-x-auto">
             <table className="w-full min-w-[400px]">
-              <thead className="px-4">
-                <tr className="px-4">
+              <thead>
+                <tr>
                   <th className={`${roTh} pl-4`}>Taşeron</th>
                   <th className={roTh}>Branş / Meslek</th>
-                  <th className={`${roTh} text-right`}>Kişi</th>
+                  <th className={`${roTh} text-right pr-4`}>Kişi</th>
                 </tr>
               </thead>
               <tbody>
@@ -746,6 +867,26 @@ function ReadOnlyView({
         <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
           <SecHeader color="#4e6a87" title="Notlar & Açıklamalar" />
           <p className="px-4 py-3 text-sm text-beton-300 leading-relaxed">{detail.notes}</p>
+        </div>
+      )}
+
+      {/* Tutanaklar (varsa) */}
+      {tutanaklar.length > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#a855f7" title="Tutanaklar" count={tutanaklar.length} />
+          <div className="divide-y divide-beton-800/60">
+            {tutanaklar.map((t) => (
+              <div key={t.id} className="px-4 py-2.5 flex items-center gap-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-beton-500 shrink-0 w-20 truncate">{t.tip}</span>
+                <span className="flex-1 text-[12.5px] text-beton-100 truncate">{t.baslik}</span>
+                {t.tutar != null && (
+                  <span className="text-[12px] text-beton-300 tabular-nums shrink-0">
+                    {t.tutar.toLocaleString("tr-TR")} {t.birim ?? ""}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

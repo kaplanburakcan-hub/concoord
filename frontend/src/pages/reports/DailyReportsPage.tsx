@@ -1,9 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../api/client";
+import { api, apiFetchBlob } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../../projects/ProjectContext";
 import OfflineQueueBanner from "./OfflineQueueBanner";
+
+function PhotoThumb({ pid, reportId }: { pid?: string; reportId: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pid) return;
+    apiFetchBlob(`/projects/${pid}/daily-reports/${reportId}/cover-photo`)
+      .then(setSrc)
+      .catch(() => {});
+  }, [pid, reportId]);
+  if (!src) return <span className="text-base text-beton-600">📷</span>;
+  return <img src={src} alt="" className="w-full h-full object-cover" />;
+}
 
 // Faz 6 — Günlük saha raporları listesi (mobil öncelikli: kart görünümü).
 // Tarih başına GEÇERLİ revizyon listelenir; Submitted rapor değişmezdir,
@@ -20,6 +32,7 @@ export type DailyReport = {
   author_name: string;
   submitted_at?: string;
   notes?: string;
+  cover_photo_file_id?: string;
 };
 
 export const DR_STATUS_LABEL: Record<string, string> = {
@@ -96,29 +109,37 @@ export default function DailyReportsPage() {
           <li key={r.id}>
             <Link
               to={`/saha-raporlari/${r.id}`}
-              className="block rounded-lg border border-beton-800 bg-beton-900 p-4 hover:border-emniyet-500"
+              className="flex items-center gap-3 rounded-lg border border-beton-800 bg-beton-900 p-3 hover:border-emniyet-500 transition-colors"
             >
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="font-medium text-white">
-                  {formatDateTR(r.report_date)}
-                  {r.revision_no > 1 && (
-                    <span className="ml-2 text-xs text-emniyet-500">rev {r.revision_no}</span>
-                  )}
-                </span>
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-xs ${DR_STATUS_STYLE[r.status]}`}
-                >
-                  {DR_STATUS_LABEL[r.status]}
-                </span>
-              </div>
-              <div className="mt-1 text-xs text-beton-400 flex flex-wrap gap-x-4 gap-y-1">
-                <span>Yazan: {r.author_name}</span>
-                {r.weather?.condition && <span>Hava: {r.weather.condition}</span>}
-                {(r.temperature_min != null || r.temperature_max != null) && (
-                  <span>
-                    Sıcaklık: {r.temperature_min ?? "–"} / {r.temperature_max ?? "–"} °C
-                  </span>
+              {/* Fotoğraf küçük resmi */}
+              <div className="shrink-0 rounded overflow-hidden border border-beton-700 bg-beton-950 flex items-center justify-center" style={{ width: 44, height: 60 }}>
+                {r.cover_photo_file_id ? (
+                  <PhotoThumb pid={current?.id} reportId={r.id} />
+                ) : (
+                  <span className="text-base text-beton-700">📷</span>
                 )}
+              </div>
+
+              {/* Kart içeriği */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="font-medium text-white">
+                    {formatDateTR(r.report_date)}
+                    {r.revision_no > 1 && (
+                      <span className="ml-2 text-xs text-emniyet-500">rev {r.revision_no}</span>
+                    )}
+                  </span>
+                  <span className={`rounded-full border px-2 py-0.5 text-xs ${DR_STATUS_STYLE[r.status]}`}>
+                    {DR_STATUS_LABEL[r.status]}
+                  </span>
+                </div>
+                <div className="mt-0.5 text-xs text-beton-400 flex flex-wrap gap-x-3 gap-y-0.5">
+                  <span>{r.author_name}</span>
+                  {r.weather?.condition && <span>{r.weather.condition}</span>}
+                  {(r.temperature_min != null || r.temperature_max != null) && (
+                    <span>{r.temperature_min ?? "–"}/{r.temperature_max ?? "–"} °C</span>
+                  )}
+                </div>
               </div>
             </Link>
           </li>

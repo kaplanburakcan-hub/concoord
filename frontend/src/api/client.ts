@@ -167,6 +167,21 @@ export async function apiUpload<T = unknown>(
   return (await res.json()) as T;
 }
 
+export async function apiFetchBlob(path: string, retry = false): Promise<string> {
+  const headers: Record<string, string> = {};
+  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+  const res = await fetch(`${BASE}/api/v1${path}`, { headers });
+  if (res.status === 401 && !retry) {
+    if (await refresh()) return apiFetchBlob(path, true);
+    setAccessToken(null);
+    setRefreshToken(null);
+    onSessionLost?.();
+    throw new RequestError(401);
+  }
+  if (!res.ok) throw new RequestError(res.status);
+  return URL.createObjectURL(await res.blob());
+}
+
 export async function apiDownload(path: string, fallbackName: string, retry = false): Promise<void> {
   const headers: Record<string, string> = {};
   if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
