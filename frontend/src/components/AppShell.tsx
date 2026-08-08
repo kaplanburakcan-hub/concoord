@@ -207,11 +207,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   className="w-full flex items-center justify-between mt-4 mb-1.5 px-3 py-0.5 rounded hover:opacity-80 transition-opacity"
                   style={{ color: "var(--chrome-text-3)" }}
                 >
-                  <span className="text-[10.5px] font-medium uppercase tracking-[0.15em]">{g.title}</span>
+                  <span className="flex-1 min-w-0 text-left text-[10.5px] font-medium uppercase tracking-[0.15em] leading-snug">{g.title}</span>
                   <svg
                     width="11" height="11" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" strokeWidth="2.5"
-                    style={{ transition: "transform .2s", transform: open ? "rotate(0deg)" : "rotate(-90deg)", flexShrink: 0 }}
+                    className="ml-2 shrink-0"
+                    style={{ transition: "transform .2s", transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
                   >
                     <path d="M6 9l6 6 6-6" />
                   </svg>
@@ -327,7 +328,7 @@ function SideLink({ item }: { item: NavDef }) {
         to={item.to}
         end={item.to === "/" || !!item.end}
         className={({ isActive }) =>
-          "relative flex items-center gap-3 px-3 py-2.5 rounded-[9px] text-[14px] transition " +
+          "relative flex items-center gap-3 px-3 py-2.5 rounded-[9px] text-[14px] transition min-w-0 " +
           (isActive ? "text-white" : "hover:opacity-90")
         }
         style={({ isActive }) =>
@@ -344,7 +345,7 @@ function SideLink({ item }: { item: NavDef }) {
             >
               {item.icon}
             </span>
-            <span className="flex-1">{item.label}</span>
+            <span className="flex-1 min-w-0 truncate">{item.label}</span>
             {isActive && (
               <span
                 className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r"
