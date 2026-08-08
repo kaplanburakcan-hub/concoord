@@ -124,9 +124,15 @@ const tdM = "py-2 pr-3 text-[12.5px] text-beton-400 border-b border-beton-800/60
 function SnapshotView({ sn, reportId, pid, hasPdf }: {
   sn: Snapshot; reportId: string; pid: string; hasPdf: boolean;
 }) {
+  const days            = sn.days            ?? [];
+  const deliveries      = sn.deliveries      ?? [];
+  const stock           = sn.stock           ?? [];
+  const pendingPayments = sn.pending_payments ?? [];
+  const pendingPOs      = sn.pending_pos      ?? [];
+
   const pendingCount =
-    sn.pending_payments.length +
-    sn.pending_pos.length +
+    pendingPayments.length +
+    pendingPOs.length +
     (sn.pending_mars > 0 ? 1 : 0) +
     (sn.open_tasks > 0 ? 1 : 0);
 
@@ -149,7 +155,7 @@ function SnapshotView({ sn, reportId, pid, hasPdf }: {
       </div>
 
       {/* Günlük özet tablosu */}
-      {sn.days.length > 0 && (
+      {days.length > 0 && (
         <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
           <SecHeader color="#3b7fd4" title="Günlük Saha Özeti" />
           <div className="overflow-x-auto">
@@ -165,7 +171,7 @@ function SnapshotView({ sn, reportId, pid, hasPdf }: {
                 </tr>
               </thead>
               <tbody>
-                {sn.days.map((d) => {
+                {days.map((d) => {
                   const eqHours = (d.equipment ?? []).reduce(
                     (s, e) => s + (e.working_hours ?? 0), 0
                   );
@@ -195,11 +201,11 @@ function SnapshotView({ sn, reportId, pid, hasPdf }: {
       )}
 
       {/* Teslimatlar */}
-      {sn.deliveries.length > 0 && (
+      {deliveries.length > 0 && (
         <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
-          <SecHeader color="#22c55e" title={`Gelen Malzeme & Teslimat (${sn.deliveries.length} irsaliye)`} />
+          <SecHeader color="#22c55e" title={`Gelen Malzeme & Teslimat (${deliveries.length} irsaliye)`} />
           <div className="divide-y divide-beton-800/60">
-            {sn.deliveries.map((d, i) => (
+            {deliveries.map((d, i) => (
               <div key={i} className="px-4 py-2.5">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className="text-xs font-semibold text-beton-100">{d.supplier}</span>
@@ -221,7 +227,7 @@ function SnapshotView({ sn, reportId, pid, hasPdf }: {
       )}
 
       {/* Depo-Stok Durumu */}
-      {sn.stock.length > 0 && (
+      {stock.length > 0 && (
         <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
           <SecHeader color="#f59e0b" title="Depo-Stok Durumu" />
           <div className="overflow-x-auto">
@@ -237,7 +243,7 @@ function SnapshotView({ sn, reportId, pid, hasPdf }: {
                 </tr>
               </thead>
               <tbody>
-                {sn.stock.map((s, i) => (
+                {stock.map((s, i) => (
                   <tr
                     key={i}
                     className={`hover:bg-beton-800/30 transition-colors ${s.below_min ? "bg-red-500/5" : ""}`}
@@ -262,7 +268,7 @@ function SnapshotView({ sn, reportId, pid, hasPdf }: {
               </tbody>
             </table>
           </div>
-          {sn.stock.some((s) => s.below_min) && (
+          {stock.some((s) => s.below_min) && (
             <p className="px-4 py-2 text-[11px] text-red-400">
               ⚠ Kırmızı satırlar minimum stok seviyesinin altında.
             </p>
@@ -276,13 +282,13 @@ function SnapshotView({ sn, reportId, pid, hasPdf }: {
           <SecHeader color="#4e6a87" title="Bekleyen Aktiviteler" />
           <div className="px-4 py-3 space-y-4">
 
-            {sn.pending_payments.length > 0 && (
+            {pendingPayments.length > 0 && (
               <div>
                 <p className="text-[10.5px] font-bold uppercase tracking-wider text-beton-400 mb-1.5">
-                  Hakediş Onay Süreci ({sn.pending_payments.length})
+                  Hakediş Onay Süreci ({pendingPayments.length})
                 </p>
                 <div className="space-y-1">
-                  {sn.pending_payments.map((p, i) => (
+                  {pendingPayments.map((p, i) => (
                     <div key={i} className="flex items-center gap-2 text-[12.5px]">
                       <span className="text-beton-100">{p.subcontractor}</span>
                       <span className="text-beton-500">·</span>
@@ -296,13 +302,13 @@ function SnapshotView({ sn, reportId, pid, hasPdf }: {
               </div>
             )}
 
-            {sn.pending_pos.length > 0 && (
+            {pendingPOs.length > 0 && (
               <div>
                 <p className="text-[10.5px] font-bold uppercase tracking-wider text-beton-400 mb-1.5">
-                  Açık Siparişler ({sn.pending_pos.length})
+                  Açık Siparişler ({pendingPOs.length})
                 </p>
                 <div className="space-y-1">
-                  {sn.pending_pos.map((p, i) => (
+                  {pendingPOs.map((p, i) => (
                     <div key={i} className="flex items-center gap-2 text-[12.5px]">
                       <span className={p.overdue ? "text-red-400 font-medium" : "text-beton-100"}>
                         {p.overdue && "⚠ "}{p.supplier} — {p.po_no}

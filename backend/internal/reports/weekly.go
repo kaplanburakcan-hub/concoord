@@ -140,9 +140,14 @@ type Snapshot struct {
 // YÜKSEK revizyon alınır (geçerli rapor).
 func (h *Handler) buildSnapshot(ctx context.Context, pid uuid.UUID, start, end time.Time) (*Snapshot, error) {
 	sn := &Snapshot{
-		GeneratedAt: time.Now().UTC(),
-		PeriodStart: start.Format("2006-01-02"),
-		PeriodEnd:   end.Format("2006-01-02"),
+		GeneratedAt:     time.Now().UTC(),
+		PeriodStart:     start.Format("2006-01-02"),
+		PeriodEnd:       end.Format("2006-01-02"),
+		Days:            []SnapDay{},
+		Deliveries:      []SnapDelivery{},
+		Stock:           []SnapStockItem{},
+		PendingPayments: []SnapPayment{},
+		PendingPOs:      []SnapPendingPO{},
 	}
 	_, wk := start.ISOWeek()
 	sn.WeekNo = wk
