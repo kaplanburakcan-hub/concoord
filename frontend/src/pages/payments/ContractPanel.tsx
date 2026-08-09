@@ -152,7 +152,9 @@ export default function ContractPanel({
         Avans, teminat ve stopaj ayarları hakediş hesabını doğrudan belirler.
       </p>
 
-      {list.length > 0 && (
+      {list.length === 0 ? (
+        <p className="mt-3 text-xs text-beton-500 italic">Bu taşeron için kayıtlı sözleşme yok.</p>
+      ) : (
         <table className="mt-3 w-full text-sm">
           <thead className="text-beton-400 text-xs">
             <tr className="text-left">

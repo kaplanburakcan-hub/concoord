@@ -533,23 +533,27 @@ export default function DailyReportFormPage() {
       </div>
 
       {/* Depo-Stok Özeti */}
-      {ctx && ctx.warehouse_delta.length > 0 && (
+      {ctx && (
         <div className={section}>
           <h2 className="font-medium text-white text-sm">Depo-Stok Özeti</h2>
           <p className="text-xs text-beton-500">{formatDateTR(reportDate)} tarihli depo hareketleri</p>
-          <div className="space-y-1.5">
-            {ctx.warehouse_delta.map((wh, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm flex-wrap">
-                <span className="flex-1 min-w-0 truncate text-beton-100">{wh.malzeme_adi}</span>
-                <span className="text-[11px] text-beton-500">{wh.kategori}</span>
-                {wh.giris > 0 && <span className="text-green-400 tabular-nums text-xs">+{wh.giris} {wh.birim}</span>}
-                {wh.cikis > 0 && <span className="text-red-400 tabular-nums text-xs">−{wh.cikis} {wh.birim}</span>}
-                <span className={`font-semibold tabular-nums text-xs ${wh.net_delta >= 0 ? "text-green-300" : "text-red-300"}`}>
-                  Net: {wh.net_delta >= 0 ? "+" : ""}{wh.net_delta} {wh.birim}
-                </span>
-              </div>
-            ))}
-          </div>
+          {ctx.warehouse_delta.length === 0 ? (
+            <p className="text-xs text-beton-500 italic">Bu tarih için depo hareketi yok.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {ctx.warehouse_delta.map((wh, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm flex-wrap">
+                  <span className="flex-1 min-w-0 truncate text-beton-100">{wh.malzeme_adi}</span>
+                  <span className="text-[11px] text-beton-500">{wh.kategori}</span>
+                  {wh.giris > 0 && <span className="text-green-400 tabular-nums text-xs">+{wh.giris} {wh.birim}</span>}
+                  {wh.cikis > 0 && <span className="text-red-400 tabular-nums text-xs">−{wh.cikis} {wh.birim}</span>}
+                  <span className={`font-semibold tabular-nums text-xs ${wh.net_delta >= 0 ? "text-green-300" : "text-red-300"}`}>
+                    Net: {wh.net_delta >= 0 ? "+" : ""}{wh.net_delta} {wh.birim}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -827,9 +831,11 @@ function ReadOnlyView({
       {err && <p className="text-red-400 text-sm">{err}</p>}
 
       {/* Şantiye Mevcudu */}
-      {(detail.manpower ?? []).length > 0 && (
-        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
-          <SecHeader color="#22c55e" title="Şantiye Mevcudu" count={totalPersonnel} />
+      <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+        <SecHeader color="#22c55e" title="Şantiye Mevcudu" count={totalPersonnel} />
+        {(detail.manpower ?? []).length === 0 ? (
+          <p className="px-4 py-3 text-[12px] text-beton-500 italic">Bu tarih için personel girişi yapılmamış.</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[400px]">
               <thead>
@@ -850,13 +856,15 @@ function ReadOnlyView({
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Günlük İmalat */}
-      {(detail.work_entries ?? []).length > 0 && (
-        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
-          <SecHeader color="#3b7fd4" title="Günlük İmalat" count={(detail.work_entries ?? []).length} />
+      <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+        <SecHeader color="#3b7fd4" title="Günlük İmalat" count={(detail.work_entries ?? []).length} />
+        {(detail.work_entries ?? []).length === 0 ? (
+          <p className="px-4 py-3 text-[12px] text-beton-500 italic">Bu tarih için imalat kalemi girilmemiş.</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[500px]">
               <thead>
@@ -881,13 +889,15 @@ function ReadOnlyView({
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Makine & Ekipman */}
-      {(detail.equipment ?? []).length > 0 && (
-        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
-          <SecHeader color="#f59e0b" title="Makine & Ekipman" count={(detail.equipment ?? []).length} />
+      <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+        <SecHeader color="#f59e0b" title="Makine & Ekipman" count={(detail.equipment ?? []).length} />
+        {(detail.equipment ?? []).length === 0 ? (
+          <p className="px-4 py-3 text-[12px] text-beton-500 italic">Bu tarih için makine/ekipman girilmemiş.</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[420px]">
               <thead>
@@ -910,13 +920,15 @@ function ReadOnlyView({
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Şantiye Kasa Harcaması */}
-      {(detail.cash_expenses ?? []).length > 0 && (
-        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
-          <SecHeader color="#eab308" title="Şantiye Kasa Harcaması" count={(detail.cash_expenses ?? []).length} />
+      <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+        <SecHeader color="#eab308" title="Şantiye Kasa Harcaması" count={(detail.cash_expenses ?? []).length} />
+        {(detail.cash_expenses ?? []).length === 0 ? (
+          <p className="px-4 py-3 text-[12px] text-beton-500 italic">Bu tarih için kasa harcaması girilmemiş.</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[460px]">
               <thead>
@@ -949,8 +961,8 @@ function ReadOnlyView({
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Notlar */}
       {detail.notes && (
@@ -981,22 +993,26 @@ function ReadOnlyView({
       )}
 
       {/* Depo-Stok Özeti */}
-      {ctx && ctx.warehouse_delta.length > 0 && (
+      {ctx && (
         <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
           <SecHeader color="#f59e0b" title="Depo-Stok Özeti" />
-          <div className="px-4 py-3 space-y-2">
-            {ctx.warehouse_delta.map((wh, i) => (
-              <div key={i} className="flex items-center gap-2 flex-wrap text-[12.5px]">
-                <span className="flex-1 min-w-0 text-beton-100">{wh.malzeme_adi}</span>
-                <span className="text-beton-500 text-[11px]">{wh.kategori}</span>
-                {wh.giris > 0 && <span className="text-green-400 tabular-nums">+{wh.giris} {wh.birim}</span>}
-                {wh.cikis > 0 && <span className="text-red-400 tabular-nums">−{wh.cikis} {wh.birim}</span>}
-                <span className={`font-semibold tabular-nums ${wh.net_delta >= 0 ? "text-green-300" : "text-red-300"}`}>
-                  Net: {wh.net_delta >= 0 ? "+" : ""}{wh.net_delta} {wh.birim}
-                </span>
-              </div>
-            ))}
-          </div>
+          {ctx.warehouse_delta.length === 0 ? (
+            <p className="px-4 py-3 text-[12px] text-beton-500 italic">Bu tarih için depo hareketi yok.</p>
+          ) : (
+            <div className="px-4 py-3 space-y-2">
+              {ctx.warehouse_delta.map((wh, i) => (
+                <div key={i} className="flex items-center gap-2 flex-wrap text-[12.5px]">
+                  <span className="flex-1 min-w-0 text-beton-100">{wh.malzeme_adi}</span>
+                  <span className="text-beton-500 text-[11px]">{wh.kategori}</span>
+                  {wh.giris > 0 && <span className="text-green-400 tabular-nums">+{wh.giris} {wh.birim}</span>}
+                  {wh.cikis > 0 && <span className="text-red-400 tabular-nums">−{wh.cikis} {wh.birim}</span>}
+                  <span className={`font-semibold tabular-nums ${wh.net_delta >= 0 ? "text-green-300" : "text-red-300"}`}>
+                    Net: {wh.net_delta >= 0 ? "+" : ""}{wh.net_delta} {wh.birim}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

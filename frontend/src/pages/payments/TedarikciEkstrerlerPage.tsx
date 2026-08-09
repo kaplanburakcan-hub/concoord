@@ -244,25 +244,23 @@ export default function TedarikciEkstrerlerPage() {
         </button>
       </div>
 
-      {/* Özet kartları */}
-      {statements.length > 0 && (
-        <div className="grid grid-cols-3 gap-3 mb-5">
-          <div className="bg-beton-900 rounded-lg p-3 border border-beton-800">
-            <p className="text-xs text-beton-500 mb-1">Toplam Ekstre Tutarı</p>
-            <p className="text-lg font-bold text-beton-100">{fmt(stats.toplam)} TRY</p>
-          </div>
-          <div className="bg-beton-900 rounded-lg p-3 border border-beton-800">
-            <p className="text-xs text-beton-500 mb-1">Ödenen</p>
-            <p className="text-lg font-bold text-green-400">{fmt(stats.odenen)} TRY</p>
-          </div>
-          <div className="bg-beton-900 rounded-lg p-3 border border-beton-800">
-            <p className="text-xs text-beton-500 mb-1">Bekleyen Bakiye</p>
-            <p className={`text-lg font-bold ${stats.bekleyen > 0 ? "text-yellow-400" : "text-beton-400"}`}>
-              {fmt(stats.bekleyen)} TRY
-            </p>
-          </div>
+      {/* Özet kartları — ekstre olsun olmasın her zaman gösterilir */}
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="bg-beton-900 rounded-lg p-3 border border-beton-800">
+          <p className="text-xs text-beton-500 mb-1">Toplam Ekstre Tutarı</p>
+          <p className="text-lg font-bold text-beton-100">{fmt(stats.toplam)} TRY</p>
         </div>
-      )}
+        <div className="bg-beton-900 rounded-lg p-3 border border-beton-800">
+          <p className="text-xs text-beton-500 mb-1">Ödenen</p>
+          <p className="text-lg font-bold text-green-400">{fmt(stats.odenen)} TRY</p>
+        </div>
+        <div className="bg-beton-900 rounded-lg p-3 border border-beton-800">
+          <p className="text-xs text-beton-500 mb-1">Bekleyen Bakiye</p>
+          <p className={`text-lg font-bold ${stats.bekleyen > 0 ? "text-yellow-400" : "text-beton-400"}`}>
+            {fmt(stats.bekleyen)} TRY
+          </p>
+        </div>
+      </div>
 
       {/* Form */}
       {adding && (
