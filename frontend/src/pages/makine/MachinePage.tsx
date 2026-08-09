@@ -35,6 +35,62 @@ type MachineLog = {
 
 type Tip = "arac" | "is_makinesi" | "ekipman";
 
+// Standart ad/tip kataloğu — "Ad / İsim" alanı bu listeden seçilir (spesifik
+// makine kimliği plaka/marka/model/seri no ile ayrışır, "Ad" ortak tipi verir).
+const AD_KATALOG: Record<Tip, string[]> = {
+  arac: [
+    "Binek Otomobil",
+    "Panelvan",
+    "Kamyonet (Pickup)",
+    "Minibüs / Servis Aracı",
+  ],
+  is_makinesi: [
+    "Kule Vinç",
+    "Mobil Vinç",
+    "Paletli Ekskavatör",
+    "Lastikli Ekskavatör",
+    "Yükleyici (Loder)",
+    "Kazıcı Yükleyici (Beko Loder)",
+    "Dozer",
+    "Greyder",
+    "Silindir (Sıkıştırma)",
+    "Damperli Kamyon",
+    "Çekici (Tır Başı)",
+    "Su Tankeri - Arazöz",
+    "Yakıt Tankeri",
+    "Vidanjör",
+    "Beton Pompası (mobil)",
+    "Beton Pompası (sabit / yer pompası)",
+    "Transmikser (Beton Mikseri)",
+    "Forklift",
+    "Teleskopik Forklift",
+    "Vinçli Kamyon",
+    "Asfalt Finişeri",
+    "Sondaj / Delici Makinesi",
+    "Hidrolik Kırıcı",
+    "Mobil Platform (Sepetli/Makaslı)",
+    "Mini Ekskavatör",
+  ],
+  ekipman: [
+    "Jeneratör",
+    "Kompresör",
+    "Transpalet",
+    "Basınçlı Yıkama Makinesi",
+    "Su Pompası (Dalgıç Motor dahil)",
+    "Kaynak Makinesi",
+    "Beton Vibratörü",
+    "Beton Kesme Makinesi",
+    "Demir Kesme/Bükme Makinesi",
+    "İskele Sistemi",
+    "Kalıp Sistemi",
+    "Aydınlatma Kulesi",
+    "El Aletleri Seti",
+    "Drone",
+    "Isıtıcı (ISIMAK vb.)",
+  ],
+};
+const AD_DIGER = "__diger__";
+
 interface Props {
   tip: Tip;
   tipLabel: string;
@@ -69,10 +125,13 @@ function fmtCur(n?: number) {
 
 // ── Empty form state ──────────────────────────────────────────────────────────
 
+const ANA_YUKLENICI = "Ana Yüklenici";
+
 function emptyMachine(tip: Tip): Partial<Machine> {
   return {
     tip,
     sahiplik: "ozmal",
+    tedarikci: ANA_YUKLENICI,
     durum: "aktif",
   };
 }
@@ -107,6 +166,7 @@ export default function MachinePage({
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Machine>>(emptyMachine(tip));
   const [saving, setSaving] = useState(false);
+  const [adCustom, setAdCustom] = useState(false);
 
   // Expanded machine (logs panel)
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -139,12 +199,14 @@ export default function MachinePage({
   function openAdd() {
     setEditId(null);
     setForm(emptyMachine(tip));
+    setAdCustom(false);
     setFormOpen(true);
   }
 
   function openEdit(m: Machine) {
     setEditId(m.id);
     setForm({ ...m });
+    setAdCustom(!!m.ad && !AD_KATALOG[tip].includes(m.ad));
     setFormOpen(true);
   }
 
@@ -546,12 +608,28 @@ export default function MachinePage({
               {/* Ad */}
               <div className="col-span-2 flex flex-col gap-1">
                 <label className="text-xs font-medium text-beton-400">Ad / İsim *</label>
-                <input
-                  placeholder="Örn: Ekskavatör, Kamyon 1, Jeneratör"
-                  value={form.ad ?? ""}
-                  onChange={e => setForm(f => ({ ...f, ad: e.target.value }))}
+                <select
+                  value={adCustom ? AD_DIGER : (form.ad ?? "")}
+                  onChange={e => {
+                    const v = e.target.value;
+                    if (v === AD_DIGER) { setAdCustom(true); setForm(f => ({ ...f, ad: "" })); return; }
+                    setAdCustom(false);
+                    setForm(f => ({ ...f, ad: v }));
+                  }}
                   className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
-                />
+                >
+                  <option value="" disabled>— Seçin —</option>
+                  {AD_KATALOG[tip].map(a => <option key={a} value={a}>{a}</option>)}
+                  <option value={AD_DIGER}>Diğer (elle yaz)</option>
+                </select>
+                {adCustom && (
+                  <input
+                    placeholder="Örn: Kamyon 1"
+                    value={form.ad ?? ""}
+                    onChange={e => setForm(f => ({ ...f, ad: e.target.value }))}
+                    className="mt-1 rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+                  />
+                )}
               </div>
 
               {/* Marka */}
@@ -621,7 +699,16 @@ export default function MachinePage({
                 <label className="text-xs font-medium text-beton-400">Sahiplik</label>
                 <select
                   value={form.sahiplik ?? "ozmal"}
-                  onChange={e => setForm(f => ({ ...f, sahiplik: e.target.value }))}
+                  onChange={e => {
+                    const sahiplik = e.target.value;
+                    setForm(f => ({
+                      ...f,
+                      sahiplik,
+                      tedarikci: sahiplik === "ozmal"
+                        ? ANA_YUKLENICI
+                        : (f.tedarikci === ANA_YUKLENICI ? "" : f.tedarikci),
+                    }));
+                  }}
                   className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                 >
                   <option value="ozmal">Öz mal</option>
@@ -634,9 +721,10 @@ export default function MachinePage({
                 <label className="text-xs font-medium text-beton-400">Tedarikçi / Kiralık Firma</label>
                 <input
                   placeholder="Firma adı"
-                  value={form.tedarikci ?? ""}
+                  value={form.sahiplik === "ozmal" ? ANA_YUKLENICI : (form.tedarikci ?? "")}
+                  disabled={form.sahiplik === "ozmal"}
                   onChange={e => setForm(f => ({ ...f, tedarikci: e.target.value }))}
-                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500 disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
 
