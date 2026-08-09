@@ -79,48 +79,58 @@ type equipmentDTO struct {
 }
 
 type workEntryDTO struct {
-	ID           uuid.UUID  `json:"id,omitempty"`
-	WorkItemID   *uuid.UUID `json:"work_item_id,omitempty"`
-	WorkItemPoz  *string    `json:"work_item_poz,omitempty"`
-	Location     *string    `json:"location,omitempty"`
-	Description  string     `json:"description"`
-	Qty          *float64   `json:"qty,omitempty"`
-	Unit         *string    `json:"unit,omitempty"`
-	Discipline   *string    `json:"discipline,omitempty"`
+	ID          uuid.UUID  `json:"id,omitempty"`
+	WorkItemID  *uuid.UUID `json:"work_item_id,omitempty"`
+	WorkItemPoz *string    `json:"work_item_poz,omitempty"`
+	Location    *string    `json:"location,omitempty"`
+	Description string     `json:"description"`
+	Qty         *float64   `json:"qty,omitempty"`
+	Unit        *string    `json:"unit,omitempty"`
+	Discipline  *string    `json:"discipline,omitempty"`
+}
+
+type cashExpenseDTO struct {
+	ID          uuid.UUID `json:"id,omitempty"`
+	Description string    `json:"description"`
+	Category    string    `json:"category"`
+	Amount      float64   `json:"amount"`
+	ReceiptNo   *string   `json:"receipt_no,omitempty"`
 }
 
 type dailyDTO struct {
-	ID                uuid.UUID       `json:"id"`
-	ProjectID         uuid.UUID       `json:"project_id"`
-	ReportDate        string          `json:"report_date"` // YYYY-MM-DD
-	RevisionNo        int             `json:"revision_no"`
-	ParentReportID    *uuid.UUID      `json:"parent_report_id,omitempty"`
-	Weather           json.RawMessage `json:"weather,omitempty"`
-	TempMin           *float64        `json:"temperature_min,omitempty"`
-	TempMax           *float64        `json:"temperature_max,omitempty"`
-	Notes             *string         `json:"notes,omitempty"`
-	Status            string          `json:"status"`
-	AuthorID          uuid.UUID       `json:"author_id"`
-	AuthorName        string          `json:"author_name"`
-	SubmittedAt       *time.Time      `json:"submitted_at,omitempty"`
-	RowVersion        int             `json:"row_version"`
-	CreatedAt         time.Time       `json:"created_at"`
-	CoverPhotoFileID  *uuid.UUID      `json:"cover_photo_file_id,omitempty"`
+	ID               uuid.UUID       `json:"id"`
+	ProjectID        uuid.UUID       `json:"project_id"`
+	ReportDate       string          `json:"report_date"` // YYYY-MM-DD
+	RevisionNo       int             `json:"revision_no"`
+	ParentReportID   *uuid.UUID      `json:"parent_report_id,omitempty"`
+	Weather          json.RawMessage `json:"weather,omitempty"`
+	TempMin          *float64        `json:"temperature_min,omitempty"`
+	TempMax          *float64        `json:"temperature_max,omitempty"`
+	Notes            *string         `json:"notes,omitempty"`
+	Status           string          `json:"status"`
+	AuthorID         uuid.UUID       `json:"author_id"`
+	AuthorName       string          `json:"author_name"`
+	SubmittedAt      *time.Time      `json:"submitted_at,omitempty"`
+	RowVersion       int             `json:"row_version"`
+	CreatedAt        time.Time       `json:"created_at"`
+	CoverPhotoFileID *uuid.UUID      `json:"cover_photo_file_id,omitempty"`
 
-	Manpower    []manpowerDTO  `json:"manpower,omitempty"`
-	Equipment   []equipmentDTO `json:"equipment,omitempty"`
-	WorkEntries []workEntryDTO `json:"work_entries,omitempty"`
+	Manpower     []manpowerDTO    `json:"manpower,omitempty"`
+	Equipment    []equipmentDTO   `json:"equipment,omitempty"`
+	WorkEntries  []workEntryDTO   `json:"work_entries,omitempty"`
+	CashExpenses []cashExpenseDTO `json:"cash_expenses,omitempty"`
 }
 
 type dailyInput struct {
-	ReportDate string          `json:"report_date"`
-	Weather    json.RawMessage `json:"weather"`
-	TempMin    *float64        `json:"temperature_min"`
-	TempMax    *float64        `json:"temperature_max"`
-	Notes      string          `json:"notes"`
-	Manpower   []manpowerDTO   `json:"manpower"`
-	Equipment  []equipmentDTO  `json:"equipment"`
-	WorkEntries []workEntryDTO `json:"work_entries"`
+	ReportDate   string           `json:"report_date"`
+	Weather      json.RawMessage  `json:"weather"`
+	TempMin      *float64         `json:"temperature_min"`
+	TempMax      *float64         `json:"temperature_max"`
+	Notes        string           `json:"notes"`
+	Manpower     []manpowerDTO    `json:"manpower"`
+	Equipment    []equipmentDTO   `json:"equipment"`
+	WorkEntries  []workEntryDTO   `json:"work_entries"`
+	CashExpenses []cashExpenseDTO `json:"cash_expenses"`
 }
 
 // ---------------------------------------------------------------------------
@@ -233,6 +243,24 @@ func (h *Handler) loadLines(ctx context.Context, d *dailyDTO) error {
 		d.WorkEntries = append(d.WorkEntries, we)
 	}
 	rows.Close()
+
+	rows, err = h.pool.Query(ctx, `
+		SELECT id, description, category, amount::float8, receipt_no
+		FROM daily_cash_expenses
+		WHERE daily_report_id=$1 AND deleted_at IS NULL
+		ORDER BY created_at`, d.ID)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var ce cashExpenseDTO
+		if err := rows.Scan(&ce.ID, &ce.Description, &ce.Category, &ce.Amount, &ce.ReceiptNo); err != nil {
+			rows.Close()
+			return err
+		}
+		d.CashExpenses = append(d.CashExpenses, ce)
+	}
+	rows.Close()
 	return nil
 }
 
@@ -258,6 +286,14 @@ func insertLines(ctx context.Context, tx pgx.Tx, reportID uuid.UUID, in dailyInp
 			INSERT INTO daily_work_entries (daily_report_id, work_item_id, location, description, qty, unit)
 			VALUES ($1,$2,NULLIF(btrim(COALESCE($3,'')),''),$4,$5,NULLIF(btrim(COALESCE($6,'')),''))`,
 			reportID, we.WorkItemID, we.Location, strings.TrimSpace(we.Description), we.Qty, we.Unit); err != nil {
+			return err
+		}
+	}
+	for _, ce := range in.CashExpenses {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO daily_cash_expenses (daily_report_id, description, category, amount, receipt_no)
+			VALUES ($1,$2,$3,$4,NULLIF(btrim(COALESCE($5,'')),''))`,
+			reportID, strings.TrimSpace(ce.Description), strings.TrimSpace(ce.Category), ce.Amount, ce.ReceiptNo); err != nil {
 			return err
 		}
 	}
@@ -442,7 +478,7 @@ func (h *Handler) UpdateDaily(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Satırlar: tam değişim (taslakta basit ve güvenli; audit başlıkta tutulur).
-	for _, tbl := range []string{"daily_manpower", "daily_equipment", "daily_work_entries"} {
+	for _, tbl := range []string{"daily_manpower", "daily_equipment", "daily_work_entries", "daily_cash_expenses"} {
 		if _, err := tx.Exec(r.Context(), `DELETE FROM `+tbl+` WHERE daily_report_id=$1`, id); err != nil {
 			if isLockViolation(err) {
 				httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
@@ -631,6 +667,9 @@ func (h *Handler) ReviseDaily(w http.ResponseWriter, r *http.Request) {
 		`INSERT INTO daily_work_entries (daily_report_id, work_item_id, location, description, qty, unit)
 		 SELECT $2, work_item_id, location, description, qty, unit
 		 FROM daily_work_entries WHERE daily_report_id=$1 AND deleted_at IS NULL`,
+		`INSERT INTO daily_cash_expenses (daily_report_id, description, category, amount, receipt_no)
+		 SELECT $2, description, category, amount, receipt_no
+		 FROM daily_cash_expenses WHERE daily_report_id=$1 AND deleted_at IS NULL`,
 	} {
 		if _, err := tx.Exec(r.Context(), q, id, newID); err != nil {
 			httpx.Internal(w, r)

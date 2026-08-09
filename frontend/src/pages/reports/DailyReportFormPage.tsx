@@ -16,6 +16,9 @@ import { DR_STATUS_LABEL, DR_STATUS_STYLE, formatDateTR } from "./DailyReportsPa
 type Manpower = { subcontractor_id?: string; trade: string; headcount: number };
 type Equipment = { equipment_name: string; count: number; working_hours?: number; idle_reason?: string };
 type WorkEntry = { work_item_id?: string; location?: string; description: string; qty?: number; unit?: string };
+type CashExpense = { description: string; category: string; amount: number; receipt_no?: string };
+
+const CASH_CATEGORIES = ["Yakıt", "Yemek", "Nakliye", "Küçük Malzeme", "Diğer"];
 
 type Detail = {
   id: string;
@@ -31,6 +34,7 @@ type Detail = {
   manpower?: (Manpower & { subcontractor_name?: string })[];
   equipment?: Equipment[];
   work_entries?: (WorkEntry & { work_item_poz?: string })[];
+  cash_expenses?: CashExpense[];
 };
 
 type Sub = { id: string; company_name: string };
@@ -71,6 +75,7 @@ export default function DailyReportFormPage() {
   const [manpower, setManpower] = useState<Manpower[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [entries, setEntries] = useState<WorkEntry[]>([]);
+  const [cashExpenses, setCashExpenses] = useState<CashExpense[]>([]);
 
   const [subs, setSubs]   = useState<Sub[]>([]);
   const [items, setItems] = useState<WorkItem[]>([]);
@@ -97,6 +102,7 @@ export default function DailyReportFormPage() {
       setManpower((d.manpower ?? []).map(({ subcontractor_id, trade, headcount }) => ({ subcontractor_id, trade, headcount })));
       setEquipment((d.equipment ?? []).map(({ equipment_name, count, working_hours, idle_reason }) => ({ equipment_name, count, working_hours, idle_reason })));
       setEntries((d.work_entries ?? []).map(({ work_item_id, location, description, qty, unit }) => ({ work_item_id, location, description, qty, unit })));
+      setCashExpenses((d.cash_expenses ?? []).map(({ description, category, amount, receipt_no }) => ({ description, category, amount, receipt_no })));
     } catch {
       setErr("Rapor yüklenemedi ya da erişim yetkiniz yok.");
     }
@@ -145,6 +151,7 @@ export default function DailyReportFormPage() {
       manpower,
       equipment,
       work_entries: entries,
+      cash_expenses: cashExpenses,
     };
   }
 
@@ -470,6 +477,50 @@ export default function DailyReportFormPage() {
         {!readOnly && canEdit && (
           <button className={addBtn} onClick={() => setEntries([...entries, { description: "" }])}>
             + İmalat girdisi ekle
+          </button>
+        )}
+      </div>
+
+      {/* Şantiye Kasa Harcaması */}
+      <div className={section}>
+        <h2 className="font-medium text-white text-sm">Şantiye Kasa Harcaması</h2>
+        {cashExpenses.map((c, i) => (
+          <div key={i} className="flex gap-2 items-end">
+            <div className="flex-1 grid grid-cols-2 gap-2">
+              <div className="col-span-2">
+                <label className={label}>Açıklama</label>
+                <input className={input} placeholder="Şantiye personeli yemek bedeli…" value={c.description}
+                  disabled={readOnly || !canEdit}
+                  onChange={(e) => setCashExpenses(upd(cashExpenses, i, { description: e.target.value }))} />
+              </div>
+              <div>
+                <label className={label}>Kategori</label>
+                <select className={input} value={c.category} disabled={readOnly || !canEdit}
+                  onChange={(e) => setCashExpenses(upd(cashExpenses, i, { category: e.target.value }))}>
+                  <option value="">— Seçin —</option>
+                  {CASH_CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={label}>Tutar (₺)</label>
+                <input type="number" min={0} step="0.01" className={input} value={c.amount || ""}
+                  disabled={readOnly || !canEdit}
+                  onChange={(e) => setCashExpenses(upd(cashExpenses, i, { amount: Number(e.target.value) }))} />
+              </div>
+              <div className="col-span-2">
+                <label className={label}>Makbuz No (opsiyonel)</label>
+                <input className={input} value={c.receipt_no ?? ""} disabled={readOnly || !canEdit}
+                  onChange={(e) => setCashExpenses(upd(cashExpenses, i, { receipt_no: e.target.value || undefined }))} />
+              </div>
+            </div>
+            {!readOnly && canEdit && (
+              <button className={rmBtn} onClick={() => setCashExpenses(cashExpenses.filter((_, j) => j !== i))}>Sil</button>
+            )}
+          </div>
+        ))}
+        {!readOnly && canEdit && (
+          <button className={addBtn} onClick={() => setCashExpenses([...cashExpenses, { description: "", category: "Diğer", amount: 0 }])}>
+            + Kasa harcaması ekle
           </button>
         )}
       </div>
@@ -856,6 +907,45 @@ function ReadOnlyView({
                     <td className={`${roTdM} pr-4`}>{e.idle_reason ?? "—"}</td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Şantiye Kasa Harcaması */}
+      {(detail.cash_expenses ?? []).length > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#eab308" title="Şantiye Kasa Harcaması" count={(detail.cash_expenses ?? []).length} />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[460px]">
+              <thead>
+                <tr>
+                  <th className={`${roTh} pl-4`}>Açıklama</th>
+                  <th className={roTh}>Kategori</th>
+                  <th className={`${roTh} text-right`}>Tutar</th>
+                  <th className={`${roTh} pr-4`}>Makbuz No</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(detail.cash_expenses ?? []).map((c, i) => (
+                  <tr key={i} className="hover:bg-beton-800/30 transition-colors">
+                    <td className={`${roTd} pl-4`}>{c.description}</td>
+                    <td className={roTdM}>{c.category}</td>
+                    <td className={`${roTd} text-right tabular-nums font-semibold`}>
+                      {c.amount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                    </td>
+                    <td className={`${roTdM} pr-4`}>{c.receipt_no ?? "—"}</td>
+                  </tr>
+                ))}
+                <tr className="bg-beton-800/20">
+                  <td className={`${roTd} pl-4 font-bold text-beton-100`} colSpan={2}>Toplam</td>
+                  <td className={`${roTd} text-right tabular-nums font-bold text-white`}>
+                    {(detail.cash_expenses ?? []).reduce((s, c) => s + c.amount, 0)
+                      .toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                  </td>
+                  <td className={`${roTdM} pr-4`}></td>
+                </tr>
               </tbody>
             </table>
           </div>

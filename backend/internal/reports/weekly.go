@@ -110,6 +110,36 @@ type SnapPendingPO struct {
 	Overdue      bool    `json:"overdue"`
 }
 
+// SnapSubcontractor — proje kapsamındaki aktif taşeron kartı (özet).
+type SnapSubcontractor struct {
+	CompanyName    string   `json:"company_name"`
+	Trade          string   `json:"trade,omitempty"`
+	ContactPerson  string   `json:"contact_person,omitempty"`
+	Phone          string   `json:"phone,omitempty"`
+	ContractNo     string   `json:"contract_no,omitempty"`
+	ContractAmount *float64 `json:"contract_amount,omitempty"`
+}
+
+// SnapPurchaseOrder — satın alma siparişi (tutar dahil).
+type SnapPurchaseOrder struct {
+	PONo         string   `json:"po_no"`
+	Supplier     string   `json:"supplier"`
+	Amount       *float64 `json:"amount,omitempty"`
+	Currency     string   `json:"currency"`
+	Status       string   `json:"status"`
+	ExpectedDate *string  `json:"expected_date,omitempty"`
+	Overdue      bool     `json:"overdue"`
+}
+
+// SnapCashExpense — şantiye kasa harcaması kalemi (günlük rapordan derlenir).
+type SnapCashExpense struct {
+	Date        string  `json:"date"`
+	Description string  `json:"description"`
+	Category    string  `json:"category"`
+	Amount      float64 `json:"amount"`
+	ReceiptNo   *string `json:"receipt_no,omitempty"`
+}
+
 // DisciplineSection — disipline göre haftalık ilerleme + sonraki hafta planı.
 type DisciplineSection struct {
 	Discipline   string   `json:"discipline"`
@@ -135,6 +165,14 @@ type Snapshot struct {
 	Deliveries []SnapDelivery  `json:"deliveries"`
 	Stock      []SnapStockItem `json:"stock"`
 
+	// Aktif taşeron listesi + satın alma siparişleri.
+	Subcontractors []SnapSubcontractor `json:"subcontractors,omitempty"`
+	PurchaseOrders []SnapPurchaseOrder `json:"purchase_orders,omitempty"`
+
+	// Şantiye kasa harcaması (günlük raporlardan haftalık derleme).
+	CashExpenses []SnapCashExpense `json:"cash_expenses,omitempty"`
+	CashTotal    float64           `json:"cash_total"`
+
 	// Bekleyen aktiviteler.
 	PendingPayments []SnapPayment   `json:"pending_payments"`
 	PendingPOs      []SnapPendingPO `json:"pending_pos"`
@@ -156,6 +194,9 @@ func (h *Handler) buildSnapshot(ctx context.Context, pid uuid.UUID, start, end t
 		Days:            []SnapDay{},
 		Deliveries:      []SnapDelivery{},
 		Stock:           []SnapStockItem{},
+		Subcontractors:  []SnapSubcontractor{},
+		PurchaseOrders:  []SnapPurchaseOrder{},
+		CashExpenses:    []SnapCashExpense{},
 		PendingPayments: []SnapPayment{},
 		PendingPOs:      []SnapPendingPO{},
 	}
@@ -420,6 +461,83 @@ func (h *Handler) buildSnapshot(ctx context.Context, pid uuid.UUID, start, end t
 	}
 	prows.Close()
 
+	// ── Aktif taşeron listesi ──────────────────────────────────────────────────
+	subRows, err := h.pool.Query(ctx, `
+		SELECT s.company_name, COALESCE(s.trade,''), COALESCE(s.contact_person,''),
+		       COALESCE(s.phone,''), COALESCE(c.contract_no,''), c.amount
+		FROM subcontractors s
+		LEFT JOIN LATERAL (
+			SELECT contract_no, amount FROM contracts
+			WHERE subcontractor_id = s.id AND deleted_at IS NULL
+			ORDER BY sign_date DESC NULLS LAST, created_at DESC LIMIT 1
+		) c ON true
+		WHERE s.project_id=$1 AND s.deleted_at IS NULL
+		ORDER BY s.company_name`, pid)
+	if err != nil {
+		return nil, fmt.Errorf("taşeronlar okunamadı: %w", err)
+	}
+	for subRows.Next() {
+		var sc SnapSubcontractor
+		if err := subRows.Scan(&sc.CompanyName, &sc.Trade, &sc.ContactPerson,
+			&sc.Phone, &sc.ContractNo, &sc.ContractAmount); err != nil {
+			subRows.Close()
+			return nil, err
+		}
+		sn.Subcontractors = append(sn.Subcontractors, sc)
+	}
+	subRows.Close()
+
+	// ── Satın alma siparişleri (tutar dahil, iptal hariç tüm durumlar) ────────
+	poRows, err := h.pool.Query(ctx, `
+		SELECT po_no, supplier_name, amount, currency, status,
+		       TO_CHAR(expected_date,'YYYY-MM-DD'),
+		       (expected_date IS NOT NULL AND expected_date < $2::date AND status IN ('Ordered','PartiallyDelivered'))
+		FROM purchase_orders
+		WHERE project_id=$1 AND deleted_at IS NULL AND status != 'Cancelled'
+		ORDER BY created_at DESC
+		LIMIT 50`, pid, sn.PeriodEnd)
+	if err != nil {
+		return nil, fmt.Errorf("satın alma siparişleri okunamadı: %w", err)
+	}
+	for poRows.Next() {
+		var p SnapPurchaseOrder
+		if err := poRows.Scan(&p.PONo, &p.Supplier, &p.Amount, &p.Currency, &p.Status,
+			&p.ExpectedDate, &p.Overdue); err != nil {
+			poRows.Close()
+			return nil, err
+		}
+		sn.PurchaseOrders = append(sn.PurchaseOrders, p)
+	}
+	poRows.Close()
+
+	// ── Şantiye kasa harcaması (haftanın taslak+gönderilmiş günlük raporlarından) ─
+	ceRows, err := h.pool.Query(ctx, `
+		SELECT to_char(dr.report_date,'YYYY-MM-DD'), dce.description, dce.category,
+		       dce.amount::float8, dce.receipt_no
+		FROM daily_cash_expenses dce
+		JOIN daily_reports dr ON dr.id = dce.daily_report_id
+		WHERE dr.project_id=$1 AND dr.deleted_at IS NULL AND dce.deleted_at IS NULL
+		  AND dr.report_date BETWEEN $2::date AND $3::date
+		  AND dr.revision_no = (
+		      SELECT max(x.revision_no) FROM daily_reports x
+		      WHERE x.project_id=dr.project_id AND x.report_date=dr.report_date
+		        AND x.deleted_at IS NULL)
+		ORDER BY dr.report_date, dce.created_at`,
+		pid, sn.PeriodStart, sn.PeriodEnd)
+	if err != nil {
+		return nil, fmt.Errorf("kasa harcamaları okunamadı: %w", err)
+	}
+	for ceRows.Next() {
+		var ce SnapCashExpense
+		if err := ceRows.Scan(&ce.Date, &ce.Description, &ce.Category, &ce.Amount, &ce.ReceiptNo); err != nil {
+			ceRows.Close()
+			return nil, err
+		}
+		sn.CashExpenses = append(sn.CashExpenses, ce)
+		sn.CashTotal += ce.Amount
+	}
+	ceRows.Close()
+
 	sn.OHSNote = "İSG özeti Faz 8 ile eklenecektir."
 	return sn, nil
 }
@@ -429,15 +547,15 @@ func (h *Handler) buildSnapshot(ctx context.Context, pid uuid.UUID, start, end t
 // ---------------------------------------------------------------------------
 
 type weeklyDTO struct {
-	ID          uuid.UUID  `json:"id"`
-	WeekNo      int        `json:"week_no"`
-	PeriodStart string     `json:"period_start"`
-	PeriodEnd   string     `json:"period_end"`
-	Status      string     `json:"status"`
-	Error       *string    `json:"error,omitempty"`
-	GeneratedBy string     `json:"generated_by_name"`
-	HasPDF      bool       `json:"has_pdf"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID          uuid.UUID `json:"id"`
+	WeekNo      int       `json:"week_no"`
+	PeriodStart string    `json:"period_start"`
+	PeriodEnd   string    `json:"period_end"`
+	Status      string    `json:"status"`
+	Error       *string   `json:"error,omitempty"`
+	GeneratedBy string    `json:"generated_by_name"`
+	HasPDF      bool      `json:"has_pdf"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // ListWeekly — üretilen haftalık raporlar (snapshot hariç; hafif liste).
@@ -705,10 +823,10 @@ func ProcessWeeklyPDF(ctx context.Context, pool *pgxpool.Pool, store *storage.Cl
 	}
 
 	nt.Send(ctx, notify.Input{
-		UserIDs: []uuid.UUID{genBy},
-		Type:    notify.TypeWeeklyReportReady,
-		Title:   fmt.Sprintf("Haftalık rapor hazır: %s / Hafta %d", sn.ProjectCode, sn.WeekNo),
-		Body:    fmt.Sprintf("%s – %s dönemi PDF raporu indirilebilir.", sn.PeriodStart, sn.PeriodEnd),
+		UserIDs:    []uuid.UUID{genBy},
+		Type:       notify.TypeWeeklyReportReady,
+		Title:      fmt.Sprintf("Haftalık rapor hazır: %s / Hafta %d", sn.ProjectCode, sn.WeekNo),
+		Body:       fmt.Sprintf("%s – %s dönemi PDF raporu indirilebilir.", sn.PeriodStart, sn.PeriodEnd),
 		EntityType: "weekly_reports", EntityID: &id, ProjectID: &pid,
 	})
 	log.Info("haftalık PDF üretildi", "weekly", id, "bytes", len(pdf))
@@ -723,10 +841,10 @@ func markWeeklyFailed(ctx context.Context, pool *pgxpool.Pool, nt *notify.Servic
 		log.Error("haftalık rapor Failed işaretlenemedi", "id", id, "err", err)
 	}
 	nt.Send(ctx, notify.Input{
-		UserIDs: []uuid.UUID{genBy},
-		Type:    notify.TypeWeeklyReportFailed,
-		Title:   "Haftalık rapor üretilemedi",
-		Body:    reason,
+		UserIDs:    []uuid.UUID{genBy},
+		Type:       notify.TypeWeeklyReportFailed,
+		Title:      "Haftalık rapor üretilemedi",
+		Body:       reason,
 		EntityType: "weekly_reports", EntityID: &id, ProjectID: &pid,
 	})
 }

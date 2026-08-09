@@ -61,6 +61,25 @@ type SnapStockItem = {
 type SnapPendingPO  = { po_no: string; supplier: string; expected_date?: string; overdue: boolean };
 type SnapPayment    = { subcontractor: string; period_no: number; status: string };
 
+type SnapSubcontractor = {
+  company_name: string; trade?: string; contact_person?: string; phone?: string;
+  contract_no?: string; contract_amount?: number;
+};
+type SnapPurchaseOrder = {
+  po_no: string; supplier: string; amount?: number; currency: string;
+  status: string; expected_date?: string; overdue: boolean;
+};
+type SnapCashExpense = {
+  date: string; description: string; category: string; amount: number; receipt_no?: string;
+};
+
+const PO_STATUS_LABEL: Record<string, string> = {
+  Ordered: "Sipariş Verildi",
+  PartiallyDelivered: "Kısmi Teslim",
+  Delivered: "Teslim Edildi",
+  Cancelled: "İptal",
+};
+
 type Snapshot = {
   generated_at: string;
   project_name: string; project_code: string;
@@ -70,6 +89,10 @@ type Snapshot = {
   discipline_sections?: SnapDisciplineSection[];
   deliveries: SnapDelivery[];
   stock: SnapStockItem[];
+  subcontractors?: SnapSubcontractor[];
+  purchase_orders?: SnapPurchaseOrder[];
+  cash_expenses?: SnapCashExpense[];
+  cash_total?: number;
   pending_payments: SnapPayment[];
   pending_pos: SnapPendingPO[];
   open_tasks: number; tasks_due_this_week: number; pending_mars: number;
@@ -452,6 +475,130 @@ function SnapshotView({ sn, reportId, pid, hasPdf, nextWeekPlans }: {
           </>
         );
       })()}
+
+      {/* Aktif Taşeron Listesi */}
+      {(sn.subcontractors ?? []).length > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#a78bfa" title="Aktif Taşeron Listesi" />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px]">
+              <thead>
+                <tr>
+                  <th className={`${th} pl-4`}>Firma</th>
+                  <th className={th}>Branş</th>
+                  <th className={th}>Yetkili</th>
+                  <th className={th}>Telefon</th>
+                  <th className={th}>Sözleşme No</th>
+                  <th className={`${th} text-right pr-4`}>Sözleşme Tutarı</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(sn.subcontractors ?? []).map((s, i) => (
+                  <tr key={i} className="hover:bg-beton-800/30 transition-colors">
+                    <td className={`${td} pl-4`}>{s.company_name}</td>
+                    <td className={tdM}>{s.trade || "—"}</td>
+                    <td className={tdM}>{s.contact_person || "—"}</td>
+                    <td className={tdM}>{s.phone || "—"}</td>
+                    <td className={tdM}>{s.contract_no || "—"}</td>
+                    <td className={`${td} text-right tabular-nums pr-4`}>
+                      {s.contract_amount != null
+                        ? s.contract_amount.toLocaleString("tr-TR", { maximumFractionDigits: 0 }) + " ₺"
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Satın Alma */}
+      {(sn.purchase_orders ?? []).length > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#fb923c" title="Satın Alma" />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px]">
+              <thead>
+                <tr>
+                  <th className={`${th} pl-4`}>PO No</th>
+                  <th className={th}>Tedarikçi</th>
+                  <th className={`${th} text-right`}>Tutar</th>
+                  <th className={th}>Durum</th>
+                  <th className={`${th} pr-4`}>Beklenen Tarih</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(sn.purchase_orders ?? []).map((p, i) => (
+                  <tr key={i} className="hover:bg-beton-800/30 transition-colors">
+                    <td className={`${td} pl-4`}>{p.po_no}</td>
+                    <td className={tdM}>{p.supplier}</td>
+                    <td className={`${td} text-right tabular-nums font-semibold`}>
+                      {p.amount != null
+                        ? p.amount.toLocaleString("tr-TR", { maximumFractionDigits: 0 }) + " " + (p.currency || "TRY")
+                        : "—"}
+                    </td>
+                    <td className={tdM}>
+                      <span className={p.overdue ? "text-red-400 font-medium" : ""}>
+                        {p.overdue && "⚠ "}{PO_STATUS_LABEL[p.status] ?? p.status}
+                      </span>
+                    </td>
+                    <td className={`${tdM} pr-4`}>{p.expected_date ? fmtTR(p.expected_date) : "—"}</td>
+                  </tr>
+                ))}
+                <tr className="bg-beton-800/20">
+                  <td className={`${td} pl-4 font-bold text-beton-100`} colSpan={2}>Toplam</td>
+                  <td className={`${td} text-right tabular-nums font-bold text-white`}>
+                    {(sn.purchase_orders ?? []).reduce((s, p) => s + (p.amount ?? 0), 0)
+                      .toLocaleString("tr-TR", { maximumFractionDigits: 0 })} TRY
+                  </td>
+                  <td className={tdM} colSpan={2}></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Şantiye Kasa Harcaması */}
+      {(sn.cash_expenses ?? []).length > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#eab308" title="Şantiye Kasa Harcaması" />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[500px]">
+              <thead>
+                <tr>
+                  <th className={`${th} pl-4`}>Tarih</th>
+                  <th className={th}>Açıklama</th>
+                  <th className={th}>Kategori</th>
+                  <th className={`${th} text-right`}>Tutar</th>
+                  <th className={`${th} pr-4`}>Makbuz No</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(sn.cash_expenses ?? []).map((c, i) => (
+                  <tr key={i} className="hover:bg-beton-800/30 transition-colors">
+                    <td className={`${td} pl-4 tabular-nums whitespace-nowrap`}>{fmtTR(c.date)}</td>
+                    <td className={td}>{c.description}</td>
+                    <td className={tdM}>{c.category}</td>
+                    <td className={`${td} text-right tabular-nums font-semibold`}>
+                      {c.amount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                    </td>
+                    <td className={`${tdM} pr-4`}>{c.receipt_no ?? "—"}</td>
+                  </tr>
+                ))}
+                <tr className="bg-beton-800/20">
+                  <td className={`${td} pl-4 font-bold text-beton-100`} colSpan={3}>Toplam</td>
+                  <td className={`${td} text-right tabular-nums font-bold text-white`}>
+                    {(sn.cash_total ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                  </td>
+                  <td className={tdM}></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* İSG Notu */}
       {sn.ohs_note && (
