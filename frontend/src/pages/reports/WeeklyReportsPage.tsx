@@ -476,10 +476,12 @@ function SnapshotView({ sn, reportId, pid, hasPdf, nextWeekPlans }: {
         );
       })()}
 
-      {/* Aktif Taşeron Listesi */}
-      {(sn.subcontractors ?? []).length > 0 && (
-        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
-          <SecHeader color="#a78bfa" title="Aktif Taşeron Listesi" />
+      {/* Aktif Taşeron Listesi — proje taşeronu olsun olmasın her zaman gösterilir */}
+      <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+        <SecHeader color="#a78bfa" title="Aktif Taşeron Listesi" />
+        {(sn.subcontractors ?? []).length === 0 ? (
+          <p className="px-4 py-3 text-[12px] text-beton-500 italic">Bu projede kayıtlı aktif taşeron yok.</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px]">
               <thead>
@@ -510,13 +512,15 @@ function SnapshotView({ sn, reportId, pid, hasPdf, nextWeekPlans }: {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Satın Alma */}
-      {(sn.purchase_orders ?? []).length > 0 && (
-        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
-          <SecHeader color="#fb923c" title="Satın Alma" />
+      {/* Satın Alma — açık sipariş/talep olsun olmasın her zaman gösterilir */}
+      <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+        <SecHeader color="#fb923c" title="Satın Alma" />
+        {(sn.purchase_orders ?? []).length === 0 ? (
+          <p className="px-4 py-3 text-[12px] text-beton-500 italic">Bekleyen satın alma siparişi ya da talebi yok.</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px]">
               <thead>
@@ -557,13 +561,15 @@ function SnapshotView({ sn, reportId, pid, hasPdf, nextWeekPlans }: {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Şantiye Kasa Harcaması */}
-      {(sn.cash_expenses ?? []).length > 0 && (
-        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
-          <SecHeader color="#eab308" title="Şantiye Kasa Harcaması" />
+      {/* Şantiye Kasa Harcaması — girilmemiş olsun olmasın her zaman gösterilir */}
+      <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+        <SecHeader color="#eab308" title="Şantiye Kasa Harcaması" />
+        {(sn.cash_expenses ?? []).length === 0 ? (
+          <p className="px-4 py-3 text-[12px] text-beton-500 italic">Bu hafta şantiye kasa harcaması girilmemiş.</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[500px]">
               <thead>
@@ -597,8 +603,8 @@ function SnapshotView({ sn, reportId, pid, hasPdf, nextWeekPlans }: {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* İSG Notu */}
       {sn.ohs_note && (
@@ -634,10 +640,12 @@ function SnapshotView({ sn, reportId, pid, hasPdf, nextWeekPlans }: {
         </div>
       )}
 
-      {/* Depo-Stok Durumu */}
-      {stock.length > 0 && (
-        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
-          <SecHeader color="#f59e0b" title="Depo-Stok Durumu" />
+      {/* Depo-Stok Durumu — depo kalemi tanımlı olsun olmasın her zaman gösterilir */}
+      <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+        <SecHeader color="#f59e0b" title="Depo-Stok Durumu" />
+        {stock.length === 0 ? (
+          <p className="px-4 py-3 text-[12px] text-beton-500 italic">Bu projede tanımlı depo kalemi yok.</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[500px]">
               <thead>
@@ -676,13 +684,13 @@ function SnapshotView({ sn, reportId, pid, hasPdf, nextWeekPlans }: {
               </tbody>
             </table>
           </div>
-          {stock.some((s) => s.below_min) && (
-            <p className="px-4 py-2 text-[11px] text-red-400">
-              ⚠ Kırmızı satırlar minimum stok seviyesinin altında.
-            </p>
-          )}
-        </div>
-      )}
+        )}
+        {stock.some((s) => s.below_min) && (
+          <p className="px-4 py-2 text-[11px] text-red-400">
+            ⚠ Kırmızı satırlar minimum stok seviyesinin altında.
+          </p>
+        )}
+      </div>
 
       {/* Bekleyen Aktiviteler */}
       {pendingCount > 0 && (

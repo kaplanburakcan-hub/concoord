@@ -166,11 +166,11 @@ type Snapshot struct {
 	Stock      []SnapStockItem `json:"stock"`
 
 	// Aktif taşeron listesi + satın alma siparişleri.
-	Subcontractors []SnapSubcontractor `json:"subcontractors,omitempty"`
-	PurchaseOrders []SnapPurchaseOrder `json:"purchase_orders,omitempty"`
+	Subcontractors []SnapSubcontractor `json:"subcontractors"`
+	PurchaseOrders []SnapPurchaseOrder `json:"purchase_orders"`
 
 	// Şantiye kasa harcaması (günlük raporlardan haftalık derleme).
-	CashExpenses []SnapCashExpense `json:"cash_expenses,omitempty"`
+	CashExpenses []SnapCashExpense `json:"cash_expenses"`
 	CashTotal    float64           `json:"cash_total"`
 
 	// Bekleyen aktiviteler.
