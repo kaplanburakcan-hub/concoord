@@ -346,7 +346,7 @@ export default function MachinePage({
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap items-center">
+      <div className="rounded-lg border border-beton-800 bg-beton-900 p-3 flex gap-2 flex-wrap items-center">
         <input
           placeholder="Ara…"
           value={search}

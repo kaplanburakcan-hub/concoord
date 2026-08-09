@@ -413,7 +413,7 @@ export default function ProjePaydaslariPage() {
           placeholder="Paydaş ara..."
           value={arama}
           onChange={(e) => setArama(e.target.value)}
-          className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+          className="w-full rounded-md bg-beton-900 border border-beton-700 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
         />
       )}
 

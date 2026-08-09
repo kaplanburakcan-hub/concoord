@@ -65,7 +65,7 @@ export default function ProgressPaymentsPage() {
       <p className="text-sm text-beton-400 mt-1">{current.name} — kümülatif hakediş iş akışı ve kesinti yönetimi.</p>
       {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="mt-4 rounded-lg border border-beton-800 bg-beton-900 p-3 flex flex-wrap items-center gap-3">
         <select
           value={subFilter} onChange={(e) => setSubFilter(e.target.value)}
           className="rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-white"

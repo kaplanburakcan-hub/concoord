@@ -94,7 +94,7 @@ export default function MonthlyReportsPage() {
           value={month}
           onChange={(e) => setMonth(e.target.value)}
           placeholder="YYYY-MM"
-          className="w-32 rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100 font-mono outline-none focus:border-emniyet-500"
+          className="w-32 rounded-md bg-beton-900 border border-beton-700 px-2 py-1.5 text-sm text-beton-100 font-mono outline-none focus:border-emniyet-500"
         />
         <Can perm="reports.generate_weekly">
           <button

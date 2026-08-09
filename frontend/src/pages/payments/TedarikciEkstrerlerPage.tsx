@@ -280,7 +280,7 @@ export default function TedarikciEkstrerlerPage() {
 
       {/* Filtreler */}
       {statements.length > 0 && (
-        <div className="flex gap-2 mb-3 flex-wrap">
+        <div className="rounded-lg border border-beton-800 bg-beton-900 p-3 mb-3 flex gap-2 flex-wrap">
           <input
             className={`${inpBase} w-48`}
             placeholder="Tedarikçi ara…"

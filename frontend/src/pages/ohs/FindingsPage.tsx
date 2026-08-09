@@ -167,7 +167,7 @@ export default function FindingsPage() {
           </span>
         )}
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-          className="ml-auto rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-xs text-beton-200">
+          className="ml-auto rounded-md bg-beton-900 border border-beton-700 px-2 py-1 text-xs text-beton-200">
           <option value="">Tümü</option>
           <option value="Open">Açık</option>
           <option value="InProgress">Devam Ediyor</option>
