@@ -50,6 +50,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: "/", label: "Panel", icon: I.panel },
       { to: "/projects", label: "Projeler", perm: "projects.view", icon: I.proje },
+      { to: "/portfoy", label: "Portföy EVM", perm: "projects.view", icon: I.portfoy },
     ],
   },
   {
@@ -114,9 +115,8 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
-    title: "Finans / Yönetim",
+    title: "Ayarlar",
     items: [
-      { to: "/portfoy", label: "Portföy EVM", perm: "projects.view", icon: I.portfoy },
       { to: "/admin/users", label: "Kullanıcılar", perm: "admin.manage_users", icon: I.kullanici },
       { to: "/admin/permissions", label: "İzin Matrisi", perm: "admin.manage_permissions", icon: I.izin },
       { to: "/admin/audit", label: "Denetim İzi", perm: "admin.view_audit_log", icon: I.denetim },
