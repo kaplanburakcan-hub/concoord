@@ -15,6 +15,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/config"
 	"github.com/ipks/ipks/backend/internal/contracts"
+	"github.com/ipks/ipks/backend/internal/correspondence"
 	"github.com/ipks/ipks/backend/internal/design"
 	"github.com/ipks/ipks/backend/internal/machines"
 	"github.com/ipks/ipks/backend/internal/meetings"
@@ -124,6 +125,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 	// --- Faz 26: Makine & Ekipman ---
 	machinesH := machines.NewHandler(pool)
+
+	// --- Faz 27: Yazışmalar (Gelen/Giden Evrak) ---
+	correspondenceH := correspondence.NewHandler(pool)
 
 	// Liveness — süreç ayakta mı?
 	r.Get("/healthz", func(w http.ResponseWriter, req *http.Request) {
@@ -522,6 +526,12 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/machines/{machineID}/logs", machinesH.ListLogs)
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/machines/{machineID}/logs", machinesH.CreateLog)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/machines/{machineID}/logs/{id}", machinesH.DeleteLog)
+
+			pr.With(mw.RequirePermission("correspondence.view")).Get("/projects/{projectID}/correspondences", correspondenceH.List)
+			pr.With(mw.RequirePermission("correspondence.create")).Post("/projects/{projectID}/correspondences", correspondenceH.Create)
+			pr.With(mw.RequirePermission("correspondence.view")).Get("/projects/{projectID}/correspondences/{id}", correspondenceH.Get)
+			pr.With(mw.RequirePermission("correspondence.edit")).Patch("/projects/{projectID}/correspondences/{id}", correspondenceH.Update)
+			pr.With(mw.RequirePermission("correspondence.delete")).Delete("/projects/{projectID}/correspondences/{id}", correspondenceH.Delete)
 		})
 
 		api.NotFound(func(w http.ResponseWriter, req *http.Request) {

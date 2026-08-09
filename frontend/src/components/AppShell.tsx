@@ -62,7 +62,7 @@ const GROUPS: NavGroup[] = [
       { to: "/proje/ana-sozlesme", label: "Ana Sözleşme", perm: "projects.view", icon: I.sozlesme },
       { to: "/proje/tasarim-projeler", label: "Tasarım ve Projeler", perm: "projects.view", icon: I.tasarim },
       {
-        to: "/yazismalar", label: "Yazışmalar", perm: "projects.view", icon: I.evrak,
+        to: "/yazismalar", label: "Yazışmalar", perm: "correspondence.view", icon: I.evrak,
         children: [
           { to: "/yazismalar/gelen", label: "Gelen Evrak" },
           { to: "/yazismalar/giden", label: "Giden Evrak" },

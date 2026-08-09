@@ -346,8 +346,8 @@ export default function App() {
                       <Route path="/saha/tutanaklar" element={<RequirePerm perm="reports.view"><SahaTutanaklariPage /></RequirePerm>} />
                       {/* ── YAZIŞMALAR ── */}
                       <Route path="/yazismalar" element={<Navigate to="/yazismalar/gelen" replace />} />
-                      <Route path="/yazismalar/gelen" element={<RequirePerm perm="projects.view"><GelenEvrakPage /></RequirePerm>} />
-                      <Route path="/yazismalar/giden" element={<RequirePerm perm="projects.view"><GidenEvrakPage /></RequirePerm>} />
+                      <Route path="/yazismalar/gelen" element={<RequirePerm perm="correspondence.view"><GelenEvrakPage /></RequirePerm>} />
+                      <Route path="/yazismalar/giden" element={<RequirePerm perm="correspondence.view"><GidenEvrakPage /></RequirePerm>} />
                       {/* ── MAKİNE & EKİPMAN ── */}
                       <Route path="/makine/araclar" element={<RequirePerm perm="projects.view"><AraclarPage /></RequirePerm>} />
                       <Route path="/makine/is-makineleri" element={<RequirePerm perm="projects.view"><IsMakineleriPage /></RequirePerm>} />

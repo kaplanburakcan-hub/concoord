@@ -1,10 +1,5 @@
-import ComingSoon from "../../components/ComingSoon";
+import CorrespondencePage from "./CorrespondencePage";
 
 export default function GidenEvrakPage() {
-  return (
-    <ComingSoon
-      title="Giden Evrak"
-      description="Projeden gönderilen yazışmaları ve evrakları buradan yönetebileceksiniz."
-    />
-  );
+  return <CorrespondencePage direction="giden" title="Giden Evrak" />;
 }

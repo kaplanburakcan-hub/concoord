@@ -41,6 +41,8 @@ var registry = []Step{
 	{Name: "0006_faz2_izin_sync", Run: stepFaz2PermSync},
 	// Faz 6: SiteManager rolü eklendi; SiteEngineer'dan reports.generate_weekly kaldırıldı.
 	{Name: "0007_site_manager_rol", Run: stepSiteManager},
+	// Faz 27: Yazışmalar (Gelen/Giden Evrak) — correspondence.* izinleri eklendi.
+	{Name: "0008_yazismalar_izin_sync", Run: stepFaz2PermSync},
 }
 
 // stepFaz2PermSync — izin sözlüğünü ve rol varsayılanlarını yeniden senkronlar.
