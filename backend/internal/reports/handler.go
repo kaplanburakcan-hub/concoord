@@ -86,6 +86,7 @@ type workEntryDTO struct {
 	Description  string     `json:"description"`
 	Qty          *float64   `json:"qty,omitempty"`
 	Unit         *string    `json:"unit,omitempty"`
+	Discipline   *string    `json:"discipline,omitempty"`
 }
 
 type dailyDTO struct {
@@ -215,7 +216,7 @@ func (h *Handler) loadLines(ctx context.Context, d *dailyDTO) error {
 	rows.Close()
 
 	rows, err = h.pool.Query(ctx, `
-		SELECT dw.id, dw.work_item_id, wi.poz_no, dw.location, dw.description, dw.qty, dw.unit
+		SELECT dw.id, dw.work_item_id, wi.poz_no, dw.location, dw.description, dw.qty, dw.unit, dw.discipline
 		FROM daily_work_entries dw
 		LEFT JOIN work_items wi ON wi.id = dw.work_item_id
 		WHERE dw.daily_report_id=$1 AND dw.deleted_at IS NULL
@@ -225,7 +226,7 @@ func (h *Handler) loadLines(ctx context.Context, d *dailyDTO) error {
 	}
 	for rows.Next() {
 		var we workEntryDTO
-		if err := rows.Scan(&we.ID, &we.WorkItemID, &we.WorkItemPoz, &we.Location, &we.Description, &we.Qty, &we.Unit); err != nil {
+		if err := rows.Scan(&we.ID, &we.WorkItemID, &we.WorkItemPoz, &we.Location, &we.Description, &we.Qty, &we.Unit, &we.Discipline); err != nil {
 			rows.Close()
 			return err
 		}

@@ -110,6 +110,13 @@ type SnapPendingPO struct {
 	Overdue      bool    `json:"overdue"`
 }
 
+// DisciplineSection — disipline göre haftalık ilerleme + sonraki hafta planı.
+type DisciplineSection struct {
+	Discipline   string   `json:"discipline"`
+	ThisWeek     []string `json:"this_week"`
+	NextWeekPlan []string `json:"next_week_plan,omitempty"`
+}
+
 type Snapshot struct {
 	GeneratedAt time.Time `json:"generated_at"`
 	ProjectName string    `json:"project_name"`
@@ -121,12 +128,15 @@ type Snapshot struct {
 	Days   []SnapDay  `json:"days"`
 	Totals SnapTotals `json:"totals"`
 
+	// Disiplin bazlı ilerleme bölümleri (work_entries'den otomatik türetilir).
+	DisciplineSections []DisciplineSection `json:"discipline_sections,omitempty"`
+
 	// Teslimat ve depo.
 	Deliveries []SnapDelivery  `json:"deliveries"`
 	Stock      []SnapStockItem `json:"stock"`
 
 	// Bekleyen aktiviteler.
-	PendingPayments []SnapPayment  `json:"pending_payments"`
+	PendingPayments []SnapPayment   `json:"pending_payments"`
 	PendingPOs      []SnapPendingPO `json:"pending_pos"`
 	OpenTasks       int             `json:"open_tasks"`
 	TasksDueWeek    int             `json:"tasks_due_this_week"`
@@ -215,6 +225,65 @@ func (h *Handler) buildSnapshot(ctx context.Context, pid uuid.UUID, start, end t
 				sn.Totals.EquipmentHours += *e.WorkingHours
 			}
 		}
+	}
+
+	// Disiplin bazlı ilerleme bölümleri: work_entries'i disipline göre grupla.
+	type aggKey struct{ disc, desc, loc, unit string }
+	type aggVal struct{ qty float64 }
+	agg := map[aggKey]*aggVal{}
+	discOrder := []string{} // kararlı sıra için
+	for _, sd := range sn.Days {
+		for _, we := range sd.WorkEntries {
+			disc := "İnşaat"
+			if we.Discipline != nil && *we.Discipline != "" {
+				disc = *we.Discipline
+			}
+			loc := ""
+			if we.Location != nil {
+				loc = *we.Location
+			}
+			unit := ""
+			if we.Unit != nil {
+				unit = *we.Unit
+			}
+			qty := 0.0
+			if we.Qty != nil {
+				qty = *we.Qty
+			}
+			k := aggKey{disc: disc, desc: we.Description, loc: loc, unit: unit}
+			if _, ok := agg[k]; !ok {
+				agg[k] = &aggVal{}
+				// disiplini sıralı listeye ekle (ilk görülen sırası)
+				found := false
+				for _, d := range discOrder {
+					if d == disc {
+						found = true
+						break
+					}
+				}
+				if !found {
+					discOrder = append(discOrder, disc)
+				}
+			}
+			agg[k].qty += qty
+		}
+	}
+	for _, disc := range discOrder {
+		sec := DisciplineSection{Discipline: disc, ThisWeek: []string{}}
+		for k, v := range agg {
+			if k.disc != disc {
+				continue
+			}
+			bullet := k.desc
+			if k.loc != "" {
+				bullet += " — " + k.loc
+			}
+			if v.qty > 0 && k.unit != "" {
+				bullet += fmt.Sprintf(" (%.1f %s toplam)", v.qty, k.unit)
+			}
+			sec.ThisWeek = append(sec.ThisWeek, bullet)
+		}
+		sn.DisciplineSections = append(sn.DisciplineSections, sec)
 	}
 
 	// Bekleyen hakediş statüleri (finansal TUTAR yok — view_financials ayrımı
@@ -404,7 +473,7 @@ func (h *Handler) ListWeekly(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{"weekly_reports": out})
 }
 
-// GetWeekly — snapshot dahil tekil kayıt (PDF doğrulaması için).
+// GetWeekly — snapshot + next_week_plans dahil tekil kayıt.
 func (h *Handler) GetWeekly(w http.ResponseWriter, r *http.Request) {
 	pid, ok := parseID(w, r, "projectID")
 	if !ok {
@@ -415,16 +484,17 @@ func (h *Handler) GetWeekly(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var d weeklyDTO
-	var snapshot json.RawMessage
+	var snapshot, nextWeekPlans json.RawMessage
 	err := h.pool.QueryRow(r.Context(), `
 		SELECT wr.id, wr.week_no, to_char(wr.period_start,'YYYY-MM-DD'),
 		       to_char(wr.period_end,'YYYY-MM-DD'), wr.status, wr.error,
-		       u.full_name, wr.generated_pdf_file_id IS NOT NULL, wr.created_at, wr.snapshot
+		       u.full_name, wr.generated_pdf_file_id IS NOT NULL, wr.created_at,
+		       wr.snapshot, wr.next_week_plans
 		FROM weekly_reports wr
 		JOIN users u ON u.id = wr.generated_by
 		WHERE wr.id=$1 AND wr.project_id=$2 AND wr.deleted_at IS NULL`, id, pid).
 		Scan(&d.ID, &d.WeekNo, &d.PeriodStart, &d.PeriodEnd, &d.Status, &d.Error,
-			&d.GeneratedBy, &d.HasPDF, &d.CreatedAt, &snapshot)
+			&d.GeneratedBy, &d.HasPDF, &d.CreatedAt, &snapshot, &nextWeekPlans)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Haftalık rapor bulunamadı.", nil)
 		return
@@ -434,8 +504,9 @@ func (h *Handler) GetWeekly(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{
-		"weekly_report": d,
-		"snapshot":      snapshot,
+		"weekly_report":   d,
+		"snapshot":        snapshot,
+		"next_week_plans": nextWeekPlans,
 	})
 }
 

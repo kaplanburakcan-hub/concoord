@@ -24,6 +24,14 @@ type SnapManpower  = { trade?: string; headcount: number; subcontractor_name?: s
 type SnapEquipment = { equipment_name: string; count: number; working_hours?: number };
 type SnapWorkEntry = { description: string; location?: string; qty?: number; unit?: string };
 
+type SnapDisciplineSection = {
+  discipline: string;
+  this_week: string[];
+  next_week_plan?: string[];
+};
+
+type SnapNextWeekPlan = { discipline: string; plans: string[] };
+
 type SnapDay = {
   date: string;
   revision_no?: number;
@@ -59,6 +67,7 @@ type Snapshot = {
   week_no: number; period_start: string; period_end: string;
   days: SnapDay[];
   totals: { days_reported: number; manpower_person_days: number; equipment_hours: number; work_entry_count: number };
+  discipline_sections?: SnapDisciplineSection[];
   deliveries: SnapDelivery[];
   stock: SnapStockItem[];
   pending_payments: SnapPayment[];
@@ -123,8 +132,17 @@ const th  = "text-left text-[10px] font-bold uppercase tracking-wider text-beton
 const td  = "py-2 pr-3 text-[12.5px] text-beton-100 border-b border-beton-800/60 align-middle";
 const tdM = "py-2 pr-3 text-[12.5px] text-beton-400 border-b border-beton-800/60 align-middle";
 
-function SnapshotView({ sn, reportId, pid, hasPdf }: {
+const DISC_COLORS: Record<string, string> = {
+  "İnşaat":  "#3b82f6",
+  "Elektrik":"#f59e0b",
+  "Mekanik": "#22c55e",
+  "İSG":     "#f87171",
+};
+function discColor(d: string) { return DISC_COLORS[d] ?? "#6b7280"; }
+
+function SnapshotView({ sn, reportId, pid, hasPdf, nextWeekPlans }: {
   sn: Snapshot; reportId: string; pid: string; hasPdf: boolean;
+  nextWeekPlans: SnapNextWeekPlan[];
 }) {
   const days            = sn.days            ?? [];
   const deliveries      = sn.deliveries      ?? [];
@@ -381,6 +399,60 @@ function SnapshotView({ sn, reportId, pid, hasPdf }: {
         </div>
       )}
 
+      {/* Disiplin İlerleme Bölümleri */}
+      {(() => {
+        // snapshot'taki discipline_sections ile next_week_plans'ı birleştir
+        const sections = sn.discipline_sections ?? [];
+        const planMap = new Map(nextWeekPlans.map((p) => [p.discipline, p.plans]));
+        if (sections.length === 0) return null;
+        return (
+          <>
+            {sections.map((sec) => {
+              const plans = planMap.get(sec.discipline) ?? sec.next_week_plan ?? [];
+              return (
+                <div key={sec.discipline} className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+                  <SecHeader color={discColor(sec.discipline)} title={`${sec.discipline} İlerleme`} />
+                  <div className="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-beton-800">
+                    {/* Bu hafta */}
+                    <div className="px-4 py-3">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-beton-500 mb-2">
+                        Haftalık İlerleme
+                      </p>
+                      <ul className="space-y-1.5">
+                        {sec.this_week.map((item, i) => (
+                          <li key={i} className="flex items-start gap-2 text-[12.5px] text-beton-200">
+                            <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: discColor(sec.discipline) }} />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    {/* Sonraki hafta */}
+                    <div className="px-4 py-3">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-beton-500 mb-2">
+                        Sonraki Hafta Planlaması
+                      </p>
+                      {plans.length > 0 ? (
+                        <ul className="space-y-1.5">
+                          {plans.map((item, i) => (
+                            <li key={i} className="flex items-start gap-2 text-[12.5px] text-beton-400">
+                              <span className="mt-1.5 w-1 h-1 rounded-full bg-beton-600 shrink-0" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-[11px] text-beton-600 italic">Plan girilmemiş.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        );
+      })()}
+
       {/* İSG Notu */}
       {sn.ohs_note && (
         <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
@@ -559,11 +631,12 @@ export default function WeeklyReportsPage() {
   const { can }     = useAuth();
   const pid         = current?.id;
 
-  const [reports,     setReports]     = useState<WeeklyReport[]>([]);
-  const [err,         setErr]         = useState<string | null>(null);
-  const [expanded,    setExpanded]    = useState<string | null>(null);
-  const [snapshots,   setSnapshots]   = useState<Record<string, Snapshot>>({});
-  const [loadingSnap, setLoadingSnap] = useState<string | null>(null);
+  const [reports,      setReports]      = useState<WeeklyReport[]>([]);
+  const [err,          setErr]          = useState<string | null>(null);
+  const [expanded,     setExpanded]     = useState<string | null>(null);
+  const [snapshots,    setSnapshots]    = useState<Record<string, Snapshot>>({});
+  const [nwPlans,      setNwPlans]      = useState<Record<string, SnapNextWeekPlan[]>>({});
+  const [loadingSnap,  setLoadingSnap]  = useState<string | null>(null);
   const [generating,  setGenerating]  = useState(false);
   const [genWeek,     setGenWeek]     = useState(() => fmtISO(mondayOf(new Date())));
   const [showGen,     setShowGen]     = useState(false);
@@ -589,11 +662,12 @@ export default function WeeklyReportsPage() {
     if (snapshots[id]) return;
     setLoadingSnap(id);
     try {
-      const res = await api<{ snapshot: Snapshot }>(
+      const res = await api<{ snapshot: Snapshot; next_week_plans: SnapNextWeekPlan[] }>(
         `/projects/${pid}/weekly-reports/${id}`,
         { projectId: pid! }
       );
       setSnapshots((prev) => ({ ...prev, [id]: res.snapshot }));
+      setNwPlans((prev) => ({ ...prev, [id]: res.next_week_plans ?? [] }));
     } catch {
       // sessiz hata — "Veri yüklenemedi." gösterilir
     } finally {
@@ -614,11 +688,12 @@ export default function WeeklyReportsPage() {
       setExpanded(res.id);
       setShowGen(false);
       try {
-        const snap = await api<{ snapshot: Snapshot }>(
+        const snap = await api<{ snapshot: Snapshot; next_week_plans: SnapNextWeekPlan[] }>(
           `/projects/${pid}/weekly-reports/${res.id}`,
           { projectId: pid }
         );
         setSnapshots((prev) => ({ ...prev, [res.id]: snap.snapshot }));
+        setNwPlans((prev) => ({ ...prev, [res.id]: snap.next_week_plans ?? [] }));
       } catch { /* sessiz — "Veri yüklenemedi." görünür */ }
     } catch {
       setErr("Rapor oluşturulamadı.");
@@ -747,7 +822,8 @@ export default function WeeklyReportsPage() {
                     {loadingSnap === r.id ? (
                       <p className="text-sm text-beton-500 py-3">Yükleniyor…</p>
                     ) : sn ? (
-                      <SnapshotView sn={sn} reportId={r.id} pid={pid} hasPdf={r.has_pdf} />
+                      <SnapshotView sn={sn} reportId={r.id} pid={pid} hasPdf={r.has_pdf}
+                        nextWeekPlans={nwPlans[r.id] ?? []} />
                     ) : (
                       <p className="text-sm text-beton-500 py-3">Veri yüklenemedi.</p>
                     )}
