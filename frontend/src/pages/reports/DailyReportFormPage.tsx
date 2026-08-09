@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, apiFetchBlob, RequestError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../../projects/ProjectContext";
@@ -443,6 +443,15 @@ export default function DailyReportFormPage() {
                     );
                   })}
                 </select>
+                {machines.length === 0 && !readOnly && canEdit && (
+                  <p className="mt-1 text-[11px] text-beton-500">
+                    Bu projede tanımlı araç/ekipman yok.{" "}
+                    <Link to="/makine/ekipmanlar" target="_blank" className="text-emniyet-500 hover:underline">
+                      Makine & Ekipman'dan tanımlayın
+                    </Link>
+                    .
+                  </p>
+                )}
               </div>
               <div>
                 <label className={label}>Adet</label>
