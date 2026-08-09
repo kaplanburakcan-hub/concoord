@@ -98,3 +98,26 @@ body .text-beton-950 { color: #fff !important; }
 [data-theme="light"] .text-emerald-400 { color: #15803d !important; }
 [data-theme="light"] .text-sky-300,
 [data-theme="light"] .text-sky-400   { color: #0369a1 !important; }
+
+/* ============================================================
+   Yazdırma şablonu — rapor sayfaları (günlük/haftalık) için.
+   `.no-print` işaretli öğeler (kenar çubuğu, üst bar, butonlar,
+   form alanları) gizlenir; kart yüzeyleri koyu temadan bağımsız
+   olarak beyaz kağıda uygun düz siyah/beyaza döner.
+   ============================================================ */
+@media print {
+  .no-print { display: none !important; }
+  html, body, .app-canvas { background: #fff !important; }
+  main { padding: 0 !important; max-width: 100% !important; }
+  * { box-shadow: none !important; }
+  [class*="bg-beton-9"], [class*="bg-beton-8"], [class*="bg-beton-950"] {
+    background: #fff !important;
+  }
+  [class*="border-beton-"] { border-color: #bbb !important; }
+  [class*="text-beton-"], [class*="text-white"], h1, h2 { color: #111 !important; }
+  a { color: #111 !important; text-decoration: none !important; }
+  table { border-collapse: collapse; width: 100% !important; }
+  th, td { border-bottom: 1px solid #ccc !important; }
+  .rounded-lg, .rounded-md { break-inside: avoid; }
+  @page { size: A4; margin: 14mm; }
+}

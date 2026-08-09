@@ -764,17 +764,25 @@ function SnapshotView({ sn, reportId, pid, hasPdf, nextWeekPlans }: {
         </div>
       )}
 
-      {/* PDF indir */}
-      {hasPdf && (
-        <a
-          href={`/api/projects/${pid}/weekly-reports/${reportId}/download`}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center justify-center gap-2 rounded-lg border border-beton-700 bg-beton-900 px-4 py-2.5 text-sm text-beton-200 hover:border-emniyet-500 hover:text-white transition-colors"
+      {/* Yazdır / PDF indir */}
+      <div className="no-print flex gap-2">
+        <button
+          onClick={() => window.print()}
+          className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-beton-700 bg-beton-900 px-4 py-2.5 text-sm text-beton-200 hover:border-emniyet-500 hover:text-white transition-colors"
         >
-          PDF İndir
-        </a>
-      )}
+          Yazdır
+        </button>
+        {hasPdf && (
+          <a
+            href={`/api/projects/${pid}/weekly-reports/${reportId}/download`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-beton-700 bg-beton-900 px-4 py-2.5 text-sm text-beton-200 hover:border-emniyet-500 hover:text-white transition-colors"
+          >
+            PDF İndir
+          </a>
+        )}
+      </div>
     </div>
   );
 }
@@ -871,7 +879,7 @@ export default function WeeklyReportsPage() {
             Günlük raporlar, teslimatlar ve depo verilerinden otomatik derlenen haftalık özetler.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="no-print flex items-center gap-2">
           {can("reports.generate_weekly") && (
             <button
               onClick={() => setShowGen((v) => !v)}

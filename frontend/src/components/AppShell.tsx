@@ -183,7 +183,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen grid grid-cols-1 md:grid-cols-[250px_1fr]">
       <aside
-        className="hidden md:flex flex-col sticky top-0 h-screen border-r"
+        className="no-print hidden md:flex flex-col sticky top-0 h-screen border-r"
         style={{ background: "var(--chrome)", color: "var(--chrome-text)", borderColor: "var(--chrome-border)" }}
       >
         <Link
@@ -250,7 +250,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex flex-col min-w-0 app-canvas">
         <header
-          className="h-16 flex items-center gap-3 px-5 sticky top-0 z-10 border-b"
+          className="no-print h-16 flex items-center gap-3 px-5 sticky top-0 z-10 border-b"
           style={{ background: "var(--chrome)", color: "var(--chrome-text)", borderColor: "var(--chrome-border)" }}
         >
           <span className="md:hidden text-white font-medium tracking-wide">ConCoord</span>

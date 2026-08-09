@@ -313,18 +313,34 @@ export default function DailyReportFormPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4 pb-24">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="font-display font-extrabold text-xl text-white">
-          {isNew ? "Yeni Günlük Rapor" : `Günlük Rapor — ${formatDateTR(reportDate)}`}
-          {detail && detail.revision_no > 1 && (
-            <span className="ml-2 text-sm text-emniyet-500">rev {detail.revision_no}</span>
-          )}
-        </h1>
-        {detail && (
-          <span className={`rounded-full border px-2 py-0.5 text-xs ${DR_STATUS_STYLE[detail.status]}`}>
-            {DR_STATUS_LABEL[detail.status]}
-          </span>
-        )}
+      <div className="rounded-lg border border-beton-800 bg-beton-900 p-4">
+        <div className="flex gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <h1 className="font-display font-extrabold text-xl text-white">
+                {isNew ? "Yeni Günlük Rapor" : `Günlük Rapor — ${formatDateTR(reportDate)}`}
+                {detail && detail.revision_no > 1 && (
+                  <span className="ml-2 text-sm text-emniyet-500">rev {detail.revision_no}</span>
+                )}
+              </h1>
+              <div className="flex items-center gap-2">
+                {detail && (
+                  <button onClick={() => window.print()}
+                    className="no-print rounded-md border border-beton-700 px-2.5 py-1 text-xs text-beton-300 hover:border-emniyet-500 transition-colors">
+                    Yazdır
+                  </button>
+                )}
+                {detail && (
+                  <span className={`rounded-full border px-2 py-0.5 text-xs ${DR_STATUS_STYLE[detail.status]}`}>
+                    {DR_STATUS_LABEL[detail.status]}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <CoverPhotoBox pid={pid} reportId={detail?.id} coverPhotoFileId={detail?.cover_photo_file_id}
+            canEdit={canEdit} onUploaded={load} />
+        </div>
       </div>
 
       {err && <p className="text-red-400 text-sm">{err}</p>}
@@ -620,7 +636,7 @@ export default function DailyReportFormPage() {
       )}
 
       {/* Aksiyon çubuğu (mobilde alta sabit) */}
-      <div className="fixed bottom-0 inset-x-0 border-t border-beton-800 bg-beton-900/95 backdrop-blur p-3">
+      <div className="no-print fixed bottom-0 inset-x-0 border-t border-beton-800 bg-beton-900/95 backdrop-blur p-3">
         <div className="max-w-2xl mx-auto flex gap-2">
           {!readOnly && canEdit && (
             <button onClick={save} disabled={busy}
@@ -648,6 +664,96 @@ export default function DailyReportFormPage() {
 
 function upd<T>(arr: T[], i: number, patch: Partial<T>): T[] {
   return arr.map((x, j) => (j === i ? { ...x, ...patch } : x));
+}
+
+// Kapak fotoğrafı — taslak (kaydedilmiş) ve gönderilmiş raporda aynı kutu.
+// reportId yoksa (yeni, henüz kaydedilmemiş taslak) yükleme devre dışıdır.
+function CoverPhotoBox({ pid, reportId, coverPhotoFileId, canEdit, onUploaded }: {
+  pid?: string;
+  reportId?: string;
+  coverPhotoFileId?: string;
+  canEdit: boolean;
+  onUploaded?: () => void;
+}) {
+  const [photoSrc, setPhotoSrc] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoErr, setPhotoErr] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const prevFileID = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!pid || !reportId || !coverPhotoFileId) { setPhotoSrc(null); return; }
+    if (coverPhotoFileId === prevFileID.current) return;
+    prevFileID.current = coverPhotoFileId;
+    apiFetchBlob(`/projects/${pid}/daily-reports/${reportId}/cover-photo`)
+      .then(setPhotoSrc)
+      .catch(() => setPhotoSrc(null));
+  }, [pid, reportId, coverPhotoFileId]);
+
+  async function handlePhotoFile(file: File) {
+    if (!pid || !reportId) return;
+    if (file.size > 8 * 1024 * 1024) { setPhotoErr("Fotoğraf 8 MB sınırını aşıyor."); return; }
+    setPhotoUploading(true);
+    setPhotoErr(null);
+    try {
+      const dataUrl = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result as string);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      await api(`/projects/${pid}/daily-reports/${reportId}/cover-photo`, {
+        method: "POST",
+        body: { photo: dataUrl },
+        projectId: pid,
+      });
+      setPhotoSrc(dataUrl);
+      onUploaded?.();
+    } catch {
+      setPhotoErr("Fotoğraf yüklenemedi.");
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
+  const clickable = canEdit && !!reportId && !photoUploading;
+
+  return (
+    <div className="shrink-0">
+      <div
+        className={`relative rounded-md overflow-hidden border border-dashed border-beton-700 bg-beton-950 flex flex-col items-center justify-center gap-1 transition-colors ${clickable ? "cursor-pointer hover:border-emniyet-500" : ""}`}
+        style={{ width: "120px", height: "192px" }}
+        onClick={() => clickable && fileRef.current?.click()}
+        title={!reportId ? "Fotoğraf eklemeden önce taslağı kaydedin" : canEdit ? "Fotoğraf ekle / değiştir" : "Kapak fotoğrafı"}
+      >
+        {photoSrc ? (
+          <img src={photoSrc} alt="Kapak fotoğrafı" className="w-full h-full object-cover" />
+        ) : (
+          <>
+            <span className="text-2xl text-beton-600">📷</span>
+            {canEdit && (
+              <span className="text-[10px] text-beton-500 text-center px-1 leading-tight">
+                {photoUploading ? "Yükleniyor..." : reportId ? "Fotoğraf ekle" : "Önce kaydedin"}
+              </span>
+            )}
+          </>
+        )}
+        {canEdit && photoSrc && reportId && (
+          <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+            <span className="text-[11px] text-white font-medium">Değiştir</span>
+          </div>
+        )}
+      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden no-print"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = ""; }}
+      />
+      {photoErr && <p className="mt-1.5 text-xs text-red-400 max-w-[120px]">{photoErr}</p>}
+    </div>
+  );
 }
 
 // ── Read-only card view (Submitted reports) ────────────────────────────────
@@ -717,47 +823,6 @@ function ReadOnlyView({
     } catch { return []; }
   })();
 
-  // Kapak fotoğrafı
-  const [photoSrc, setPhotoSrc] = useState<string | null>(null);
-  const [photoUploading, setPhotoUploading] = useState(false);
-  const [photoErr, setPhotoErr] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const prevFileID = useRef<string | undefined>(undefined);
-
-  useEffect(() => {
-    if (!pid || !detail.cover_photo_file_id) { setPhotoSrc(null); return; }
-    if (detail.cover_photo_file_id === prevFileID.current) return;
-    prevFileID.current = detail.cover_photo_file_id;
-    apiFetchBlob(`/projects/${pid}/daily-reports/${detail.id}/cover-photo`)
-      .then(setPhotoSrc)
-      .catch(() => setPhotoSrc(null));
-  }, [pid, detail.id, detail.cover_photo_file_id]);
-
-  async function handlePhotoFile(file: File) {
-    if (file.size > 8 * 1024 * 1024) { setPhotoErr("Fotoğraf 8 MB sınırını aşıyor."); return; }
-    setPhotoUploading(true);
-    setPhotoErr(null);
-    try {
-      const dataUrl = await new Promise<string>((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(r.result as string);
-        r.onerror = rej;
-        r.readAsDataURL(file);
-      });
-      await api(`/projects/${pid}/daily-reports/${detail.id}/cover-photo`, {
-        method: "POST",
-        body: { photo: dataUrl },
-        projectId: pid,
-      });
-      // Blob URL'yi hemen güncelle (sayfa yenilemeye gerek yok)
-      setPhotoSrc(dataUrl);
-    } catch {
-      setPhotoErr("Fotoğraf yüklenemedi.");
-    } finally {
-      setPhotoUploading(false);
-    }
-  }
-
   return (
     <div className="max-w-3xl mx-auto pb-24 space-y-3">
 
@@ -776,9 +841,15 @@ function ReadOnlyView({
                 </h1>
                 <p className="text-sm text-beton-400 mt-0.5">{formatDateTR(detail.report_date)}</p>
               </div>
-              <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${DR_STATUS_STYLE[detail.status]}`}>
-                {DR_STATUS_LABEL[detail.status]}
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={() => window.print()}
+                  className="no-print rounded-md border border-beton-700 px-2.5 py-1 text-xs text-beton-300 hover:border-emniyet-500 transition-colors">
+                  Yazdır
+                </button>
+                <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${DR_STATUS_STYLE[detail.status]}`}>
+                  {DR_STATUS_LABEL[detail.status]}
+                </span>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-x-5 gap-y-1.5">
@@ -828,39 +899,8 @@ function ReadOnlyView({
           </div>
 
           {/* Sağ: kapak fotoğrafı (5cm × 8cm ≈ w-[120px] h-[192px]) */}
-          <div
-            className="shrink-0 relative rounded-md overflow-hidden border border-dashed border-beton-700 bg-beton-950 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-emniyet-500 transition-colors"
-            style={{ width: "120px", height: "192px" }}
-            onClick={() => canEdit && !photoUploading && fileRef.current?.click()}
-            title={canEdit ? "Fotoğraf ekle / değiştir" : "Kapak fotoğrafı"}
-          >
-            {photoSrc ? (
-              <img src={photoSrc} alt="Kapak fotoğrafı" className="w-full h-full object-cover" />
-            ) : (
-              <>
-                <span className="text-2xl text-beton-600">📷</span>
-                {canEdit && (
-                  <span className="text-[10px] text-beton-500 text-center px-1 leading-tight">
-                    {photoUploading ? "Yükleniyor..." : "Fotoğraf ekle"}
-                  </span>
-                )}
-              </>
-            )}
-            {canEdit && photoSrc && (
-              <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-                <span className="text-[11px] text-white font-medium">Değiştir</span>
-              </div>
-            )}
-          </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = ""; }}
-          />
+          <CoverPhotoBox pid={pid} reportId={detail.id} coverPhotoFileId={detail.cover_photo_file_id} canEdit={canEdit} />
         </div>
-        {photoErr && <p className="mt-1.5 text-xs text-red-400">{photoErr}</p>}
       </div>
 
       {err && <p className="text-red-400 text-sm">{err}</p>}
@@ -1079,7 +1119,7 @@ function ReadOnlyView({
       )}
 
       {/* Action bar */}
-      <div className="fixed bottom-0 inset-x-0 border-t border-beton-800 bg-beton-900/95 backdrop-blur p-3">
+      <div className="no-print fixed bottom-0 inset-x-0 border-t border-beton-800 bg-beton-900/95 backdrop-blur p-3">
         <div className="max-w-3xl mx-auto flex gap-2">
           <p className="flex-1 text-xs text-beton-500 self-center">
             Gönderilmiş rapor değiştirilemez. Düzeltme gerekiyorsa yeni revizyon açın.
