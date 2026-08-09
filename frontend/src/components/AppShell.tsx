@@ -79,7 +79,7 @@ const GROUPS: NavGroup[] = [
       { to: "/malzeme-onaylari", label: "Malzeme Onayları", perm: "material_approvals.view", icon: I.malzeme },
       { to: "/proje/ilerleme-raporlari", label: "Proje İzleme Raporları", perm: "reports.view", icon: I.rapor },
       { to: "/aylik-raporlar/imalat", label: "İmalat Raporları", perm: "reports.view_financial_reports", icon: I.aylik },
-      { to: "/proje/personel", label: "Personel Yönetimi", perm: "reports.view", icon: I.personel },
+      { to: "/proje/personel", label: "Personel Yönetimi", perm: "reports.view", icon: I.personel, end: true },
     ],
   },
   {
@@ -95,7 +95,7 @@ const GROUPS: NavGroup[] = [
   {
     title: "Saha",
     items: [
-      { to: "/saha-raporlari", label: "Günlük Rapor Girişi", perm: "reports.view", icon: I.saha },
+      { to: "/saha-raporlari", label: "Günlük Rapor Girişi", perm: "reports.view", icon: I.saha, end: true },
       { to: "/saha-raporlari/haftalik", label: "Haftalık Raporlar", perm: "reports.view", icon: I.rapor },
       { to: "/saha/tutanaklar", label: "Saha Tutanakları", perm: "reports.view", icon: I.rapor },
       { to: "/proje/personel-puantaj", label: "Personel & Puantaj Girişi", perm: "reports.view", icon: I.puantaj },
