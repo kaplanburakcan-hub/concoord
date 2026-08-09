@@ -72,32 +72,38 @@ body {
   background-size: 22px 22px;
 }
 
-/* --- Güvenlik geçişleri (35 sayfayı elle değiştirmeden) --- */
-/* Accent üstündeki metin her iki temada da beyaz (emniyet artık azure). */
-body .text-beton-950 { color: #fff !important; }
-/* İçerikteki text-white başlıkları açık temada koyu mürekkebe döner
-   (chrome/sidebar <main> dışında olduğundan beyaz kalır). */
-[data-theme="light"] main .text-white { color: rgb(15 32 54) !important; }
+/* --- Güvenlik geçişleri (35 sayfayı elle değiştirmeden) ---
+   @layer utilities içine alınır: Tailwind v3 CSS Cascade Layers kullanır
+   (@tailwind base/components/utilities), ve katmansız (unlayered) important
+   kurallar katmanlı important kurallara göre daha DÜŞÜK önceliğe sahiptir —
+   bu blok katmansız kalırsa aşağıdaki override'lar sessizce kaybedebilir. */
+@layer utilities {
+  /* Accent üstündeki metin her iki temada da beyaz (emniyet artık azure). */
+  body .text-beton-950 { color: #fff !important; }
+  /* İçerikteki text-white başlıkları açık temada koyu mürekkebe döner
+     (chrome/sidebar <main> dışında olduğundan beyaz kalır). */
+  [data-theme="light"] main .text-white { color: rgb(15 32 54) !important; }
 
-/* --- Durum renkleri: light modda kontrast düzeltmesi ---
-   Sayfalarda kullanılan semantik tonlar (red-400/300, green-300, blue-300…)
-   koyu zemin için seçilmişti; beyaz/pastel yüzeyde okunmuyorlardı. Açık temada
-   bir-iki kademe koyu karşılıklarına çevrilir. Yarı saydam dolgu tonları
-   (bg-red-500/15 gibi) olduğu gibi kalır — zaten hafif ve iki temada da çalışır. */
-[data-theme="light"] .text-red-300,
-[data-theme="light"] .text-red-400   { color: #dc2626 !important; }
-[data-theme="light"] .text-green-300,
-[data-theme="light"] .text-green-400 { color: #15803d !important; }
-[data-theme="light"] .text-blue-300,
-[data-theme="light"] .text-blue-400  { color: #1d4ed8 !important; }
-[data-theme="light"] .text-amber-300,
-[data-theme="light"] .text-amber-400,
-[data-theme="light"] .text-yellow-300,
-[data-theme="light"] .text-yellow-400 { color: #b45309 !important; }
-[data-theme="light"] .text-emerald-300,
-[data-theme="light"] .text-emerald-400 { color: #15803d !important; }
-[data-theme="light"] .text-sky-300,
-[data-theme="light"] .text-sky-400   { color: #0369a1 !important; }
+  /* --- Durum renkleri: light modda kontrast düzeltmesi ---
+     Sayfalarda kullanılan semantik tonlar (red-400/300, green-300, blue-300…)
+     koyu zemin için seçilmişti; beyaz/pastel yüzeyde okunmuyorlardı. Açık temada
+     bir-iki kademe koyu karşılıklarına çevrilir. Yarı saydam dolgu tonları
+     (bg-red-500/15 gibi) olduğu gibi kalır — zaten hafif ve iki temada da çalışır. */
+  [data-theme="light"] .text-red-300,
+  [data-theme="light"] .text-red-400   { color: #dc2626 !important; }
+  [data-theme="light"] .text-green-300,
+  [data-theme="light"] .text-green-400 { color: #15803d !important; }
+  [data-theme="light"] .text-blue-300,
+  [data-theme="light"] .text-blue-400  { color: #1d4ed8 !important; }
+  [data-theme="light"] .text-amber-300,
+  [data-theme="light"] .text-amber-400,
+  [data-theme="light"] .text-yellow-300,
+  [data-theme="light"] .text-yellow-400 { color: #b45309 !important; }
+  [data-theme="light"] .text-emerald-300,
+  [data-theme="light"] .text-emerald-400 { color: #15803d !important; }
+  [data-theme="light"] .text-sky-300,
+  [data-theme="light"] .text-sky-400   { color: #0369a1 !important; }
+}
 
 /* ============================================================
    Yazdırma şablonu — rapor sayfaları (günlük/haftalık) için.

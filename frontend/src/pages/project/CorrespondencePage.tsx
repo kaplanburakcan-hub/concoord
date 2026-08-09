@@ -44,6 +44,14 @@ const DURUM_STYLE: Record<string, string> = {
   "Kapalı": "bg-beton-800 text-beton-300 border-beton-700",
   "Bilgi Amaçlı": "bg-blue-500/15 text-blue-300 border-blue-500/40",
 };
+const KATEGORI_STYLE: Record<string, string> = {
+  "Genel": "bg-beton-800 text-beton-300 border-beton-700",
+  "Teknik": "bg-blue-500/15 text-blue-300 border-blue-500/40",
+  "İdari": "bg-purple-500/15 text-purple-300 border-purple-500/40",
+  "Mali": "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+  "İSG": "bg-red-500/15 text-red-300 border-red-500/40",
+  "Onay Talebi": "bg-amber-500/15 text-amber-300 border-amber-500/40",
+};
 
 function fmtTR(iso?: string) {
   if (!iso) return "—";
@@ -301,21 +309,39 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
       </div>
 
       {/* Filtreler */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="rounded-lg border border-beton-800 bg-beton-900 p-3 space-y-2.5">
         <input
-          className={`${input} w-56`}
+          className={`${input} max-w-sm`}
           placeholder="Konu, kurum, evrak no ara…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select className={`${input} w-40`} value={filterDurum} onChange={(e) => setFilterDurum(e.target.value)}>
-          <option value="">Tüm Durumlar</option>
-          {DURUMLAR.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
-        <select className={`${input} w-40`} value={filterKategori} onChange={(e) => setFilterKategori(e.target.value)}>
-          <option value="">Tüm Kategoriler</option>
-          {KATEGORILER.map((k) => <option key={k} value={k}>{k}</option>)}
-        </select>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mr-1">Durum</span>
+          <button onClick={() => setFilterDurum("")}
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterDurum === "" ? "bg-emniyet-500 border-emniyet-500 text-beton-950" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}>
+            Tümü
+          </button>
+          {DURUMLAR.map((d) => (
+            <button key={d} onClick={() => setFilterDurum(filterDurum === d ? "" : d)}
+              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterDurum === d ? DURUM_STYLE[d] : "border-beton-700 text-beton-500 hover:border-beton-500"}`}>
+              {d}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mr-1">Kategori</span>
+          <button onClick={() => setFilterKategori("")}
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterKategori === "" ? "bg-emniyet-500 border-emniyet-500 text-beton-950" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}>
+            Tümü
+          </button>
+          {KATEGORILER.map((k) => (
+            <button key={k} onClick={() => setFilterKategori(filterKategori === k ? "" : k)}
+              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterKategori === k ? KATEGORI_STYLE[k] : "border-beton-700 text-beton-500 hover:border-beton-500"}`}>
+              {k}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Liste */}
