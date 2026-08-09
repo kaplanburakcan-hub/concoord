@@ -7,5 +7,6 @@ BEGIN
   DELETE FROM daily_reports
   WHERE project_id = v_proj
     AND report_date BETWEEN '2026-07-27' AND '2026-08-09'
-    AND revision_no = 1;
+    AND revision_no = 1
+    AND status = 'Draft';
 END $$;
