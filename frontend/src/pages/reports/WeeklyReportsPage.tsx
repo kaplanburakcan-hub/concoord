@@ -138,6 +138,45 @@ function SnapshotView({ sn, reportId, pid, hasPdf }: {
     (sn.pending_mars > 0 ? 1 : 0) +
     (sn.open_tasks > 0 ? 1 : 0);
 
+  // ── Haftalık aggregation ──────────────────────────────────────────────────
+  const manpowerAgg = new Map<string, number>();
+  days.forEach((d) =>
+    (d.manpower ?? []).forEach((m) => {
+      const key = m.trade ?? "Genel";
+      manpowerAgg.set(key, (manpowerAgg.get(key) ?? 0) + m.headcount);
+    })
+  );
+
+  const equipAgg = new Map<string, { hours: number; days: number }>();
+  days.forEach((d) =>
+    (d.equipment ?? []).forEach((e) => {
+      const prev = equipAgg.get(e.equipment_name) ?? { hours: 0, days: 0 };
+      equipAgg.set(e.equipment_name, {
+        hours: prev.hours + (e.working_hours ?? 0),
+        days:  prev.days  + 1,
+      });
+    })
+  );
+
+  // work entries: group by description, sum qty (assume same unit per description)
+  const workAgg = new Map<string, { qty: number; unit: string; locations: string[] }>();
+  days.forEach((d) =>
+    (d.work_entries ?? []).forEach((w) => {
+      const prev = workAgg.get(w.description);
+      if (prev) {
+        prev.qty += w.qty ?? 0;
+        if (w.location && !prev.locations.includes(w.location))
+          prev.locations.push(w.location);
+      } else {
+        workAgg.set(w.description, {
+          qty: w.qty ?? 0,
+          unit: w.unit ?? "",
+          locations: w.location ? [w.location] : [],
+        });
+      }
+    })
+  );
+
   return (
     <div className="space-y-3 pt-1">
 
@@ -155,6 +194,49 @@ function SnapshotView({ sn, reportId, pid, hasPdf }: {
           </div>
         ))}
       </div>
+
+      {/* Günlük personel bar */}
+      {days.length > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <div className="overflow-x-auto">
+            <div className="flex min-w-max divide-x divide-beton-800">
+              {days.map((d) => {
+                const dayNames: Record<string, string> = {
+                  "1": "PZT", "2": "SAL", "3": "ÇAR", "4": "PER",
+                  "5": "CUM", "6": "CTS", "0": "PAZ",
+                };
+                const dayKey = String(new Date(d.date).getDay());
+                const dayLabel = dayNames[dayKey] ?? "";
+                const isToday = d.date === new Date().toISOString().slice(0, 10);
+                const hasData = d.manpower_total > 0;
+                return (
+                  <div
+                    key={d.date}
+                    className={`flex-1 min-w-[80px] px-3 py-3 text-center transition-colors ${
+                      isToday
+                        ? "bg-emniyet-500/10 border-b-2 border-b-emniyet-500"
+                        : "hover:bg-beton-800/30"
+                    }`}
+                  >
+                    <div className={`text-[10px] font-bold uppercase tracking-widest mb-0.5 ${
+                      isToday ? "text-emniyet-400" : "text-beton-500"
+                    }`}>{dayLabel}</div>
+                    <div className="text-[11px] text-beton-500 tabular-nums mb-2">
+                      {fmtTR(d.date).slice(0, 5)}
+                    </div>
+                    <div className={`text-2xl font-bold tabular-nums leading-none ${
+                      !hasData ? "text-beton-700" : isToday ? "text-white" : "text-beton-100"
+                    }`}>
+                      {hasData ? d.manpower_total : "—"}
+                    </div>
+                    <div className="text-[9px] uppercase tracking-wider text-beton-600 mt-1">kişi</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Günlük özet tablosu */}
       {days.length > 0 && (
@@ -199,6 +281,111 @@ function SnapshotView({ sn, reportId, pid, hasPdf }: {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Personel Dökümü */}
+      {manpowerAgg.size > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#a78bfa" title="Personel Dökümü (Haftalık)" />
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className={`${th} pl-4`}>Meslek / Unvan</th>
+                  <th className={`${th} text-right pr-4`}>Adam-Gün</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...manpowerAgg.entries()].map(([trade, total]) => (
+                  <tr key={trade} className="hover:bg-beton-800/30 transition-colors">
+                    <td className={`${td} pl-4`}>{trade}</td>
+                    <td className={`${td} text-right tabular-nums font-semibold pr-4`}>{total}</td>
+                  </tr>
+                ))}
+                <tr className="bg-beton-800/20">
+                  <td className={`${td} pl-4 font-bold text-beton-100`}>Toplam</td>
+                  <td className={`${td} text-right tabular-nums font-bold text-white pr-4`}>
+                    {sn.totals.manpower_person_days}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* İmalat Kalemleri */}
+      {workAgg.size > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#34d399" title="Haftalık İmalat Kalemleri" />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[460px]">
+              <thead>
+                <tr>
+                  <th className={`${th} pl-4`}>İş Kalemi</th>
+                  <th className={th}>Konum</th>
+                  <th className={`${th} text-right`}>Miktar</th>
+                  <th className={`${th} pr-4`}>Birim</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...workAgg.entries()].map(([desc, { qty, unit, locations }]) => (
+                  <tr key={desc} className="hover:bg-beton-800/30 transition-colors">
+                    <td className={`${td} pl-4`}>{desc}</td>
+                    <td className={tdM}>{locations.join(", ") || "—"}</td>
+                    <td className={`${td} text-right tabular-nums font-semibold`}>
+                      {qty > 0 ? qty.toLocaleString("tr-TR", { maximumFractionDigits: 3 }) : "—"}
+                    </td>
+                    <td className={`${tdM} pr-4`}>{unit || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Ekipman Kullanımı */}
+      {equipAgg.size > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#fb923c" title="Ekipman Kullanımı (Haftalık)" />
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className={`${th} pl-4`}>Ekipman</th>
+                  <th className={`${th} text-right`}>Gün</th>
+                  <th className={`${th} text-right pr-4`}>Toplam (sa)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...equipAgg.entries()].map(([name, { hours, days: dCnt }]) => (
+                  <tr key={name} className="hover:bg-beton-800/30 transition-colors">
+                    <td className={`${td} pl-4`}>{name}</td>
+                    <td className={`${td} text-right tabular-nums`}>{dCnt}</td>
+                    <td className={`${td} text-right tabular-nums font-semibold pr-4`}>
+                      {hours.toFixed(1)}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="bg-beton-800/20">
+                  <td className={`${td} pl-4 font-bold text-beton-100`} colSpan={2}>Toplam</td>
+                  <td className={`${td} text-right tabular-nums font-bold text-white pr-4`}>
+                    {sn.totals.equipment_hours.toFixed(1)} sa
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* İSG Notu */}
+      {sn.ohs_note && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#f87171" title="İSG / Güvenlik Notu" />
+          <p className="px-4 py-3 text-[12.5px] text-beton-300 leading-relaxed">{sn.ohs_note}</p>
         </div>
       )}
 
