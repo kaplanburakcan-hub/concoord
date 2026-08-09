@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 
@@ -249,8 +249,8 @@ export default function MachinePage({
   const kpiDevre   = machines.filter(m => m.durum === "devre_disi").length;
   const kpiKiralik = machines.filter(m => m.sahiplik === "kiralik").length;
 
-  if (!pid) return <div className="p-8 text-[var(--text-muted)]">Proje seçilmedi.</div>;
-  if (busy)  return <div className="p-8 text-[var(--text-muted)]">Yükleniyor…</div>;
+  if (!pid) return <div className="p-8 text-beton-400">Proje seçilmedi.</div>;
+  if (busy)  return <div className="p-8 text-beton-400">Yükleniyor…</div>;
   if (err)   return <div className="p-8 text-red-500">{err}</div>;
 
   return (
@@ -258,7 +258,7 @@ export default function MachinePage({
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-xl font-bold text-[var(--text)]">{tipLabel}</h1>
+        <h1 className="text-xl font-bold text-beton-100">{tipLabel}</h1>
         <button
           onClick={openAdd}
           className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
@@ -270,14 +270,14 @@ export default function MachinePage({
       {/* KPI bar */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
-          { label: "Toplam", value: kpiTotal, cls: "text-[var(--text)]" },
+          { label: "Toplam", value: kpiTotal, cls: "text-beton-100" },
           { label: "Aktif", value: kpiAktif, cls: "text-green-600" },
           { label: "Bakımda", value: kpiBakim, cls: "text-yellow-600" },
           { label: "Devre Dışı", value: kpiDevre, cls: "text-red-600" },
           { label: "Kiralık", value: kpiKiralik, cls: "text-blue-600" },
         ].map(k => (
-          <div key={k.label} className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 flex flex-col gap-0.5">
-            <span className="text-xs text-[var(--text-muted)] uppercase tracking-wide">{k.label}</span>
+          <div key={k.label} className="rounded-xl border border-beton-800 bg-beton-900 p-3 flex flex-col gap-0.5">
+            <span className="text-xs text-beton-400 uppercase tracking-wide">{k.label}</span>
             <span className={`text-2xl font-bold ${k.cls}`}>{k.value}</span>
           </div>
         ))}
@@ -289,24 +289,24 @@ export default function MachinePage({
           placeholder="Ara…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-1.5 text-sm text-[var(--text)] w-48"
+          className="border border-beton-800 bg-beton-950 rounded-lg px-3 py-1.5 text-sm text-beton-100 w-48"
         />
         <select
           value={filterDurum}
           onChange={e => setFilterDurum(e.target.value)}
-          className="border border-[var(--border)] bg-[var(--bg)] rounded-lg px-3 py-1.5 text-sm text-[var(--text)]"
+          className="border border-beton-800 bg-beton-950 rounded-lg px-3 py-1.5 text-sm text-beton-100"
         >
           <option value="all">Tüm Durumlar</option>
           <option value="aktif">Aktif</option>
           <option value="bakim">Bakımda</option>
           <option value="devre_disi">Devre Dışı</option>
         </select>
-        <span className="text-xs text-[var(--text-muted)] ml-1">{filtered.length} kayıt</span>
+        <span className="text-xs text-beton-400 ml-1">{filtered.length} kayıt</span>
       </div>
 
       {/* Machine List */}
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center text-[var(--text-muted)] text-sm">
+        <div className="rounded-xl border border-dashed border-beton-800 p-12 text-center text-beton-400 text-sm">
           Henüz {tipLabel.toLowerCase()} tanımlanmamış. "Ekle" butonuyla başlayın.
         </div>
       ) : (
@@ -315,19 +315,19 @@ export default function MachinePage({
             const durum = DURUM_MAP[m.durum] ?? DURUM_MAP["aktif"];
             const isExpanded = expandedId === m.id;
             return (
-              <div key={m.id} className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+              <div key={m.id} className="rounded-xl border border-beton-800 bg-beton-900 overflow-hidden">
                 {/* Machine row */}
                 <div
                   className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
                   onClick={() => toggleExpand(m.id)}
                 >
                   {/* Expand indicator */}
-                  <span className="text-[var(--text-muted)] text-xs select-none">{isExpanded ? "▼" : "▶"}</span>
+                  <span className="text-beton-400 text-xs select-none">{isExpanded ? "▼" : "▶"}</span>
 
                   {/* Name + subtitle */}
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm text-[var(--text)] truncate">{m.ad}</div>
-                    <div className="text-xs text-[var(--text-muted)] truncate">
+                    <div className="font-semibold text-sm text-beton-100 truncate">{m.ad}</div>
+                    <div className="text-xs text-beton-400 truncate">
                       {[m.marka, m.model].filter(Boolean).join(" ")}
                       {showPlaka && m.plaka ? ` · ${m.plaka}` : ""}
                       {showSeriNo && m.seri_no ? ` · S/N: ${m.seri_no}` : ""}
@@ -336,14 +336,14 @@ export default function MachinePage({
                   </div>
 
                   {/* Sahiplik */}
-                  <span className="text-xs text-[var(--text-muted)] hidden sm:block w-20 shrink-0 text-right">
+                  <span className="text-xs text-beton-400 hidden sm:block w-20 shrink-0 text-right">
                     {SAHIPLIK_MAP[m.sahiplik] ?? m.sahiplik}
                     {m.gunluk_ucret ? <><br />{fmtCur(m.gunluk_ucret)}/gün</> : ""}
                   </span>
 
                   {/* Bakım dates */}
                   {showBakim && (
-                    <div className="hidden md:block text-xs text-[var(--text-muted)] w-32 text-right shrink-0">
+                    <div className="hidden md:block text-xs text-beton-400 w-32 text-right shrink-0">
                       <div>Son: {fmtDate(m.son_bakim_tarihi)}</div>
                       <div>Sıradaki: {fmtDate(m.sonraki_bakim_tarihi)}</div>
                     </div>
@@ -367,7 +367,7 @@ export default function MachinePage({
                         </button>
                         <button
                           onClick={() => setConfirmDeleteId(null)}
-                          className="px-2 py-0.5 rounded border border-[var(--border)] text-xs text-[var(--text)] hover:bg-[var(--bg-hover)]"
+                          className="px-2 py-0.5 rounded border border-beton-800 text-xs text-beton-100 hover:bg-[var(--bg-hover)]"
                         >
                           İptal
                         </button>
@@ -376,7 +376,7 @@ export default function MachinePage({
                       <>
                         <button
                           onClick={() => openEdit(m)}
-                          className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text)]"
+                          className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-beton-400 hover:text-beton-100"
                           title="Düzenle"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -386,7 +386,7 @@ export default function MachinePage({
                         </button>
                         <button
                           onClick={() => setConfirmDeleteId(m.id)}
-                          className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-[var(--text-muted)] hover:text-red-600"
+                          className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-beton-400 hover:text-red-600"
                           title="Sil"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -401,38 +401,38 @@ export default function MachinePage({
 
                 {/* Expanded: Log panel */}
                 {isExpanded && (
-                  <div className="border-t border-[var(--border)] bg-[var(--bg)] px-4 py-4 space-y-4">
-                    <h3 className="text-sm font-semibold text-[var(--text)]">Günlük Puantaj — {m.ad}</h3>
+                  <div className="border-t border-beton-800 bg-beton-950 px-4 py-4 space-y-4">
+                    <h3 className="text-sm font-semibold text-beton-100">Günlük Puantaj — {m.ad}</h3>
 
                     {/* Add log form */}
                     <div className="flex flex-wrap gap-2 items-end">
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs text-[var(--text-muted)]">Tarih</label>
+                        <label className="text-xs text-beton-400">Tarih</label>
                         <input
                           type="date"
                           value={logForm.tarih ?? ""}
                           onChange={e => setLogForm(f => ({ ...f, tarih: e.target.value }))}
-                          className="border border-[var(--border)] bg-[var(--card)] rounded px-2 py-1 text-sm text-[var(--text)] w-36"
+                          className="border border-beton-800 bg-beton-900 rounded px-2 py-1 text-sm text-beton-100 w-36"
                         />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs text-[var(--text-muted)]">Miktar</label>
+                        <label className="text-xs text-beton-400">Miktar</label>
                         <input
                           type="number"
                           min="0"
                           step="0.5"
                           value={logForm.calisma_miktari ?? 0}
                           onChange={e => setLogForm(f => ({ ...f, calisma_miktari: parseFloat(e.target.value) }))}
-                          className="border border-[var(--border)] bg-[var(--card)] rounded px-2 py-1 text-sm text-[var(--text)] w-24"
+                          className="border border-beton-800 bg-beton-900 rounded px-2 py-1 text-sm text-beton-100 w-24"
                         />
                       </div>
                       {logBirimi === "her-ikisi" ? (
                         <div className="flex flex-col gap-1">
-                          <label className="text-xs text-[var(--text-muted)]">Birim</label>
+                          <label className="text-xs text-beton-400">Birim</label>
                           <select
                             value={logForm.calisma_birimi ?? "saat"}
                             onChange={e => setLogForm(f => ({ ...f, calisma_birimi: e.target.value }))}
-                            className="border border-[var(--border)] bg-[var(--card)] rounded px-2 py-1 text-sm text-[var(--text)]"
+                            className="border border-beton-800 bg-beton-900 rounded px-2 py-1 text-sm text-beton-100"
                           >
                             <option value="saat">Saat</option>
                             <option value="km">Km</option>
@@ -440,28 +440,28 @@ export default function MachinePage({
                         </div>
                       ) : (
                         <div className="flex flex-col gap-1">
-                          <label className="text-xs text-[var(--text-muted)]">Birim</label>
-                          <span className="border border-[var(--border)] bg-[var(--card)] rounded px-2 py-1 text-sm text-[var(--text-muted)]">
+                          <label className="text-xs text-beton-400">Birim</label>
+                          <span className="border border-beton-800 bg-beton-900 rounded px-2 py-1 text-sm text-beton-400">
                             {logBirimi === "saat" ? "Saat" : "Km"}
                           </span>
                         </div>
                       )}
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs text-[var(--text-muted)]">Operatör</label>
+                        <label className="text-xs text-beton-400">Operatör</label>
                         <input
                           placeholder="Operatör adı"
                           value={logForm.operator ?? ""}
                           onChange={e => setLogForm(f => ({ ...f, operator: e.target.value }))}
-                          className="border border-[var(--border)] bg-[var(--card)] rounded px-2 py-1 text-sm text-[var(--text)] w-36"
+                          className="border border-beton-800 bg-beton-900 rounded px-2 py-1 text-sm text-beton-100 w-36"
                         />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs text-[var(--text-muted)]">Açıklama</label>
+                        <label className="text-xs text-beton-400">Açıklama</label>
                         <input
                           placeholder="İsteğe bağlı"
                           value={logForm.aciklama ?? ""}
                           onChange={e => setLogForm(f => ({ ...f, aciklama: e.target.value }))}
-                          className="border border-[var(--border)] bg-[var(--card)] rounded px-2 py-1 text-sm text-[var(--text)] w-48"
+                          className="border border-beton-800 bg-beton-900 rounded px-2 py-1 text-sm text-beton-100 w-48"
                         />
                       </div>
                       <button
@@ -478,14 +478,14 @@ export default function MachinePage({
 
                     {/* Log list */}
                     {logsBusy ? (
-                      <div className="text-sm text-[var(--text-muted)]">Yükleniyor…</div>
+                      <div className="text-sm text-beton-400">Yükleniyor…</div>
                     ) : logs.length === 0 ? (
-                      <div className="text-sm text-[var(--text-muted)]">Henüz puantaj kaydı yok.</div>
+                      <div className="text-sm text-beton-400">Henüz puantaj kaydı yok.</div>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm min-w-[520px]">
                           <thead>
-                            <tr className="text-xs text-[var(--text-muted)] border-b border-[var(--border)]">
+                            <tr className="text-xs text-beton-400 border-b border-beton-800">
                               <th className="text-left py-1.5 pr-3">Tarih</th>
                               <th className="text-right py-1.5 pr-3">Miktar</th>
                               <th className="text-left py-1.5 pr-3">Operatör</th>
@@ -495,17 +495,17 @@ export default function MachinePage({
                           </thead>
                           <tbody>
                             {logs.map(lg => (
-                              <tr key={lg.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-hover)]">
-                                <td className="py-1.5 pr-3 text-[var(--text)]">{fmtDate(lg.tarih)}</td>
-                                <td className="py-1.5 pr-3 text-right font-medium text-[var(--text)]">
+                              <tr key={lg.id} className="border-b border-beton-800 last:border-0 hover:bg-[var(--bg-hover)]">
+                                <td className="py-1.5 pr-3 text-beton-100">{fmtDate(lg.tarih)}</td>
+                                <td className="py-1.5 pr-3 text-right font-medium text-beton-100">
                                   {lg.calisma_miktari} {lg.calisma_birimi}
                                 </td>
-                                <td className="py-1.5 pr-3 text-[var(--text-muted)]">{lg.operator ?? "—"}</td>
-                                <td className="py-1.5 text-[var(--text-muted)] max-w-xs truncate">{lg.aciklama ?? "—"}</td>
+                                <td className="py-1.5 pr-3 text-beton-400">{lg.operator ?? "—"}</td>
+                                <td className="py-1.5 text-beton-400 max-w-xs truncate">{lg.aciklama ?? "—"}</td>
                                 <td className="py-1.5">
                                   <button
                                     onClick={() => deleteLog(lg.id)}
-                                    className="text-[var(--text-muted)] hover:text-red-500 p-1 rounded"
+                                    className="text-beton-400 hover:text-red-500 p-1 rounded"
                                   >
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                       <polyline points="3 6 5 6 21 6"/>
@@ -522,7 +522,7 @@ export default function MachinePage({
 
                     {/* Description */}
                     {m.aciklama && (
-                      <p className="text-xs text-[var(--text-muted)] border-t border-[var(--border)] pt-2">
+                      <p className="text-xs text-beton-400 border-t border-beton-800 pt-2">
                         {m.aciklama}
                       </p>
                     )}

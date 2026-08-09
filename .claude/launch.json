@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend-dev",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "env": { "PATH": "C:\\Program Files\\nodejs;C:\\Windows\\System32" },
+      "runtimeArgs": ["C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js", "run", "dev"],
+      "cwd": "C:\\Users\\CASPER\\Desktop\\concoord\\frontend",
+      "port": 5173
+    }
+  ]
+}

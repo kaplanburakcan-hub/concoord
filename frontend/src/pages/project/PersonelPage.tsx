@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 
@@ -57,8 +57,8 @@ export default function PersonelPage() {
       .finally(() => setLoading(false));
   }, [proj?.id]);
 
-  if (!proj) return <div className="p-8 text-[var(--text-muted)]">Proje seçilmedi.</div>;
-  if (loading) return <div className="p-8 text-[var(--text-muted)]">Yükleniyor…</div>;
+  if (!proj) return <div className="p-8 text-beton-400">Proje seçilmedi.</div>;
+  if (loading) return <div className="p-8 text-beton-400">Yükleniyor…</div>;
   if (error) return <div className="p-8 text-red-500">Veriler yüklenemedi.</div>;
 
   const firmalar = [...new Set(personeller.map(p => p.firma).filter(Boolean))].sort();
@@ -87,43 +87,43 @@ export default function PersonelPage() {
   });
 
   const inpCls =
-    "rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--text)] " +
+    "rounded-lg border border-beton-800 bg-beton-900 px-3 py-1.5 text-sm text-beton-100 " +
     "outline-none focus:border-blue-500 transition-colors";
 
   return (
     <div className="p-6 space-y-5 max-w-5xl mx-auto">
       {/* Başlık */}
       <div>
-        <h1 className="text-xl font-bold text-[var(--text)]">Personel Yönetimi</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-0.5">
+        <h1 className="text-xl font-bold text-beton-100">Personel Yönetimi</h1>
+        <p className="text-sm text-beton-400 mt-0.5">
           {proj.name} — Kayıtlı personel: {personeller.length} kişi
         </p>
       </div>
 
       {/* Özet kartlar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-center">
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 text-center">
           <div className="text-2xl font-bold text-green-600">{aktifSayisi}</div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">Aktif Personel</div>
+          <div className="text-xs text-beton-400 mt-0.5">Aktif Personel</div>
         </div>
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-center">
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 text-center">
           <div className="text-2xl font-bold text-gray-500">{pasifSayisi}</div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">Pasif / Ayrılmış</div>
+          <div className="text-xs text-beton-400 mt-0.5">Pasif / Ayrılmış</div>
         </div>
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-center">
-          <div className="text-2xl font-bold text-[var(--text)]">{firmalar.length}</div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">Firma</div>
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 text-center">
+          <div className="text-2xl font-bold text-beton-100">{firmalar.length}</div>
+          <div className="text-xs text-beton-400 mt-0.5">Firma</div>
         </div>
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-center">
-          <div className="text-2xl font-bold text-[var(--text)]">{gorevler.length}</div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">Farklı Görev</div>
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 text-center">
+          <div className="text-2xl font-bold text-beton-100">{gorevler.length}</div>
+          <div className="text-xs text-beton-400 mt-0.5">Farklı Görev</div>
         </div>
       </div>
 
       {/* Görev dağılımı */}
       {Object.keys(gorevDagilim).length > 0 && (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4">
-          <h2 className="text-sm font-semibold text-[var(--text)] mb-3">Aktif Personel — Görev Dağılımı</h2>
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4">
+          <h2 className="text-sm font-semibold text-beton-100 mb-3">Aktif Personel — Görev Dağılımı</h2>
           <div className="flex flex-wrap gap-2">
             {Object.entries(gorevDagilim)
               .sort((a, b) => b[1] - a[1])
@@ -134,7 +134,7 @@ export default function PersonelPage() {
                   className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-all ${
                     filterGorev === gorev
                       ? "bg-blue-500 text-white border-blue-500"
-                      : "border-[var(--border)] text-[var(--text-muted)] hover:border-blue-400"
+                      : "border-beton-800 text-beton-400 hover:border-blue-400"
                   }`}
                 >
                   {gorev}
@@ -170,45 +170,45 @@ export default function PersonelPage() {
         {(search || filterGorev || filterFirma || filterAktif !== "aktif") && (
           <button
             onClick={() => { setSearch(""); setFilterGorev(""); setFilterFirma(""); setFilterAktif("aktif"); }}
-            className="px-3 py-1.5 text-xs rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+            className="px-3 py-1.5 text-xs rounded-lg border border-beton-800 text-beton-400 hover:text-beton-100 transition-colors"
           >
             Temizle
           </button>
         )}
-        <span className="ml-auto text-xs text-[var(--text-muted)] self-center">
+        <span className="ml-auto text-xs text-beton-400 self-center">
           {filtered.length} kayıt
         </span>
       </div>
 
       {/* Liste */}
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-12 text-center text-[var(--text-muted)]">
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-12 text-center text-beton-400">
           {personeller.length === 0 ? "Personel kaydı bulunamadı." : "Arama kriterine uyan personel yok."}
         </div>
       ) : (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+        <div className="rounded-xl border border-beton-800 bg-beton-900 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)]">
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Personel</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide hidden sm:table-cell">Görev</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide hidden md:table-cell">Firma</th>
-                <th className="px-4 py-2.5 text-center text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Durum</th>
+              <tr className="border-b border-beton-800 bg-[var(--bg-hover)]">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-beton-400 uppercase tracking-wide">Personel</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-beton-400 uppercase tracking-wide hidden sm:table-cell">Görev</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-beton-400 uppercase tracking-wide hidden md:table-cell">Firma</th>
+                <th className="px-4 py-2.5 text-center text-xs font-medium text-beton-400 uppercase tracking-wide">Durum</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(p => {
                 const gorevMeta = GOREV_META[p.gorev] ?? { label: p.gorev, cls: DEFAULT_CLS };
                 return (
-                  <tr key={p.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
+                  <tr key={p.id} className="border-b border-beton-800 last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${avatarColor(p.ad_soyad)}`}>
                           {initials(p.ad_soyad)}
                         </div>
                         <div>
-                          <div className="font-medium text-[var(--text)]">{p.ad_soyad}</div>
-                          <div className="text-xs text-[var(--text-muted)] sm:hidden">{p.gorev} · {p.firma}</div>
+                          <div className="font-medium text-beton-100">{p.ad_soyad}</div>
+                          <div className="text-xs text-beton-400 sm:hidden">{p.gorev} · {p.firma}</div>
                         </div>
                       </div>
                     </td>
@@ -217,7 +217,7 @@ export default function PersonelPage() {
                         {gorevMeta.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-[var(--text-muted)] hidden md:table-cell">{p.firma || "—"}</td>
+                    <td className="px-4 py-3 text-beton-400 hidden md:table-cell">{p.firma || "—"}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         p.is_aktif

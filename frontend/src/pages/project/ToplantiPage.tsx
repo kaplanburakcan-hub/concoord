@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 
@@ -54,11 +54,11 @@ function parseAksiyon(raw: string | null | undefined): AksiyonMaddesi[] {
 }
 
 const inpCls =
-  "rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--text)] " +
+  "rounded-lg border border-beton-800 bg-beton-900 px-3 py-1.5 text-sm text-beton-100 " +
   "outline-none focus:border-blue-500 transition-colors";
 
 const taCls =
-  "rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--text)] " +
+  "rounded-lg border border-beton-800 bg-beton-900 px-3 py-2 text-sm text-beton-100 " +
   "outline-none focus:border-blue-500 transition-colors resize-none w-full";
 
 // ── Detay Paneli ─────────────────────────────────────────────────────────────
@@ -69,35 +69,35 @@ function MeetingDetail({ m, onClose }: { m: Meeting; onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto">
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 w-full max-w-2xl space-y-5 shadow-xl mt-8 mb-8">
+      <div className="bg-beton-900 border border-beton-800 rounded-2xl p-6 w-full max-w-2xl space-y-5 shadow-xl mt-8 mb-8">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap gap-1.5 mb-1.5">
               {m.toplanti_no && (
-                <span className="text-xs font-mono bg-[var(--bg-hover)] text-[var(--text-muted)] px-2 py-0.5 rounded">
+                <span className="text-xs font-mono bg-[var(--bg-hover)] text-beton-400 px-2 py-0.5 rounded">
                   {m.toplanti_no}
                 </span>
               )}
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${turuMeta.cls}`}>{turuMeta.label}</span>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${durumMeta.cls}`}>{durumMeta.label}</span>
             </div>
-            <h2 className="text-lg font-bold text-[var(--text)]">{m.baslik}</h2>
-            <p className="text-sm text-[var(--text-muted)] mt-0.5">
+            <h2 className="text-lg font-bold text-beton-100">{m.baslik}</h2>
+            <p className="text-sm text-beton-400 mt-0.5">
               {fmtDate(m.tarih)}
               {m.baslangic_saati && ` · ${m.baslangic_saati}`}
               {m.bitis_saati && ` – ${m.bitis_saati}`}
               {m.lokasyon && ` · 📍 ${m.lokasyon}`}
             </p>
           </div>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text)] text-xl leading-none p-1">×</button>
+          <button onClick={onClose} className="text-beton-400 hover:text-beton-100 text-xl leading-none p-1">×</button>
         </div>
 
         {m.katilimcilar?.length > 0 && (
           <div>
-            <div className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">Katılımcılar</div>
+            <div className="text-xs font-semibold text-beton-400 uppercase tracking-wide mb-2">Katılımcılar</div>
             <div className="flex flex-wrap gap-1.5">
               {m.katilimcilar.map((k, i) => (
-                <span key={i} className="text-xs bg-[var(--bg-hover)] text-[var(--text)] px-2 py-0.5 rounded-full border border-[var(--border)]">
+                <span key={i} className="text-xs bg-[var(--bg-hover)] text-beton-100 px-2 py-0.5 rounded-full border border-beton-800">
                   {k}
                 </span>
               ))}
@@ -107,35 +107,35 @@ function MeetingDetail({ m, onClose }: { m: Meeting; onClose: () => void }) {
 
         {m.gundem && (
           <div>
-            <div className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">Gündem</div>
-            <div className="text-sm text-[var(--text)] bg-[var(--bg-hover)] rounded-lg p-3 whitespace-pre-wrap">{m.gundem}</div>
+            <div className="text-xs font-semibold text-beton-400 uppercase tracking-wide mb-2">Gündem</div>
+            <div className="text-sm text-beton-100 bg-[var(--bg-hover)] rounded-lg p-3 whitespace-pre-wrap">{m.gundem}</div>
           </div>
         )}
 
         {m.kararlar && (
           <div>
-            <div className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">Alınan Kararlar</div>
-            <div className="text-sm text-[var(--text)] bg-[var(--bg-hover)] rounded-lg p-3 whitespace-pre-wrap">{m.kararlar}</div>
+            <div className="text-xs font-semibold text-beton-400 uppercase tracking-wide mb-2">Alınan Kararlar</div>
+            <div className="text-sm text-beton-100 bg-[var(--bg-hover)] rounded-lg p-3 whitespace-pre-wrap">{m.kararlar}</div>
           </div>
         )}
 
         {aksiyonlar.length > 0 && (
           <div>
-            <div className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">
+            <div className="text-xs font-semibold text-beton-400 uppercase tracking-wide mb-2">
               Aksiyon Maddeleri ({aksiyonlar.length})
             </div>
             <div className="space-y-2">
               {aksiyonlar.map((a, i) => (
                 <div key={i} className="flex items-start gap-3 bg-[var(--bg-hover)] rounded-lg p-3">
-                  <span className="text-xs font-bold text-[var(--text-muted)] w-5 mt-0.5 shrink-0">{i + 1}.</span>
+                  <span className="text-xs font-bold text-beton-400 w-5 mt-0.5 shrink-0">{i + 1}.</span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm text-[var(--text)]">{a.aksiyon}</div>
+                    <div className="text-sm text-beton-100">{a.aksiyon}</div>
                     <div className="flex flex-wrap gap-2 mt-1">
                       {a.sorumlu && (
-                        <span className="text-xs text-[var(--text-muted)]">👤 {a.sorumlu}</span>
+                        <span className="text-xs text-beton-400">👤 {a.sorumlu}</span>
                       )}
                       {a.son_tarih && (
-                        <span className="text-xs text-[var(--text-muted)]">📅 {fmtDate(a.son_tarih)}</span>
+                        <span className="text-xs text-beton-400">📅 {fmtDate(a.son_tarih)}</span>
                       )}
                       {a.durum && (
                         <span className={`text-xs px-1.5 py-0.5 rounded-full ${
@@ -155,9 +155,9 @@ function MeetingDetail({ m, onClose }: { m: Meeting; onClose: () => void }) {
         )}
 
         {m.sonraki_toplanti_tarihi && (
-          <div className="rounded-lg border border-[var(--border)] p-3 flex items-center gap-2">
-            <span className="text-sm text-[var(--text-muted)]">Sonraki Toplantı:</span>
-            <span className="text-sm font-medium text-[var(--text)]">{fmtDate(m.sonraki_toplanti_tarihi)}</span>
+          <div className="rounded-lg border border-beton-800 p-3 flex items-center gap-2">
+            <span className="text-sm text-beton-400">Sonraki Toplantı:</span>
+            <span className="text-sm font-medium text-beton-100">{fmtDate(m.sonraki_toplanti_tarihi)}</span>
           </div>
         )}
       </div>
@@ -213,47 +213,47 @@ function CreateModal({ projectId, onSave, onClose }: { projectId: string; onSave
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto">
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-xl mt-8 mb-8">
-        <h3 className="font-semibold text-[var(--text)] text-lg">Yeni Toplantı Tutanağı</h3>
+      <div className="bg-beton-900 border border-beton-800 rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-xl mt-8 mb-8">
+        <h3 className="font-semibold text-beton-100 text-lg">Yeni Toplantı Tutanağı</h3>
         {err && <div className="text-sm text-red-500">{err}</div>}
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">Toplantı No</label>
+              <label className="text-xs text-beton-400 mb-1 block">Toplantı No</label>
               <input className={inpCls + " w-full"} value={toplatiNo} onChange={e => setToplantiNo(e.target.value)} placeholder="TT-001" />
             </div>
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">Tür</label>
+              <label className="text-xs text-beton-400 mb-1 block">Tür</label>
               <select className={inpCls + " w-full"} value={turu} onChange={e => setTuru(e.target.value)}>
                 {Object.entries(TURU_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
           </div>
           <div>
-            <label className="text-xs text-[var(--text-muted)] mb-1 block">Başlık *</label>
+            <label className="text-xs text-beton-400 mb-1 block">Başlık *</label>
             <input className={inpCls + " w-full"} value={baslik} onChange={e => setBaslik(e.target.value)} placeholder="ör. Haftalık İlerleme Toplantısı" />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">Tarih</label>
+              <label className="text-xs text-beton-400 mb-1 block">Tarih</label>
               <input className={inpCls + " w-full"} type="date" value={tarih} onChange={e => setTarih(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">Başlangıç</label>
+              <label className="text-xs text-beton-400 mb-1 block">Başlangıç</label>
               <input className={inpCls + " w-full"} type="time" value={baslangic} onChange={e => setBaslangic(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">Bitiş</label>
+              <label className="text-xs text-beton-400 mb-1 block">Bitiş</label>
               <input className={inpCls + " w-full"} type="time" value={bitis} onChange={e => setBitis(e.target.value)} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">Lokasyon</label>
+              <label className="text-xs text-beton-400 mb-1 block">Lokasyon</label>
               <input className={inpCls + " w-full"} value={lokasyon} onChange={e => setLokasyon(e.target.value)} placeholder="Şantiye, ofis…" />
             </div>
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">Durum</label>
+              <label className="text-xs text-beton-400 mb-1 block">Durum</label>
               <select className={inpCls + " w-full"} value={durum} onChange={e => setDurum(e.target.value)}>
                 <option value="planli">Planlandı</option>
                 <option value="gerceklesti">Gerçekleşti</option>
@@ -262,20 +262,20 @@ function CreateModal({ projectId, onSave, onClose }: { projectId: string; onSave
             </div>
           </div>
           <div>
-            <label className="text-xs text-[var(--text-muted)] mb-1 block">Katılımcılar (her satıra bir isim)</label>
+            <label className="text-xs text-beton-400 mb-1 block">Katılımcılar (her satıra bir isim)</label>
             <textarea className={taCls} rows={3} value={katilimcilar} onChange={e => setKatilimcilar(e.target.value)} placeholder={"Ahmet Yılmaz\nAyşe Kaya\n…"} />
           </div>
           <div>
-            <label className="text-xs text-[var(--text-muted)] mb-1 block">Gündem</label>
+            <label className="text-xs text-beton-400 mb-1 block">Gündem</label>
             <textarea className={taCls} rows={3} value={gundem} onChange={e => setGundem(e.target.value)} placeholder="Toplantı gündem maddeleri…" />
           </div>
           <div>
-            <label className="text-xs text-[var(--text-muted)] mb-1 block">Alınan Kararlar</label>
+            <label className="text-xs text-beton-400 mb-1 block">Alınan Kararlar</label>
             <textarea className={taCls} rows={3} value={kararlar} onChange={e => setKararlar(e.target.value)} placeholder="Toplantıda alınan kararlar…" />
           </div>
         </div>
         <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-[var(--border)] text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-beton-800 text-sm text-beton-400 hover:text-beton-100 transition-colors">
             İptal
           </button>
           <button onClick={submit} disabled={saving} className="flex-1 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium transition-colors disabled:opacity-50">
@@ -314,8 +314,8 @@ export default function ToplantiPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proj?.id]);
 
-  if (!proj) return <div className="p-8 text-[var(--text-muted)]">Proje seçilmedi.</div>;
-  if (loading) return <div className="p-8 text-[var(--text-muted)]">Yükleniyor…</div>;
+  if (!proj) return <div className="p-8 text-beton-400">Proje seçilmedi.</div>;
+  if (loading) return <div className="p-8 text-beton-400">Yükleniyor…</div>;
   if (error) return <div className="p-8 text-red-500">Veriler yüklenemedi.</div>;
 
   const filtered = meetings.filter(m => {
@@ -342,8 +342,8 @@ export default function ToplantiPage() {
       {/* Başlık */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text)]">Toplantı Tutanakları</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">{proj.name} — PMP İletişim Yönetimi</p>
+          <h1 className="text-xl font-bold text-beton-100">Toplantı Tutanakları</h1>
+          <p className="text-sm text-beton-400 mt-0.5">{proj.name} — PMP İletişim Yönetimi</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
@@ -355,21 +355,21 @@ export default function ToplantiPage() {
 
       {/* KPI */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-center">
-          <div className="text-2xl font-bold text-[var(--text)]">{meetings.length}</div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">Toplam Toplantı</div>
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 text-center">
+          <div className="text-2xl font-bold text-beton-100">{meetings.length}</div>
+          <div className="text-xs text-beton-400 mt-0.5">Toplam Toplantı</div>
         </div>
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-center">
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 text-center">
           <div className="text-2xl font-bold text-green-600">{byDurum["gerceklesti"] ?? 0}</div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">Gerçekleşti</div>
+          <div className="text-xs text-beton-400 mt-0.5">Gerçekleşti</div>
         </div>
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-center">
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 text-center">
           <div className="text-2xl font-bold text-blue-600">{byDurum["planli"] ?? 0}</div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">Planlandı</div>
+          <div className="text-xs text-beton-400 mt-0.5">Planlandı</div>
         </div>
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-center">
-          <div className="text-2xl font-bold text-[var(--text)]">{totalAksiyon}</div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">Aksiyon Maddesi</div>
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 text-center">
+          <div className="text-2xl font-bold text-beton-100">{totalAksiyon}</div>
+          <div className="text-xs text-beton-400 mt-0.5">Aksiyon Maddesi</div>
         </div>
       </div>
 
@@ -392,17 +392,17 @@ export default function ToplantiPage() {
         {(search || filterTur || filterDurum) && (
           <button
             onClick={() => { setSearch(""); setFilterTur(""); setFilterDurum(""); }}
-            className="px-3 py-1.5 text-xs rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+            className="px-3 py-1.5 text-xs rounded-lg border border-beton-800 text-beton-400 hover:text-beton-100 transition-colors"
           >
             Temizle
           </button>
         )}
-        <span className="ml-auto text-xs text-[var(--text-muted)] self-center">{filtered.length} kayıt</span>
+        <span className="ml-auto text-xs text-beton-400 self-center">{filtered.length} kayıt</span>
       </div>
 
       {/* Liste */}
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-12 text-center text-[var(--text-muted)]">
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-12 text-center text-beton-400">
           {meetings.length === 0
             ? "Henüz tutanak eklenmedi. \"+ Yeni Tutanak\" butonuyla başlayın."
             : "Arama kriterine uyan tutanak yok."}
@@ -417,28 +417,28 @@ export default function ToplantiPage() {
               <button
                 key={m.id}
                 onClick={() => setSelected(m)}
-                className="w-full text-left rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 hover:bg-[var(--bg-hover)] transition-colors"
+                className="w-full text-left rounded-xl border border-beton-800 bg-beton-900 p-4 hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5 mb-1">
                       {m.toplanti_no && (
-                        <span className="text-xs font-mono bg-[var(--bg-hover)] text-[var(--text-muted)] px-1.5 py-0.5 rounded">
+                        <span className="text-xs font-mono bg-[var(--bg-hover)] text-beton-400 px-1.5 py-0.5 rounded">
                           {m.toplanti_no}
                         </span>
                       )}
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${turuMeta.cls}`}>{turuMeta.label}</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${durumMeta.cls}`}>{durumMeta.label}</span>
                     </div>
-                    <div className="font-medium text-[var(--text)] truncate">{m.baslik}</div>
-                    <div className="text-xs text-[var(--text-muted)] mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                    <div className="font-medium text-beton-100 truncate">{m.baslik}</div>
+                    <div className="text-xs text-beton-400 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                       <span>{fmtDate(m.tarih)}</span>
                       {m.lokasyon && <span>📍 {m.lokasyon}</span>}
                       {m.katilimcilar?.length > 0 && <span>👥 {m.katilimcilar.length} katılımcı</span>}
                       {akSayisi > 0 && <span>✅ {akSayisi} aksiyon</span>}
                     </div>
                   </div>
-                  <span className="text-[var(--text-muted)] text-lg shrink-0">›</span>
+                  <span className="text-beton-400 text-lg shrink-0">›</span>
                 </div>
               </button>
             );

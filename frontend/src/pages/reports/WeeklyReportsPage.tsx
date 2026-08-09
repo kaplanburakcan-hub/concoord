@@ -26,6 +26,7 @@ type SnapWorkEntry = { description: string; location?: string; qty?: number; uni
 
 type SnapDay = {
   date: string;
+  revision_no?: number;
   status: string;
   weather_condition?: string;
   temperature_min?: number;
@@ -63,6 +64,7 @@ type Snapshot = {
   pending_payments: SnapPayment[];
   pending_pos: SnapPendingPO[];
   open_tasks: number; tasks_due_this_week: number; pending_mars: number;
+  ohs_note?: string;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

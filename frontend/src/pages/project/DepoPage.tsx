@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 
@@ -44,7 +44,7 @@ function fmtNum(n: number, unit: string) {
 }
 
 const inpCls =
-  "rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--text)] " +
+  "rounded-lg border border-beton-800 bg-beton-900 px-3 py-1.5 text-sm text-beton-100 " +
   "outline-none focus:border-blue-500 transition-colors";
 
 // ── Modal: Hareket Ekle ────────────────────────────────────────────────────────
@@ -88,19 +88,19 @@ function MovementModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl">
-        <h3 className="font-semibold text-[var(--text)] text-lg">Stok Hareketi Ekle</h3>
+      <div className="bg-beton-900 border border-beton-800 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl">
+        <h3 className="font-semibold text-beton-100 text-lg">Stok Hareketi Ekle</h3>
         {err && <div className="text-sm text-red-500">{err}</div>}
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-[var(--text-muted)] mb-1 block">Malzeme</label>
+            <label className="text-xs text-beton-400 mb-1 block">Malzeme</label>
             <select className={inpCls + " w-full"} value={itemId} onChange={e => setItemId(e.target.value)}>
               {items.map(i => <option key={i.id} value={i.id}>{i.malzeme_adi} ({i.birim})</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">Hareket Türü</label>
+              <label className="text-xs text-beton-400 mb-1 block">Hareket Türü</label>
               <select className={inpCls + " w-full"} value={turu} onChange={e => setTuru(e.target.value as typeof turu)}>
                 <option value="giris">Giriş</option>
                 <option value="cikis">Çıkış</option>
@@ -109,7 +109,7 @@ function MovementModal({
               </select>
             </div>
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">
+              <label className="text-xs text-beton-400 mb-1 block">
                 Miktar{selectedItem ? ` (${selectedItem.birim})` : ""}
               </label>
               <input
@@ -122,21 +122,21 @@ function MovementModal({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">Tarih</label>
+              <label className="text-xs text-beton-400 mb-1 block">Tarih</label>
               <input className={inpCls + " w-full"} type="date" value={tarih} onChange={e => setTarih(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">Belge No</label>
+              <label className="text-xs text-beton-400 mb-1 block">Belge No</label>
               <input className={inpCls + " w-full"} type="text" value={belgeNo} onChange={e => setBelgeNo(e.target.value)} placeholder="İrsaliye, fatura…" />
             </div>
           </div>
           <div>
-            <label className="text-xs text-[var(--text-muted)] mb-1 block">Açıklama</label>
+            <label className="text-xs text-beton-400 mb-1 block">Açıklama</label>
             <input className={inpCls + " w-full"} type="text" value={aciklama} onChange={e => setAciklama(e.target.value)} placeholder="Opsiyonel…" />
           </div>
         </div>
         <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-[var(--border)] text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-beton-800 text-sm text-beton-400 hover:text-beton-100 transition-colors">
             İptal
           </button>
           <button onClick={submit} disabled={saving} className="flex-1 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium transition-colors disabled:opacity-50">
@@ -186,35 +186,35 @@ function ItemModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl">
-        <h3 className="font-semibold text-[var(--text)] text-lg">Malzeme Ekle</h3>
+      <div className="bg-beton-900 border border-beton-800 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl">
+        <h3 className="font-semibold text-beton-100 text-lg">Malzeme Ekle</h3>
         {err && <div className="text-sm text-red-500">{err}</div>}
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-[var(--text-muted)] mb-1 block">Malzeme Adı</label>
+            <label className="text-xs text-beton-400 mb-1 block">Malzeme Adı</label>
             <input className={inpCls + " w-full"} value={malzemeAdi} onChange={e => setMalzemeAdi(e.target.value)} placeholder="ör. Nervürlü Demir Ø10" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">Kategori</label>
+              <label className="text-xs text-beton-400 mb-1 block">Kategori</label>
               <select className={inpCls + " w-full"} value={kategori} onChange={e => setKategori(e.target.value)}>
                 {KATEGORILER.map(k => <option key={k} value={k}>{k}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">Birim</label>
+              <label className="text-xs text-beton-400 mb-1 block">Birim</label>
               <select className={inpCls + " w-full"} value={birim} onChange={e => setBirim(e.target.value)}>
                 {BIRIMLER.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
           </div>
           <div>
-            <label className="text-xs text-[var(--text-muted)] mb-1 block">Minimum Stok</label>
+            <label className="text-xs text-beton-400 mb-1 block">Minimum Stok</label>
             <input className={inpCls + " w-full"} type="number" min="0" step="0.01" value={minStok} onChange={e => setMinStok(e.target.value)} />
           </div>
         </div>
         <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-[var(--border)] text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-beton-800 text-sm text-beton-400 hover:text-beton-100 transition-colors">
             İptal
           </button>
           <button onClick={submit} disabled={saving} className="flex-1 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium transition-colors disabled:opacity-50">
@@ -259,8 +259,8 @@ export default function DepoPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proj?.id]);
 
-  if (!proj) return <div className="p-8 text-[var(--text-muted)]">Proje seçilmedi.</div>;
-  if (loading) return <div className="p-8 text-[var(--text-muted)]">Yükleniyor…</div>;
+  if (!proj) return <div className="p-8 text-beton-400">Proje seçilmedi.</div>;
+  if (loading) return <div className="p-8 text-beton-400">Yükleniyor…</div>;
   if (error) return <div className="p-8 text-red-500">Veriler yüklenemedi.</div>;
 
   const kategoriler = [...new Set(items.map(i => i.kategori).filter(Boolean))].sort();
@@ -288,13 +288,13 @@ export default function DepoPage() {
       {/* Başlık */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text)]">Depo Raporları</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">{proj.name} — Stok takibi ve hareket kayıtları</p>
+          <h1 className="text-xl font-bold text-beton-100">Depo Raporları</h1>
+          <p className="text-sm text-beton-400 mt-0.5">{proj.name} — Stok takibi ve hareket kayıtları</p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => setShowItemModal(true)}
-            className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+            className="px-3 py-1.5 rounded-lg border border-beton-800 text-sm text-beton-400 hover:text-beton-100 transition-colors"
           >
             + Malzeme
           </button>
@@ -311,23 +311,23 @@ export default function DepoPage() {
 
       {/* KPI */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-center">
-          <div className="text-2xl font-bold text-[var(--text)]">{items.length}</div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">Malzeme Kalemi</div>
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 text-center">
+          <div className="text-2xl font-bold text-beton-100">{items.length}</div>
+          <div className="text-xs text-beton-400 mt-0.5">Malzeme Kalemi</div>
         </div>
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-center">
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 text-center">
           <div className={`text-2xl font-bold ${kritikItems.length > 0 ? "text-red-500" : "text-green-600"}`}>
             {kritikItems.length}
           </div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">Kritik Stok</div>
+          <div className="text-xs text-beton-400 mt-0.5">Kritik Stok</div>
         </div>
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-center">
-          <div className="text-2xl font-bold text-[var(--text)]">{movements.length}</div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">Toplam Hareket</div>
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 text-center">
+          <div className="text-2xl font-bold text-beton-100">{movements.length}</div>
+          <div className="text-xs text-beton-400 mt-0.5">Toplam Hareket</div>
         </div>
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-center">
-          <div className="text-2xl font-bold text-[var(--text)]">{kategoriler.length}</div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">Kategori</div>
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 text-center">
+          <div className="text-2xl font-bold text-beton-100">{kategoriler.length}</div>
+          <div className="text-xs text-beton-400 mt-0.5">Kategori</div>
         </div>
       </div>
 
@@ -348,7 +348,7 @@ export default function DepoPage() {
       )}
 
       {/* Sekme */}
-      <div className="flex gap-1 border-b border-[var(--border)]">
+      <div className="flex gap-1 border-b border-beton-800">
         {(["stok", "hareketler"] as const).map(t => (
           <button
             key={t}
@@ -356,7 +356,7 @@ export default function DepoPage() {
             className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
               tab === t
                 ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]"
+                : "border-transparent text-beton-400 hover:text-beton-100"
             }`}
           >
             {t === "stok" ? `Stok Durumu (${items.length})` : `Hareketler (${movements.length})`}
@@ -379,7 +379,7 @@ export default function DepoPage() {
           </select>
         )}
         {(search || filterKat) && (
-          <button onClick={() => { setSearch(""); setFilterKat(""); }} className="px-3 py-1.5 text-xs rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
+          <button onClick={() => { setSearch(""); setFilterKat(""); }} className="px-3 py-1.5 text-xs rounded-lg border border-beton-800 text-beton-400 hover:text-beton-100 transition-colors">
             Temizle
           </button>
         )}
@@ -388,35 +388,35 @@ export default function DepoPage() {
       {/* Stok Tablosu */}
       {tab === "stok" && (
         filteredItems.length === 0 ? (
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-12 text-center text-[var(--text-muted)]">
+          <div className="rounded-xl border border-beton-800 bg-beton-900 p-12 text-center text-beton-400">
             {items.length === 0 ? "Henüz malzeme eklenmedi. \"+ Malzeme\" butonuyla başlayın." : "Arama kriterine uyan malzeme yok."}
           </div>
         ) : (
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-x-auto">
+          <div className="rounded-xl border border-beton-800 bg-beton-900 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)]">
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Malzeme</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide hidden sm:table-cell">Kategori</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Mevcut</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide hidden md:table-cell">Min. Stok</th>
-                  <th className="px-4 py-2.5 text-center text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Durum</th>
+                <tr className="border-b border-beton-800 bg-[var(--bg-hover)]">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-beton-400 uppercase tracking-wide">Malzeme</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-beton-400 uppercase tracking-wide hidden sm:table-cell">Kategori</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-beton-400 uppercase tracking-wide">Mevcut</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-beton-400 uppercase tracking-wide hidden md:table-cell">Min. Stok</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-medium text-beton-400 uppercase tracking-wide">Durum</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredItems.map(item => {
                   const kritik = item.min_stok > 0 && item.mevcut_miktar <= item.min_stok;
                   return (
-                    <tr key={item.id} className={`border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors ${kritik ? "bg-red-50/50 dark:bg-red-900/10" : ""}`}>
+                    <tr key={item.id} className={`border-b border-beton-800 last:border-0 hover:bg-[var(--bg-hover)] transition-colors ${kritik ? "bg-red-50/50 dark:bg-red-900/10" : ""}`}>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-[var(--text)]">{item.malzeme_adi}</div>
-                        {item.aciklama && <div className="text-xs text-[var(--text-muted)]">{item.aciklama}</div>}
+                        <div className="font-medium text-beton-100">{item.malzeme_adi}</div>
+                        {item.aciklama && <div className="text-xs text-beton-400">{item.aciklama}</div>}
                       </td>
-                      <td className="px-4 py-3 text-[var(--text-muted)] hidden sm:table-cell">{item.kategori}</td>
-                      <td className={`px-4 py-3 text-right font-medium ${kritik ? "text-red-500" : "text-[var(--text)]"}`}>
+                      <td className="px-4 py-3 text-beton-400 hidden sm:table-cell">{item.kategori}</td>
+                      <td className={`px-4 py-3 text-right font-medium ${kritik ? "text-red-500" : "text-beton-100"}`}>
                         {fmtNum(item.mevcut_miktar, item.birim)}
                       </td>
-                      <td className="px-4 py-3 text-right text-[var(--text-muted)] hidden md:table-cell">
+                      <td className="px-4 py-3 text-right text-beton-400 hidden md:table-cell">
                         {item.min_stok > 0 ? fmtNum(item.min_stok, item.birim) : "—"}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -440,40 +440,40 @@ export default function DepoPage() {
       {/* Hareketler Tablosu */}
       {tab === "hareketler" && (
         filteredMovements.length === 0 ? (
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-12 text-center text-[var(--text-muted)]">
+          <div className="rounded-xl border border-beton-800 bg-beton-900 p-12 text-center text-beton-400">
             {movements.length === 0 ? "Henüz hareket kaydı yok." : "Arama kriterine uyan kayıt yok."}
           </div>
         ) : (
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-x-auto">
+          <div className="rounded-xl border border-beton-800 bg-beton-900 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)]">
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Tarih</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Malzeme</th>
-                  <th className="px-4 py-2.5 text-center text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Tür</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Miktar</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide hidden md:table-cell">Belge</th>
+                <tr className="border-b border-beton-800 bg-[var(--bg-hover)]">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-beton-400 uppercase tracking-wide">Tarih</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-beton-400 uppercase tracking-wide">Malzeme</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-medium text-beton-400 uppercase tracking-wide">Tür</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-beton-400 uppercase tracking-wide">Miktar</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-beton-400 uppercase tracking-wide hidden md:table-cell">Belge</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredMovements.map(mv => {
                   const meta = HAREKET_META[mv.hareket_turu] ?? HAREKET_META.giris;
                   return (
-                    <tr key={mv.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
-                      <td className="px-4 py-3 text-[var(--text-muted)] text-xs">{fmtDate(mv.tarih)}</td>
+                    <tr key={mv.id} className="border-b border-beton-800 last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
+                      <td className="px-4 py-3 text-beton-400 text-xs">{fmtDate(mv.tarih)}</td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-[var(--text)]">{mv.malzeme_adi}</div>
-                        {mv.aciklama && <div className="text-xs text-[var(--text-muted)]">{mv.aciklama}</div>}
+                        <div className="font-medium text-beton-100">{mv.malzeme_adi}</div>
+                        {mv.aciklama && <div className="text-xs text-beton-400">{mv.aciklama}</div>}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${meta.cls}`}>
                           {meta.sign} {meta.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right font-medium text-[var(--text)]">
+                      <td className="px-4 py-3 text-right font-medium text-beton-100">
                         {mv.miktar.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}
                       </td>
-                      <td className="px-4 py-3 text-[var(--text-muted)] text-xs hidden md:table-cell">
+                      <td className="px-4 py-3 text-beton-400 text-xs hidden md:table-cell">
                         {mv.belge_no ?? "—"}
                       </td>
                     </tr>

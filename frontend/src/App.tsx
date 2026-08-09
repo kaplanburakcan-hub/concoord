@@ -189,7 +189,7 @@ export default function App() {
                       <Route
                         path="/saha-raporlari/haftalik"
                         element={
-                          <RequirePerm perm="reports.generate_weekly">
+                          <RequirePerm perm="reports.view">
                             <WeeklyReportsPage />
                           </RequirePerm>
                         }
@@ -331,7 +331,7 @@ export default function App() {
 
                       {/* ── PROJE yeni modüller ── */}
                       <Route path="/proje/ozet" element={<RequirePerm perm="projects.view"><ProjectSummaryPage /></RequirePerm>} />
-                      <Route path="/proje/paysdaslar" element={<RequirePerm perm="projects.view"><ProjePaydaslariPage /></RequirePerm>} />
+                      <Route path="/proje/paydaslar" element={<RequirePerm perm="projects.view"><ProjePaydaslariPage /></RequirePerm>} />
                       <Route path="/proje/kesif" element={<RequirePerm perm="projects.view"><ProjeKesfiPage /></RequirePerm>} />
                       <Route path="/proje/personel" element={<RequirePerm perm="reports.view"><PersonelPage /></RequirePerm>} />
                       <Route path="/aylik-raporlar/imalat" element={<RequirePerm perm="reports.view_financial_reports"><ImalatRaporlariPage /></RequirePerm>} />

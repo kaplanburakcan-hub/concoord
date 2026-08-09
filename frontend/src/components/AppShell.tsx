@@ -56,7 +56,7 @@ const GROUPS: NavGroup[] = [
     title: "Proje",
     items: [
       { to: "/proje/ozet", label: "Özet / Dashboard", perm: "projects.view", icon: I.ozet },
-      { to: "/proje/paysdaslar", label: "Proje Paydaşları", perm: "projects.view", icon: I.kullanici },
+      { to: "/proje/paydaslar", label: "Proje Paydaşları", perm: "projects.view", icon: I.kullanici },
       { to: "/proje/kesif", label: "Proje Keşfi", perm: "projects.view", icon: I.dok },
       { to: "/proje/ana-sozlesme", label: "Ana Sözleşme", perm: "projects.view", icon: I.sozlesme },
       { to: "/proje/tasarim-projeler", label: "Tasarım ve Projeler", perm: "projects.view", icon: I.tasarim },
@@ -96,6 +96,7 @@ const GROUPS: NavGroup[] = [
     title: "Saha",
     items: [
       { to: "/saha-raporlari", label: "Günlük Rapor Girişi", perm: "reports.view", icon: I.saha },
+      { to: "/saha-raporlari/haftalik", label: "Haftalık Raporlar", perm: "reports.view", icon: I.rapor },
       { to: "/saha/tutanaklar", label: "Saha Tutanakları", perm: "reports.view", icon: I.rapor },
       { to: "/proje/personel-puantaj", label: "Personel & Puantaj Girişi", perm: "reports.view", icon: I.puantaj },
       { to: "/proje/depo", label: "Depo Raporları", perm: "reports.view", icon: I.depo },

@@ -506,8 +506,8 @@ func (h *Handler) GenerateWeekly(w http.ResponseWriter, r *http.Request) {
 			"days_reported": sn.Totals.DaysReported},
 		IP: m.IP, ReqID: m.ReqID,
 	})
-	httpx.JSON(w, http.StatusAccepted, map[string]interface{}{
-		"id": id, "status": "Pending",
+	httpx.JSON(w, http.StatusCreated, map[string]interface{}{
+		"id": id, "status": "Ready",
 		"week_no": sn.WeekNo, "period_start": sn.PeriodStart, "period_end": sn.PeriodEnd,
 	})
 }

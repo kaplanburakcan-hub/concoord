@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useProjects } from "../../projects/ProjectContext";
 
@@ -58,8 +57,6 @@ const REPORT_TYPES: ReportType[] = [
 
 export default function ImalatRaporlariPage() {
   const { current } = useProjects();
-  const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
 
   if (!current) {
     return <p className="text-sm text-beton-400">Önce bir proje seçin.</p>;
@@ -103,33 +100,17 @@ export default function ImalatRaporlariPage() {
         <p className="text-xs uppercase tracking-wider text-beton-500 mb-3">İsteğe bağlı raporlar</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {REPORT_TYPES.filter((r) => !r.default).map((r) => (
-            <Link
+            <div
               key={r.id}
-              to={r.id === "custom"
-                ? (customStart && customEnd ? `${r.path}?start=${customStart}&end=${customEnd}` : r.path)
-                : r.path}
-              className={"rounded-xl border p-4 transition hover:brightness-110 " + r.color}
+              className={"rounded-xl border p-4 opacity-50 cursor-not-allowed select-none " + r.color}
+              title="Yakında kullanılabilir olacak"
             >
-              <p className="font-medium text-beton-100 text-sm">{r.label}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium text-beton-100 text-sm">{r.label}</p>
+                <span className="rounded-full border border-beton-700 px-2 py-0.5 text-[10px] text-beton-500 bg-beton-900 shrink-0">Yakında</span>
+              </div>
               <p className="mt-1 text-xs text-beton-400 leading-relaxed">{r.desc}</p>
-              {r.id === "custom" && (
-                <div className="mt-3 flex gap-2" onClick={(e) => e.preventDefault()}>
-                  <input
-                    type="date"
-                    value={customStart}
-                    onChange={(e) => setCustomStart(e.target.value)}
-                    className="flex-1 rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-xs text-beton-100 outline-none focus:border-emniyet-500"
-                  />
-                  <span className="text-beton-500 text-xs self-center">–</span>
-                  <input
-                    type="date"
-                    value={customEnd}
-                    onChange={(e) => setCustomEnd(e.target.value)}
-                    className="flex-1 rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-xs text-beton-100 outline-none focus:border-emniyet-500"
-                  />
-                </div>
-              )}
-            </Link>
+            </div>
           ))}
         </div>
       </div>
