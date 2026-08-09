@@ -39,6 +39,13 @@ type Detail = {
 
 type Sub = { id: string; company_name: string };
 type WorkItem = { id: string; poz_no: string; description: string; unit: string };
+type Machine = { id: string; tip: string; ad: string };
+
+const MACHINE_TIP_LABEL: Record<string, string> = {
+  arac: "Araç",
+  is_makinesi: "İş Makinesi",
+  ekipman: "Ekipman",
+};
 
 type WarehouseDelta = {
   malzeme_adi: string; kategori: string; birim: string;
@@ -79,6 +86,7 @@ export default function DailyReportFormPage() {
 
   const [subs, setSubs]   = useState<Sub[]>([]);
   const [items, setItems] = useState<WorkItem[]>([]);
+  const [machines, setMachines] = useState<Machine[]>([]);
   const [ctx,  setCtx]   = useState<DailyCtx | null>(null);
 
   const readOnly = !!detail && detail.status === "Submitted";
@@ -113,10 +121,23 @@ export default function DailyReportFormPage() {
   }, [load]);
 
   // Referans listeleri (çevrimdışıysa boş kalır; serbest metin girişi yeter).
+  // active_on=reportDate: yalnızca o tarihte sözleşmesi geçerli olan
+  // taşeronlar listelenir (personel dropdown'ının kontrol altyapısı).
+  useEffect(() => {
+    if (!pid || !reportDate) return;
+    api<{ subcontractors: Sub[] }>(
+      `/projects/${pid}/subcontractors?active_on=${reportDate}`,
+      { projectId: pid }
+    )
+      .then((r) => setSubs(r.subcontractors))
+      .catch(() => {});
+  }, [pid, reportDate]);
+  // Tanımlı araçlar/iş makineleri/ekipmanlar — ekipman satırları serbest
+  // metin yerine bu listeden seçilir.
   useEffect(() => {
     if (!pid) return;
-    api<{ subcontractors: Sub[] }>(`/projects/${pid}/subcontractors`, { projectId: pid })
-      .then((r) => setSubs(r.subcontractors))
+    api<{ machines: Machine[] }>(`/projects/${pid}/machines`, { projectId: pid })
+      .then((r) => setMachines(r.machines))
       .catch(() => {});
   }, [pid]);
   // Depo-stok özeti ve bekleyen aktiviteler — tarih değiştiğinde yenile.
@@ -390,8 +411,22 @@ export default function DailyReportFormPage() {
             <div className="flex-1 grid grid-cols-2 gap-2">
               <div className="col-span-2 sm:col-span-1">
                 <label className={label}>Ekipman</label>
-                <input className={input} placeholder="Kule vinç…" value={e.equipment_name} disabled={readOnly || !canEdit}
-                  onChange={(ev) => setEquipment(upd(equipment, i, { equipment_name: ev.target.value }))} />
+                <select className={input} value={e.equipment_name} disabled={readOnly || !canEdit}
+                  onChange={(ev) => setEquipment(upd(equipment, i, { equipment_name: ev.target.value }))}>
+                  <option value="" disabled>— Seçin —</option>
+                  {e.equipment_name && !machines.some((m) => m.ad === e.equipment_name) && (
+                    <option value={e.equipment_name}>{e.equipment_name} (tanımsız)</option>
+                  )}
+                  {["arac", "is_makinesi", "ekipman"].map((tip) => {
+                    const group = machines.filter((m) => m.tip === tip);
+                    if (group.length === 0) return null;
+                    return (
+                      <optgroup key={tip} label={MACHINE_TIP_LABEL[tip] ?? tip}>
+                        {group.map((m) => <option key={m.id} value={m.ad}>{m.ad}</option>)}
+                      </optgroup>
+                    );
+                  })}
+                </select>
               </div>
               <div>
                 <label className={label}>Adet</label>

@@ -49,11 +49,22 @@ func (h *Handler) ListSubcontractors(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// active_on=YYYY-MM-DD verilirse yalnızca o tarihte geçerli sözleşmesi
+	// olan taşeronlar döner (günlük rapor personel dropdown'ının kontrol
+	// altyapısı — sözleşmesi bitmiş/başlamamış taşeron listelenmez).
+	activeOn := strings.TrimSpace(r.URL.Query().Get("active_on"))
 	rows, err := h.pool.Query(r.Context(), `
-		SELECT `+subCols+` FROM subcontractors
-		WHERE project_id=$1 AND deleted_at IS NULL
-		  AND ($2::uuid IS NULL OR id=$2)
-		ORDER BY company_name`, pid, scope)
+		SELECT `+subCols+` FROM subcontractors s
+		WHERE s.project_id=$1 AND s.deleted_at IS NULL
+		  AND ($2::uuid IS NULL OR s.id=$2)
+		  AND ($3='' OR EXISTS (
+		        SELECT 1 FROM contracts c
+		        WHERE c.subcontractor_id = s.id AND c.deleted_at IS NULL
+		          AND (c.start_date IS NULL OR c.start_date <= $3::date)
+		          AND (COALESCE(c.revised_end_date, c.end_date) IS NULL
+		               OR COALESCE(c.revised_end_date, c.end_date) >= $3::date)
+		      ))
+		ORDER BY s.company_name`, pid, scope, activeOn)
 	if err != nil {
 		httpx.Internal(w, r)
 		return

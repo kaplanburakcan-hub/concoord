@@ -96,7 +96,7 @@ const GROUPS: NavGroup[] = [
     title: "Saha",
     items: [
       { to: "/saha-raporlari", label: "Günlük Rapor Girişi", perm: "reports.view", icon: I.saha, end: true },
-      { to: "/saha-raporlari/haftalik", label: "Haftalık Raporlar", perm: "reports.view", icon: I.rapor },
+      { to: "/saha-raporlari/haftalik", label: "Haftalık Raporlar", perm: "reports.generate_weekly", icon: I.rapor },
       { to: "/saha/tutanaklar", label: "Saha Tutanakları", perm: "reports.view", icon: I.rapor },
       { to: "/proje/personel-puantaj", label: "Personel & Puantaj Girişi", perm: "reports.view", icon: I.puantaj },
       { to: "/proje/depo", label: "Depo Raporları", perm: "reports.view", icon: I.depo },

@@ -189,7 +189,7 @@ export default function App() {
                       <Route
                         path="/saha-raporlari/haftalik"
                         element={
-                          <RequirePerm perm="reports.view">
+                          <RequirePerm perm="reports.generate_weekly">
                             <WeeklyReportsPage />
                           </RequirePerm>
                         }

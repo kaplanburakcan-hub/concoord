@@ -300,6 +300,36 @@ func insertLines(ctx context.Context, tx pgx.Tx, reportID uuid.UUID, in dailyInp
 	return nil
 }
 
+// validateManpowerContracts — personel satırlarında seçilen taşeronların
+// rapor tarihinde geçerli (başlamış, süresi (varsa uzatılmış bitişiyle)
+// dolmamış) bir sözleşmesi olduğunu doğrular. Bu, ListSubcontractors'daki
+// active_on filtresinin sunucu tarafı karşılığıdır — dropdown'ı atlayıp
+// doğrudan API'ye yazan bir istemci de bu kontrolden geçmek zorundadır.
+func (h *Handler) validateManpowerContracts(ctx context.Context, pid uuid.UUID, reportDate string, manpower []manpowerDTO) (map[string]string, error) {
+	fields := map[string]string{}
+	for i, m := range manpower {
+		if m.SubcontractorID == nil {
+			continue // Ana yüklenici — taşeron seçilmemiş, kontrol gerekmez
+		}
+		var active bool
+		if err := h.pool.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM contracts c
+				WHERE c.subcontractor_id = $1 AND c.project_id = $2 AND c.deleted_at IS NULL
+				  AND (c.start_date IS NULL OR c.start_date <= $3::date)
+				  AND (COALESCE(c.revised_end_date, c.end_date) IS NULL
+				       OR COALESCE(c.revised_end_date, c.end_date) >= $3::date)
+			)`, *m.SubcontractorID, pid, reportDate).Scan(&active); err != nil {
+			return nil, err
+		}
+		if !active {
+			fields[fmt.Sprintf("manpower[%d].subcontractor_id", i)] =
+				"bu taşeronun rapor tarihinde geçerli bir sözleşmesi yok"
+		}
+	}
+	return fields, nil
+}
+
 // ---------------------------------------------------------------------------
 // Günlük rapor uçları
 // ---------------------------------------------------------------------------
@@ -388,6 +418,13 @@ func (h *Handler) CreateDaily(w http.ResponseWriter, r *http.Request) {
 		httpx.ValidationFailed(w, r, fields)
 		return
 	}
+	if fields, err := h.validateManpowerContracts(r.Context(), pid, in.ReportDate, in.Manpower); err != nil {
+		httpx.Internal(w, r)
+		return
+	} else if len(fields) > 0 {
+		httpx.ValidationFailed(w, r, fields)
+		return
+	}
 
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {
@@ -446,6 +483,13 @@ func (h *Handler) UpdateDaily(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if fields := validateDaily(in); len(fields) > 0 {
+		httpx.ValidationFailed(w, r, fields)
+		return
+	}
+	if fields, err := h.validateManpowerContracts(r.Context(), pid, in.ReportDate, in.Manpower); err != nil {
+		httpx.Internal(w, r)
+		return
+	} else if len(fields) > 0 {
 		httpx.ValidationFailed(w, r, fields)
 		return
 	}
