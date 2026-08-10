@@ -62,7 +62,7 @@ body {
   transition: background-color .25s, color .25s;
 }
 
-/* Aptos Light varsayılan; sayısal hizalama için mono sınıfı tabular kalsın */
+/* Roboto varsayılan (bkz. tailwind.config.js); sayısal hizalama için mono sınıfı tabular kalsın */
 .font-mono { font-variant-numeric: tabular-nums; }
 
 /* İşlev alanı nokta deseni (AppShell <main> bu sınıfı kullanır).

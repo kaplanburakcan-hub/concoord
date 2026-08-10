@@ -29,10 +29,10 @@ export default {
         },
       },
       fontFamily: {
-        // Tüm roller Aptos Light (Windows/Office'te yerleşik); yoksa Inter'e düşer.
-        display: ["'Aptos'", "'Aptos Display'", "'Segoe UI Variable'", "'Segoe UI'", "'Inter'", "system-ui", "sans-serif"],
-        body: ["'Aptos'", "'Segoe UI Variable'", "'Segoe UI'", "'Inter'", "system-ui", "sans-serif"],
-        mono: ["'Aptos'", "'Segoe UI Variable'", "'Inter'", "system-ui", "sans-serif"],
+        // Tüm roller Roboto (Google Fonts, index.html'de yüklenir).
+        display: ["'Roboto'", "system-ui", "sans-serif"],
+        body: ["'Roboto'", "system-ui", "sans-serif"],
+        mono: ["'Roboto'", "system-ui", "sans-serif"],
       },
     },
   },
