@@ -144,7 +144,7 @@ export default function MaterialApprovalDetailPage() {
       {/* İş akışı aksiyonları */}
       {mar.status === "Submitted" && can("material_approvals.review") && (
         <button onClick={() => act("review")} disabled={busy}
-          className="rounded bg-blue-500/80 hover:bg-blue-500 disabled:opacity-60 text-white font-semibold px-4 py-2 text-sm">
+          className="rounded bg-emniyet-500/80 hover:bg-emniyet-500 disabled:opacity-60 text-beton-950 font-semibold px-4 py-2 text-sm">
           İncelemeye al ve karara sun
         </button>
       )}

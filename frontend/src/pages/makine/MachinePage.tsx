@@ -323,7 +323,7 @@ export default function MachinePage({
         <h1 className="text-xl font-bold text-beton-100">{tipLabel}</h1>
         <button
           onClick={openAdd}
-          className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
+          className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium"
         >
           + {tipLabel === "Ekipmanlar" ? "Ekipman" : tipLabel === "İş Makineleri" ? "Makine" : "Araç"} Ekle
         </button>
@@ -529,7 +529,7 @@ export default function MachinePage({
                       <button
                         onClick={addLog}
                         disabled={logSaving || (logForm.calisma_miktari ?? 0) <= 0}
-                        className="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium disabled:opacity-50"
+                        className="px-3 py-1.5 rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium disabled:opacity-50"
                       >
                         {logSaving ? "…" : "Ekle"}
                       </button>
@@ -805,7 +805,7 @@ export default function MachinePage({
               <button
                 onClick={saveMachine}
                 disabled={saving || !form.ad?.trim()}
-                className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium disabled:opacity-50"
+                className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium disabled:opacity-50"
               >
                 {saving ? "Kaydediliyor…" : "Kaydet"}
               </button>

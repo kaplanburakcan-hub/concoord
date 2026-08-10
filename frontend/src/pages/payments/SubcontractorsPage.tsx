@@ -259,7 +259,7 @@ function TedarikciPanel({ tedarikciler, selected, onSelect, canManage, onChanged
           />
           <button
             onClick={add}
-            className="w-full rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-1.5"
+            className="w-full rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-sm py-1.5"
           >
             Tedarikçi Ekle
           </button>

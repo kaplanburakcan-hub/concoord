@@ -431,7 +431,7 @@ export default function SahaTutanaklariPage() {
               )}
               {secili.durum === "onay_sureci" && bekleyenOnay !== -1 && (
                 <button onClick={() => setOnayModal(true)}
-                  className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500"
+                  className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-beton-950 hover:brightness-110"
                 >Onay Ver / Reddet</button>
               )}
               {secili.durum === "taslak" && (

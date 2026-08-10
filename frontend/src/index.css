@@ -39,25 +39,29 @@
   --shadow: 0 1px 2px rgba(16,40,80,.05), 0 4px 14px rgba(16,40,80,.05);
 }
 [data-theme="dark"] {
-  --beton-950: 10 20 36;
-  --beton-900: 15 30 53;
-  --beton-800: 30 50 84;
-  --beton-700: 42 66 106;
-  --beton-600: 107 127 158;
-  --beton-500: 107 127 158;
-  --beton-400: 157 176 204;
-  --beton-300: 190 205 225;
-  --beton-200: 230 236 246;
-  --beton-100: 245 248 252;
-  --emniyet-500: 79 139 255;
-  --emniyet-600: 63 120 236;
+  /* beton ölçeği — nötr Grafit ailesi (eski lacivert tondan bilinçli
+     olarak ayrıldı; kart yüzeyi chrome ile aynı tonda, sayfa zemini
+     bir kademe koyu — sidebar ile bütünleşik tek bir koyu tema). */
+  --beton-950: 22 24 28;
+  --beton-900: 32 36 44;
+  --beton-800: 46 50 58;
+  --beton-700: 62 67 77;
+  --beton-600: 130 136 146;
+  --beton-500: 130 136 146;
+  --beton-400: 172 178 187;
+  --beton-300: 200 205 212;
+  --beton-200: 228 231 235;
+  --beton-100: 245 246 248;
+  /* vurgu — logo sarısı (sidebar'daki group-accent ile aynı) */
+  --emniyet-500: 245 168 0;
+  --emniyet-600: 214 145 0;
   --sky: 95 199 251;
   --chrome: #20242c; --chrome-2: #2a2f39; --chrome-active: #363c48;
   --chrome-text: #eef0f4; --chrome-text-2: #9aa2b1; --chrome-text-3: #6b7383;
   --chrome-border: rgba(255,255,255,.08);
   --group-accent: #f5a800; --group-fill: rgba(245,168,0,.14); --group-border: rgba(245,168,0,.28);
-  --accent: #4f8bff; --accent-sky: #5fc7fb;
-  --grid: #1a2f51; --muted: #6b7f9e; --dot: rgba(120,160,220,.055);
+  --accent: #f5a800; --accent-sky: #5fc7fb;
+  --grid: #2a2f39; --muted: #8a9099; --dot: rgba(180,190,200,.05);
   --shadow: 0 1px 2px rgba(0,0,0,.3);
 }
 
@@ -88,8 +92,11 @@ body {
    kurallar katmanlı important kurallara göre daha DÜŞÜK önceliğe sahiptir —
    bu blok katmansız kalırsa aşağıdaki override'lar sessizce kaybedebilir. */
 @layer utilities {
-  /* Accent üstündeki metin her iki temada da beyaz (emniyet artık azure). */
-  body .text-beton-950 { color: #fff !important; }
+  /* Accent üstündeki metin: açık temada emniyet-500 mavi kaldığından beyaz
+     metin gerekir; koyu temada emniyet-500 artık sarı (--group-accent ile
+     aynı), bu yüzden text-beton-950 kendi koyu tonunda kalmalı — override
+     yalnızca açık temaya kısıtlanır. */
+  [data-theme="light"] body .text-beton-950 { color: #fff !important; }
   /* İçerikteki text-white başlıkları açık temada koyu mürekkebe döner
      (chrome/sidebar <main> dışında olduğundan beyaz kalır). */
   [data-theme="light"] main .text-white { color: rgb(15 32 54) !important; }
