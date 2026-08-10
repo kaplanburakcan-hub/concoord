@@ -45,9 +45,12 @@ function applyProjectAccent(color?: string | null) {
   if (rgb) {
     root.setProperty("--emniyet-500", rgb);
     root.setProperty("--emniyet-600", darken(color!, 0.18) ?? rgb);
+    // Sayfa zemini bu değere göre hafif tonlanır (bkz. index.css .app-canvas).
+    root.setProperty("--project-accent-rgb", rgb);
   } else {
     root.removeProperty("--emniyet-500");
     root.removeProperty("--emniyet-600");
+    root.removeProperty("--project-accent-rgb");
   }
 }
 

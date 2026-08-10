@@ -65,9 +65,15 @@ body {
 /* Aptos Light varsayılan; sayısal hizalama için mono sınıfı tabular kalsın */
 .font-mono { font-variant-numeric: tabular-nums; }
 
-/* İşlev alanı nokta deseni (AppShell <main> bu sınıfı kullanır) */
+/* İşlev alanı nokta deseni (AppShell <main> bu sınıfı kullanır).
+   Aktif projenin vurgu rengi varsa (--project-accent-rgb, bkz.
+   ProjectContext.tsx) zemin o rengin hafif bir tonuna kayar — proje
+   değişince "hangi projedeyim" hissi zemin renginden gelsin, metinler
+   nötr/koyu kalsın diye kart/metin renklerine dokunulmaz. color-mix
+   desteklenmiyorsa ilk satır (düz beton-950) geçerli kalır. */
 .app-canvas {
   background-color: rgb(var(--beton-950));
+  background-color: color-mix(in srgb, rgb(var(--beton-950)) 93%, rgb(var(--project-accent-rgb, var(--beton-950))));
   background-image: radial-gradient(var(--dot) 1.1px, transparent 1.1px);
   background-size: 22px 22px;
 }
