@@ -265,7 +265,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
               style={{ background: "rgba(255,255,255,.06)", borderColor: "var(--chrome-border)" }}
               title="Aktif proje"
             >
-              <span className="text-[11.5px] font-medium" style={{ color: "var(--accent-sky)" }}>
+              <span className="text-[11.5px] font-medium" style={{ color: "var(--group-accent)" }}>
                 {current?.code ?? "PROJE"}
               </span>
               <select
