@@ -98,6 +98,7 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
           currency: f.currency,
           status: f.status,
           budget_total: f.budget_total,
+          accent_color: f.accent_color ?? "",
           row_version: project.row_version,
         },
       });
@@ -117,6 +118,12 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
     ["Para birimi", project.currency],
     ["Bütçe", project.budget_total != null ? project.budget_total.toLocaleString("tr-TR") : "—"],
     ["Statü", project.status],
+    ["Vurgu Rengi", project.accent_color
+      ? <span className="inline-flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full border border-beton-700 inline-block" style={{ background: project.accent_color }} />
+          <span className="font-mono">{project.accent_color}</span>
+        </span>
+      : "Varsayılan"],
   ];
 
   if (!edit) {
@@ -155,6 +162,23 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
         <select className={inp} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
           {["Planning", "Active", "OnHold", "Closed", "Archived"].map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
+      </Field>
+      <Field label="Vurgu Rengi">
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={f.accent_color || "#2f6fed"}
+            onChange={(e) => setF({ ...f, accent_color: e.target.value })}
+            className="h-9 w-12 rounded border border-beton-800 bg-beton-950 cursor-pointer"
+          />
+          <span className="text-xs text-beton-400 font-mono">{f.accent_color || "varsayılan"}</span>
+          {f.accent_color && (
+            <button type="button" onClick={() => setF({ ...f, accent_color: undefined })}
+              className="text-xs text-beton-500 hover:text-beton-300 ml-auto">
+              Sıfırla
+            </button>
+          )}
+        </div>
       </Field>
       {err && <p className="sm:col-span-2 text-sm text-red-400">{err}</p>}
       <div className="sm:col-span-2 flex gap-2">

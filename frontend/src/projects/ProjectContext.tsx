@@ -14,9 +14,42 @@ export type Project = {
   start_date?: string;
   end_date?: string;
   status: string;
+  accent_color?: string;
   row_version: number;
   created_at: string;
 };
+
+// #RRGGBB → "R G B" (Tailwind'in rgb(var(--emniyet-500) / <alpha-value>) deseniyle uyumlu).
+function hexToRgbTriplet(hex: string): string | null {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
+}
+function darken(hex: string, amount: number): string | null {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  const r = Math.max(0, Math.round(((n >> 16) & 255) * (1 - amount)));
+  const g = Math.max(0, Math.round(((n >> 8) & 255) * (1 - amount)));
+  const b = Math.max(0, Math.round((n & 255) * (1 - amount)));
+  return `${r} ${g} ${b}`;
+}
+
+// Proje vurgu rengini kök CSS değişkenlerine uygular; proje rengi yoksa
+// (veya proje seçili değilse) tema varsayılanına dönmesi için satır içi
+// override kaldırılır (CSS cascade [data-theme] kuralına düşer).
+function applyProjectAccent(color?: string | null) {
+  const root = document.documentElement.style;
+  const rgb = color ? hexToRgbTriplet(color) : null;
+  if (rgb) {
+    root.setProperty("--emniyet-500", rgb);
+    root.setProperty("--emniyet-600", darken(color!, 0.18) ?? rgb);
+  } else {
+    root.removeProperty("--emniyet-500");
+    root.removeProperty("--emniyet-600");
+  }
+}
 
 type ProjectState = {
   projects: Project[];
@@ -85,6 +118,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     () => projects.find((p) => p.id === currentId) ?? null,
     [projects, currentId]
   );
+
+  // Aktif projenin vurgu rengini uygula; proje değişince veya renk yoksa
+  // tema varsayılanına dön.
+  useEffect(() => {
+    applyProjectAccent(current?.accent_color);
+    return () => applyProjectAccent(null);
+  }, [current?.accent_color]);
 
   const value = useMemo<ProjectState>(
     () => ({ projects, current, loading, select, reload }),

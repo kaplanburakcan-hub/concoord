@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -47,17 +48,20 @@ type projectDTO struct {
 	StartDate   *time.Time `json:"start_date,omitempty"`
 	EndDate     *time.Time `json:"end_date,omitempty"`
 	Status      string     `json:"status"`
+	AccentColor *string    `json:"accent_color,omitempty"`
 	RowVersion  int        `json:"row_version"`
 	CreatedAt   time.Time  `json:"created_at"`
 }
 
 const projectCols = `id, code, name, location, client_name, budget_total::float8, currency,
-	start_date, end_date, status, row_version, created_at`
+	start_date, end_date, status, accent_color, row_version, created_at`
 
 func scanProject(row pgx.Row, p *projectDTO) error {
 	return row.Scan(&p.ID, &p.Code, &p.Name, &p.Location, &p.ClientName, &p.BudgetTotal,
-		&p.Currency, &p.StartDate, &p.EndDate, &p.Status, &p.RowVersion, &p.CreatedAt)
+		&p.Currency, &p.StartDate, &p.EndDate, &p.Status, &p.AccentColor, &p.RowVersion, &p.CreatedAt)
 }
+
+var hexColorRe = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 
 // ListProjects — proje seçicinin kaynağı. Kullanıcı yalnızca ÜYESİ olduğu
 // projeleri görür (Plan §3). İstisna: projects.view iznine GLOBAL (proje
@@ -108,6 +112,7 @@ type createProjectReq struct {
 	StartDate   *string  `json:"start_date"` // YYYY-MM-DD
 	EndDate     *string  `json:"end_date"`
 	Status      *string  `json:"status"`
+	AccentColor *string  `json:"accent_color"`
 }
 
 func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
@@ -129,6 +134,10 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		httpx.ValidationFailed(w, r, fields)
 		return
 	}
+	if req.AccentColor != nil && strings.TrimSpace(*req.AccentColor) != "" && !hexColorRe.MatchString(strings.TrimSpace(*req.AccentColor)) {
+		httpx.ValidationFailed(w, r, map[string]string{"accent_color": "geçerli bir hex renk kodu girin (#RRGGBB)"})
+		return
+	}
 
 	uid, _ := auth.UserIDFrom(r.Context())
 
@@ -142,11 +151,11 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	var p projectDTO
 	err = scanProject(tx.QueryRow(r.Context(), `
 		INSERT INTO projects (code, name, location, client_name, budget_total, currency,
-			start_date, end_date, status)
-		VALUES ($1,$2,$3,$4,$5,$6, NULLIF($7,'')::date, NULLIF($8,'')::date, $9)
+			start_date, end_date, status, accent_color)
+		VALUES ($1,$2,$3,$4,$5,$6, NULLIF($7,'')::date, NULLIF($8,'')::date, $9, NULLIF($10,''))
 		RETURNING `+projectCols,
 		req.Code, req.Name, req.Location, req.ClientName, req.BudgetTotal, currency,
-		strDeref(req.StartDate), strDeref(req.EndDate), status), &p)
+		strDeref(req.StartDate), strDeref(req.EndDate), status, strDeref(req.AccentColor)), &p)
 	if err != nil {
 		if isUniqueViolation(err) {
 			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "Bu proje kodu zaten kullanımda.", nil)
@@ -212,6 +221,7 @@ type updateProjectReq struct {
 	StartDate   *string  `json:"start_date"`
 	EndDate     *string  `json:"end_date"`
 	Status      *string  `json:"status"`
+	AccentColor *string  `json:"accent_color"`
 	RowVersion  int      `json:"row_version"`
 }
 
@@ -276,6 +286,18 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 	if req.BudgetTotal != nil {
 		budget = req.BudgetTotal
 	}
+	accentColor := before.AccentColor
+	if req.AccentColor != nil {
+		trimmed := strings.TrimSpace(*req.AccentColor)
+		if trimmed == "" {
+			accentColor = nil // boş değer = varsayılan temaya dön
+		} else if !hexColorRe.MatchString(trimmed) {
+			httpx.ValidationFailed(w, r, map[string]string{"accent_color": "geçerli bir hex renk kodu girin (#RRGGBB)"})
+			return
+		} else {
+			accentColor = &trimmed
+		}
+	}
 
 	var after projectDTO
 	err = scanProject(tx.QueryRow(r.Context(), `
@@ -283,11 +305,11 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 			name=$2, location=$3, client_name=$4, budget_total=$5, currency=$6,
 			start_date=COALESCE(NULLIF($7,'')::date, start_date),
 			end_date=COALESCE(NULLIF($8,'')::date, end_date),
-			status=$9, row_version=row_version+1
+			status=$9, accent_color=$10, row_version=row_version+1
 		WHERE id=$1
 		RETURNING `+projectCols,
 		pid, name, location, clientName, budget, currency,
-		strDeref(req.StartDate), strDeref(req.EndDate), status), &after)
+		strDeref(req.StartDate), strDeref(req.EndDate), status, accentColor), &after)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
