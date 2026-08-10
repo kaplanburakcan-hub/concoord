@@ -205,12 +205,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
               <div key={g.title}>
                 <button
                   onClick={() => toggleGroup(g.title)}
-                  className="w-full flex items-center justify-between mt-4 mb-1.5 px-3 py-0.5 rounded hover:opacity-80 transition-opacity"
-                  style={{ color: "var(--chrome-text-3)" }}
+                  className="w-full flex items-center justify-between mt-4 mb-1.5 px-3 py-2 rounded-[9px] transition-colors hover:brightness-110"
+                  style={{
+                    color: "var(--group-accent)",
+                    background: "var(--group-fill)",
+                    border: "1px solid var(--group-border)",
+                  }}
                 >
-                  <span className="flex-1 min-w-0 text-left text-[10.5px] font-medium uppercase tracking-[0.15em] leading-snug">{g.title}</span>
+                  <span className="flex-1 min-w-0 text-left text-[14px] font-bold leading-snug">{g.title}</span>
                   <svg
-                    width="11" height="11" viewBox="0 0 24 24" fill="none"
+                    width="13" height="13" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" strokeWidth="2.5"
                     className="ml-2 shrink-0"
                     style={{ transition: "transform .2s", transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
@@ -342,7 +346,7 @@ function SideLink({ item }: { item: NavDef }) {
           <>
             <span
               className="flex-none [&>svg]:w-[18px] [&>svg]:h-[18px] [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-width:1.7]"
-              style={{ color: isActive ? "var(--accent-sky)" : "currentColor" }}
+              style={{ color: isActive ? "var(--group-accent)" : "currentColor" }}
             >
               {item.icon}
             </span>
@@ -350,7 +354,7 @@ function SideLink({ item }: { item: NavDef }) {
             {isActive && (
               <span
                 className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r"
-                style={{ background: "var(--accent-sky)" }}
+                style={{ background: "var(--group-accent)" }}
               />
             )}
           </>
@@ -365,7 +369,7 @@ function SideLink({ item }: { item: NavDef }) {
               to={c.to}
               end={c.end}
               className="block py-1.5 text-[13px] transition"
-              style={({ isActive }) => ({ color: isActive ? "var(--accent-sky)" : "var(--chrome-text-2)" })}
+              style={({ isActive }) => ({ color: isActive ? "var(--group-accent)" : "var(--chrome-text-2)" })}
             >
               {c.label}
             </NavLink>
