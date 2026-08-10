@@ -10,11 +10,15 @@ export type Project = {
   location?: string;
   client_name?: string;
   budget_total?: number;
+  contract_amount?: number;
   currency: string;
   start_date?: string;
   end_date?: string;
   status: string;
   accent_color?: string;
+  site_handover_date?: string;
+  client_rep_name?: string;
+  site_manager_name?: string;
   row_version: number;
   created_at: string;
 };

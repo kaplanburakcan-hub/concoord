@@ -1,5 +1,7 @@
 package projects
 
+import "strings"
+
 // Saf doğrulama fonksiyonları — DB'siz, tam test edilebilir. Handler'lar bunları
 // çağırır; testler doğrudan doğrular (Plan: kritik kurallar kod düzeyinde garanti).
 
@@ -12,8 +14,16 @@ var MilestoneStatuses = map[string]bool{
 	"Planned": true, "InProgress": true, "Completed": true, "Delayed": true,
 }
 
+// ActiveExtra — statü "Active" olduğunda künyede zorunlu olan ek alanlar.
+type ActiveExtra struct {
+	SiteHandoverDate string // yer teslim / iş başı tarihi (YYYY-MM-DD)
+	ClientRepName    string // işveren proje sorumlusu
+	SiteManagerName  string // şantiye şefi
+}
+
 // ValidateProject — proje künyesi alan doğrulaması. Boş map = geçerli.
-func ValidateProject(code, name, currency, status string) map[string]string {
+// status "Active" ise extra'daki üç alan zorunlu hale gelir.
+func ValidateProject(code, name, currency, status string, extra ActiveExtra) map[string]string {
 	f := map[string]string{}
 	if code == "" {
 		f["code"] = "zorunlu"
@@ -26,6 +36,17 @@ func ValidateProject(code, name, currency, status string) map[string]string {
 	}
 	if !ProjectStatuses[status] {
 		f["status"] = "geçersiz statü"
+	}
+	if status == "Active" {
+		if strings.TrimSpace(extra.SiteHandoverDate) == "" {
+			f["site_handover_date"] = "proje Aktif iken zorunlu"
+		}
+		if strings.TrimSpace(extra.ClientRepName) == "" {
+			f["client_rep_name"] = "proje Aktif iken zorunlu"
+		}
+		if strings.TrimSpace(extra.SiteManagerName) == "" {
+			f["site_manager_name"] = "proje Aktif iken zorunlu"
+		}
 	}
 	return f
 }

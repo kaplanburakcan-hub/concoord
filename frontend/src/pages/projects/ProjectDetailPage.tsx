@@ -1,9 +1,17 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api } from "../../api/client";
+import { api, RequestError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects, type Project } from "../ProjectContext";
+
+const STATUS_LABEL: Record<string, string> = {
+  Planning: "Planlama",
+  Active: "Aktif",
+  OnHold: "Beklemede",
+  Closed: "Kapandı",
+  Archived: "Arşiv",
+};
 
 type Milestone = {
   id: string;
@@ -83,10 +91,24 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
   const [f, setF] = useState(project);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
+
+  const isActive = f.status === "Active";
+
+  function validateActiveExtra(): boolean {
+    if (!isActive) return true;
+    const fe: Record<string, string> = {};
+    if (!f.site_handover_date) fe.site_handover_date = "proje Aktif iken zorunlu";
+    if (!f.client_rep_name?.trim()) fe.client_rep_name = "proje Aktif iken zorunlu";
+    if (!f.site_manager_name?.trim()) fe.site_manager_name = "proje Aktif iken zorunlu";
+    setFieldErr(fe);
+    return Object.keys(fe).length === 0;
+  }
 
   async function save() {
-    setBusy(true);
     setErr(null);
+    if (!validateActiveExtra()) return;
+    setBusy(true);
     try {
       const res = await api<{ project: Project }>(`/projects/${project.id}`, {
         method: "PATCH",
@@ -98,15 +120,24 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
           currency: f.currency,
           status: f.status,
           budget_total: f.budget_total,
+          contract_amount: f.contract_amount,
           accent_color: f.accent_color ?? "",
+          site_handover_date: f.site_handover_date ?? "",
+          client_rep_name: f.client_rep_name ?? "",
+          site_manager_name: f.site_manager_name ?? "",
           row_version: project.row_version,
         },
       });
       onSaved(res.project);
       setF(res.project);
       setEdit(false);
-    } catch {
-      setErr("Kaydedilemedi (sürüm çakışması olabilir).");
+      setFieldErr({});
+    } catch (e) {
+      if (e instanceof RequestError && e.api?.details) {
+        setFieldErr(e.api.details as Record<string, string>);
+      } else {
+        setErr("Kaydedilemedi (sürüm çakışması olabilir).");
+      }
     } finally {
       setBusy(false);
     }
@@ -116,8 +147,14 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
     ["İşveren", project.client_name || "—"],
     ["Lokasyon", project.location || "—"],
     ["Para birimi", project.currency],
-    ["Bütçe", project.budget_total != null ? project.budget_total.toLocaleString("tr-TR") : "—"],
-    ["Statü", project.status],
+    ["Sözleşme Bedeli", project.contract_amount != null ? project.contract_amount.toLocaleString("tr-TR") : "—"],
+    ["Yapım Bütçesi", project.budget_total != null ? project.budget_total.toLocaleString("tr-TR") : "—"],
+    ["Statü", STATUS_LABEL[project.status] ?? project.status],
+    ...(project.status === "Active" ? [
+      ["Yer Teslim / İş Başı Tarihi", project.site_handover_date ? fmtDateTR(project.site_handover_date) : "—"] as [string, ReactNode],
+      ["İşveren Proje Sorumlusu", project.client_rep_name || "—"] as [string, ReactNode],
+      ["Şantiye Şefi", project.site_manager_name || "—"] as [string, ReactNode],
+    ] : []),
     ["Vurgu Rengi", project.accent_color
       ? <span className="inline-flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-full border border-beton-700 inline-block" style={{ background: project.accent_color }} />
@@ -137,14 +174,22 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
             </div>
           ))}
         </div>
-        {canEdit && (
-          <button
-            onClick={() => { setF(project); setEdit(true); }}
-            className="mt-3 rounded-md border border-beton-800 px-3 py-1.5 text-sm text-beton-200 hover:border-emniyet-500"
+        <div className="mt-3 flex gap-2 flex-wrap">
+          {canEdit && (
+            <button
+              onClick={() => { setF(project); setEdit(true); }}
+              className="rounded-md border border-beton-800 px-3 py-1.5 text-sm text-beton-200 hover:border-emniyet-500"
+            >
+              Künyeyi düzenle
+            </button>
+          )}
+          <Link
+            to="/proje/ana-sozlesme"
+            className="rounded-md border border-beton-800 px-3 py-1.5 text-sm text-beton-200 hover:border-emniyet-500"
           >
-            Künyeyi düzenle
-          </button>
-        )}
+            Ana Sözleşme Ekle / Düzenle
+          </Link>
+        </div>
       </div>
     );
   }
@@ -155,14 +200,32 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
       <Field label="İşveren"><input className={inp} value={f.client_name || ""} onChange={(e) => setF({ ...f, client_name: e.target.value })} /></Field>
       <Field label="Lokasyon"><input className={inp} value={f.location || ""} onChange={(e) => setF({ ...f, location: e.target.value })} /></Field>
       <Field label="Para birimi"><input className={inp} value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value })} /></Field>
-      <Field label="Bütçe">
+      <Field label="Sözleşme Bedeli">
+        <input type="number" className={inp} value={f.contract_amount ?? ""} onChange={(e) => setF({ ...f, contract_amount: e.target.value === "" ? undefined : Number(e.target.value) })} />
+      </Field>
+      <Field label="Yapım Bütçesi">
         <input type="number" className={inp} value={f.budget_total ?? ""} onChange={(e) => setF({ ...f, budget_total: e.target.value === "" ? undefined : Number(e.target.value) })} />
       </Field>
       <Field label="Statü">
         <select className={inp} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
-          {["Planning", "Active", "OnHold", "Closed", "Archived"].map((s) => <option key={s} value={s}>{s}</option>)}
+          {["Planning", "Active", "OnHold", "Closed", "Archived"].map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
         </select>
       </Field>
+
+      {isActive && (
+        <>
+          <Field label="Yer Teslim / İş Başı Tarihi *" error={fieldErr.site_handover_date}>
+            <input type="date" className={inp} value={f.site_handover_date ?? ""} onChange={(e) => setF({ ...f, site_handover_date: e.target.value })} />
+          </Field>
+          <Field label="İşveren Proje Sorumlusu *" error={fieldErr.client_rep_name}>
+            <input className={inp} value={f.client_rep_name ?? ""} onChange={(e) => setF({ ...f, client_rep_name: e.target.value })} />
+          </Field>
+          <Field label="Şantiye Şefi *" error={fieldErr.site_manager_name}>
+            <input className={inp} value={f.site_manager_name ?? ""} onChange={(e) => setF({ ...f, site_manager_name: e.target.value })} />
+          </Field>
+        </>
+      )}
+
       <Field label="Vurgu Rengi">
         <div className="flex items-center gap-2">
           <input
@@ -185,7 +248,7 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
         <button onClick={save} disabled={busy} className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-semibold px-4 py-1.5 text-sm">
           {busy ? "Kaydediliyor…" : "Kaydet"}
         </button>
-        <button onClick={() => setEdit(false)} className="rounded-md border border-beton-800 px-3 py-1.5 text-sm text-beton-200 hover:border-emniyet-500">Vazgeç</button>
+        <button onClick={() => { setEdit(false); setFieldErr({}); }} className="rounded-md border border-beton-800 px-3 py-1.5 text-sm text-beton-200 hover:border-emniyet-500">Vazgeç</button>
       </div>
     </div>
   );
@@ -297,11 +360,18 @@ function MilestoneList({ projectId, milestones, canEdit, onChange }: {
 const inp = "w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-1.5 text-sm text-beton-200 outline-none focus:border-emniyet-500";
 const inpSm = "w-full rounded bg-beton-950 border border-beton-800 px-2 py-1 text-xs text-beton-200 outline-none focus:border-emniyet-500";
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function fmtDateTR(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}.${m}.${y}`;
+}
+
+function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
   return (
     <div>
       <label className="block text-xs text-beton-400 mb-1">{label}</label>
       {children}
+      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
     </div>
   );
 }

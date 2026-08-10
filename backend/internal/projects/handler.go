@@ -38,27 +38,33 @@ func NewHandler(pool *pgxpool.Pool, eval *rbac.Evaluator, rec *audit.Recorder, l
 // ---------------------------------------------------------------------------
 
 type projectDTO struct {
-	ID          uuid.UUID  `json:"id"`
-	Code        string     `json:"code"`
-	Name        string     `json:"name"`
-	Location    *string    `json:"location,omitempty"`
-	ClientName  *string    `json:"client_name,omitempty"`
-	BudgetTotal *float64   `json:"budget_total,omitempty"`
-	Currency    string     `json:"currency"`
-	StartDate   *time.Time `json:"start_date,omitempty"`
-	EndDate     *time.Time `json:"end_date,omitempty"`
-	Status      string     `json:"status"`
-	AccentColor *string    `json:"accent_color,omitempty"`
-	RowVersion  int        `json:"row_version"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID               uuid.UUID  `json:"id"`
+	Code             string     `json:"code"`
+	Name             string     `json:"name"`
+	Location         *string    `json:"location,omitempty"`
+	ClientName       *string    `json:"client_name,omitempty"`
+	BudgetTotal      *float64   `json:"budget_total,omitempty"`
+	ContractAmount   *float64   `json:"contract_amount,omitempty"`
+	Currency         string     `json:"currency"`
+	StartDate        *time.Time `json:"start_date,omitempty"`
+	EndDate          *time.Time `json:"end_date,omitempty"`
+	Status           string     `json:"status"`
+	AccentColor      *string    `json:"accent_color,omitempty"`
+	SiteHandoverDate *time.Time `json:"site_handover_date,omitempty"`
+	ClientRepName    *string    `json:"client_rep_name,omitempty"`
+	SiteManagerName  *string    `json:"site_manager_name,omitempty"`
+	RowVersion       int        `json:"row_version"`
+	CreatedAt        time.Time  `json:"created_at"`
 }
 
-const projectCols = `id, code, name, location, client_name, budget_total::float8, currency,
-	start_date, end_date, status, accent_color, row_version, created_at`
+const projectCols = `id, code, name, location, client_name, budget_total::float8, contract_amount::float8,
+	currency, start_date, end_date, status, accent_color,
+	site_handover_date, client_rep_name, site_manager_name, row_version, created_at`
 
 func scanProject(row pgx.Row, p *projectDTO) error {
-	return row.Scan(&p.ID, &p.Code, &p.Name, &p.Location, &p.ClientName, &p.BudgetTotal,
-		&p.Currency, &p.StartDate, &p.EndDate, &p.Status, &p.AccentColor, &p.RowVersion, &p.CreatedAt)
+	return row.Scan(&p.ID, &p.Code, &p.Name, &p.Location, &p.ClientName, &p.BudgetTotal, &p.ContractAmount,
+		&p.Currency, &p.StartDate, &p.EndDate, &p.Status, &p.AccentColor,
+		&p.SiteHandoverDate, &p.ClientRepName, &p.SiteManagerName, &p.RowVersion, &p.CreatedAt)
 }
 
 var hexColorRe = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
@@ -103,16 +109,20 @@ func (h *Handler) ListProjects(w http.ResponseWriter, r *http.Request) {
 }
 
 type createProjectReq struct {
-	Code        string   `json:"code"`
-	Name        string   `json:"name"`
-	Location    *string  `json:"location"`
-	ClientName  *string  `json:"client_name"`
-	BudgetTotal *float64 `json:"budget_total"`
-	Currency    *string  `json:"currency"`
-	StartDate   *string  `json:"start_date"` // YYYY-MM-DD
-	EndDate     *string  `json:"end_date"`
-	Status      *string  `json:"status"`
-	AccentColor *string  `json:"accent_color"`
+	Code             string   `json:"code"`
+	Name             string   `json:"name"`
+	Location         *string  `json:"location"`
+	ClientName       *string  `json:"client_name"`
+	BudgetTotal      *float64 `json:"budget_total"`
+	ContractAmount   *float64 `json:"contract_amount"`
+	Currency         *string  `json:"currency"`
+	StartDate        *string  `json:"start_date"` // YYYY-MM-DD
+	EndDate          *string  `json:"end_date"`
+	Status           *string  `json:"status"`
+	AccentColor      *string  `json:"accent_color"`
+	SiteHandoverDate *string  `json:"site_handover_date"`
+	ClientRepName    *string  `json:"client_rep_name"`
+	SiteManagerName  *string  `json:"site_manager_name"`
 }
 
 func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
@@ -130,7 +140,11 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	if req.Status != nil && *req.Status != "" {
 		status = *req.Status
 	}
-	if fields := ValidateProject(req.Code, req.Name, currency, status); len(fields) > 0 {
+	if fields := ValidateProject(req.Code, req.Name, currency, status, ActiveExtra{
+		SiteHandoverDate: strDeref(req.SiteHandoverDate),
+		ClientRepName:    strDeref(req.ClientRepName),
+		SiteManagerName:  strDeref(req.SiteManagerName),
+	}); len(fields) > 0 {
 		httpx.ValidationFailed(w, r, fields)
 		return
 	}
@@ -150,12 +164,14 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 
 	var p projectDTO
 	err = scanProject(tx.QueryRow(r.Context(), `
-		INSERT INTO projects (code, name, location, client_name, budget_total, currency,
-			start_date, end_date, status, accent_color)
-		VALUES ($1,$2,$3,$4,$5,$6, NULLIF($7,'')::date, NULLIF($8,'')::date, $9, NULLIF($10,''))
+		INSERT INTO projects (code, name, location, client_name, budget_total, contract_amount, currency,
+			start_date, end_date, status, accent_color, site_handover_date, client_rep_name, site_manager_name)
+		VALUES ($1,$2,$3,$4,$5,$6,$7, NULLIF($8,'')::date, NULLIF($9,'')::date, $10, NULLIF($11,''),
+			NULLIF($12,'')::date, NULLIF($13,''), NULLIF($14,''))
 		RETURNING `+projectCols,
-		req.Code, req.Name, req.Location, req.ClientName, req.BudgetTotal, currency,
-		strDeref(req.StartDate), strDeref(req.EndDate), status, strDeref(req.AccentColor)), &p)
+		req.Code, req.Name, req.Location, req.ClientName, req.BudgetTotal, req.ContractAmount, currency,
+		strDeref(req.StartDate), strDeref(req.EndDate), status, strDeref(req.AccentColor),
+		strDeref(req.SiteHandoverDate), strDeref(req.ClientRepName), strDeref(req.SiteManagerName)), &p)
 	if err != nil {
 		if isUniqueViolation(err) {
 			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "Bu proje kodu zaten kullanımda.", nil)
@@ -213,16 +229,20 @@ func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateProjectReq struct {
-	Name        *string  `json:"name"`
-	Location    *string  `json:"location"`
-	ClientName  *string  `json:"client_name"`
-	BudgetTotal *float64 `json:"budget_total"`
-	Currency    *string  `json:"currency"`
-	StartDate   *string  `json:"start_date"`
-	EndDate     *string  `json:"end_date"`
-	Status      *string  `json:"status"`
-	AccentColor *string  `json:"accent_color"`
-	RowVersion  int      `json:"row_version"`
+	Name             *string  `json:"name"`
+	Location         *string  `json:"location"`
+	ClientName       *string  `json:"client_name"`
+	BudgetTotal      *float64 `json:"budget_total"`
+	ContractAmount   *float64 `json:"contract_amount"`
+	Currency         *string  `json:"currency"`
+	StartDate        *string  `json:"start_date"`
+	EndDate          *string  `json:"end_date"`
+	Status           *string  `json:"status"`
+	AccentColor      *string  `json:"accent_color"`
+	SiteHandoverDate *string  `json:"site_handover_date"`
+	ClientRepName    *string  `json:"client_rep_name"`
+	SiteManagerName  *string  `json:"site_manager_name"`
+	RowVersion       int      `json:"row_version"`
 }
 
 func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
@@ -270,7 +290,26 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 	if req.Status != nil && *req.Status != "" {
 		status = *req.Status
 	}
-	if fields := ValidateProject(before.Code, name, currency, status); len(fields) > 0 {
+	siteHandoverDate := ""
+	if before.SiteHandoverDate != nil {
+		siteHandoverDate = before.SiteHandoverDate.Format("2006-01-02")
+	}
+	if req.SiteHandoverDate != nil {
+		siteHandoverDate = strDeref(req.SiteHandoverDate)
+	}
+	clientRepName := strDeref(before.ClientRepName)
+	if req.ClientRepName != nil {
+		clientRepName = strDeref(req.ClientRepName)
+	}
+	siteManagerName := strDeref(before.SiteManagerName)
+	if req.SiteManagerName != nil {
+		siteManagerName = strDeref(req.SiteManagerName)
+	}
+	if fields := ValidateProject(before.Code, name, currency, status, ActiveExtra{
+		SiteHandoverDate: siteHandoverDate,
+		ClientRepName:    clientRepName,
+		SiteManagerName:  siteManagerName,
+	}); len(fields) > 0 {
 		httpx.ValidationFailed(w, r, fields)
 		return
 	}
@@ -285,6 +324,10 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 	budget := before.BudgetTotal
 	if req.BudgetTotal != nil {
 		budget = req.BudgetTotal
+	}
+	contractAmount := before.ContractAmount
+	if req.ContractAmount != nil {
+		contractAmount = req.ContractAmount
 	}
 	accentColor := before.AccentColor
 	if req.AccentColor != nil {
@@ -302,14 +345,17 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 	var after projectDTO
 	err = scanProject(tx.QueryRow(r.Context(), `
 		UPDATE projects SET
-			name=$2, location=$3, client_name=$4, budget_total=$5, currency=$6,
-			start_date=COALESCE(NULLIF($7,'')::date, start_date),
-			end_date=COALESCE(NULLIF($8,'')::date, end_date),
-			status=$9, accent_color=$10, row_version=row_version+1
+			name=$2, location=$3, client_name=$4, budget_total=$5, contract_amount=$6, currency=$7,
+			start_date=COALESCE(NULLIF($8,'')::date, start_date),
+			end_date=COALESCE(NULLIF($9,'')::date, end_date),
+			status=$10, accent_color=$11,
+			site_handover_date=NULLIF($12,'')::date, client_rep_name=NULLIF($13,''), site_manager_name=NULLIF($14,''),
+			row_version=row_version+1
 		WHERE id=$1
 		RETURNING `+projectCols,
-		pid, name, location, clientName, budget, currency,
-		strDeref(req.StartDate), strDeref(req.EndDate), status, accentColor), &after)
+		pid, name, location, clientName, budget, contractAmount, currency,
+		strDeref(req.StartDate), strDeref(req.EndDate), status, accentColor,
+		siteHandoverDate, clientRepName, siteManagerName), &after)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
