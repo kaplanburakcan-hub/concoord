@@ -6,6 +6,7 @@ import { Can } from "../auth/guards";
 import { useProjects } from "../projects/ProjectContext";
 import SCurve from "./dashboard/SCurve";
 import type { SCurvePoint } from "./dashboard/SCurve";
+import ProgressDonut from "./dashboard/ProgressDonut";
 
 // Faz 9 — rol duyarlı proje dashboard'u. Finansal blok (EVM) backend'de izinle
 // süzülür: reports.view_financial_reports yoksa `evm` alanı hiç gelmez; taşeron
@@ -41,6 +42,8 @@ type EVM = {
   plan_source: string;
   s_curve: SCurvePoint[];
   as_of_month: string;
+  contract_amount?: number;
+  financial_progress_pct: number;
 };
 type Dash = {
   project: { id: string; code: string; name: string; status: string; currency: string };
@@ -131,18 +134,44 @@ export default function Dashboard() {
 
       {dash && (
         <div className="mt-6 grid gap-4">
-          {/* İlerleme çubuğu — herkese açık (tutar içermez) */}
-          <Card title="Fiziki ilerleme">
-            <div className="h-3 rounded-full bg-beton-800 border border-beton-700 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-emniyet-500 transition-all"
-                style={{ width: `${Math.min(100, dash.progress_pct)}%` }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-beton-400" style={{ fontVariantNumeric: "tabular-nums" }}>
-              %{dash.progress_pct.toFixed(1)}
-            </p>
-          </Card>
+          <div className={dash.evm ? "grid gap-4 md:grid-cols-2" : "grid gap-4"}>
+            {/* İlerleme çubuğu — herkese açık (tutar içermez) */}
+            <Card title="Fiziki ilerleme">
+              <div className="h-3 rounded-full bg-beton-800 border border-beton-700 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-emniyet-500 transition-all"
+                  style={{ width: `${Math.min(100, dash.progress_pct)}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-beton-400" style={{ fontVariantNumeric: "tabular-nums" }}>
+                %{dash.progress_pct.toFixed(1)}
+              </p>
+            </Card>
+
+            {/* Parasal ilerleme — finansal veri, EVM ile aynı izin kapısı
+                (dash.evm yalnızca reports.view_financial_reports ile gelir).
+                Taşeron hakedişleri + teslim alınmış satınalmalar (AC) /
+                proje sözleşme bedeli. */}
+            {dash.evm && (
+              <Card title="Parasal İlerleme">
+                {dash.evm.contract_amount ? (
+                  <>
+                    <ProgressDonut pct={dash.evm.financial_progress_pct} />
+                    <p className="mt-2 text-xs text-beton-400 text-center" style={{ fontVariantNumeric: "tabular-nums" }}>
+                      {money(dash.evm.ac)} / {money(dash.evm.contract_amount)}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-beton-500 text-center">
+                      Gerçekleşen harcama (hakediş + satınalma) / sözleşme bedeli
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-beton-400">
+                    Sözleşme bedeli girilmemiş — proje künyesinden ekleyin.
+                  </p>
+                )}
+              </Card>
+            )}
+          </div>
 
           {/* EVM — yalnızca finansal rapor izniyle gelir */}
           {dash.evm && (

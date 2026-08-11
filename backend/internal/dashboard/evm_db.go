@@ -28,6 +28,13 @@ type EVMResult struct {
 	PlanSource     string        `json:"plan_source"` // manual | milestones | linear
 	SCurve         []SCurvePoint `json:"s_curve"`
 	AsOfMonth      string        `json:"as_of_month"` // kümülatiflerin kesildiği ay
+
+	// Parasal ilerleme (Panel'de "Fiziki ilerleme"nin yanındaki halka grafik):
+	// AC (kesinleşen hakediş + teslim alınmış satınalma) / sözleşme bedeli.
+	// BAC (Yapım Bütçesi) ile KARIŞTIRILMAMALI — projects.contract_amount
+	// künyedeki ayrı bir alandır, boş bırakılabilir.
+	ContractAmount       *float64 `json:"contract_amount,omitempty"`
+	FinancialProgressPct float64  `json:"financial_progress_pct"`
 }
 
 // LoadEVM — proje için EVM verisini derler. Kümülatif PV/EV/AC ve endeksler
@@ -36,18 +43,19 @@ type EVMResult struct {
 func LoadEVM(ctx context.Context, pool *pgxpool.Pool, pid uuid.UUID, now time.Time) (*EVMResult, error) {
 	res := &EVMResult{}
 
-	// Proje künyesi: bütçe (BAC) + plan ufku.
-	var budget *float64
+	// Proje künyesi: bütçe (BAC) + sözleşme bedeli + plan ufku.
+	var budget, contractAmt *float64
 	var start, end *time.Time
 	if err := pool.QueryRow(ctx, `
-		SELECT budget_total, currency, start_date, end_date
+		SELECT budget_total, contract_amount, currency, start_date, end_date
 		FROM projects WHERE id=$1 AND deleted_at IS NULL`, pid).
-		Scan(&budget, &res.Currency, &start, &end); err != nil {
+		Scan(&budget, &contractAmt, &res.Currency, &start, &end); err != nil {
 		return nil, err
 	}
 	if budget != nil {
 		res.BAC = *budget
 	}
+	res.ContractAmount = contractAmt
 
 	// Sözleşme toplamı (EV ölçeği için; ana sözleşme değil ALT sözleşmeler —
 	// EV kesinleşmiş TAŞERON hakedişlerinden türediği için payda da odur).
@@ -165,6 +173,9 @@ func LoadEVM(ctx context.Context, pool *pgxpool.Pool, pid uuid.UUID, now time.Ti
 	res.EAC = EAC(res.BAC, res.EV, res.AC, rawCPI)
 	res.ETC = ETC(res.EAC, res.AC)
 	res.ProgressPct = ProgressPct(res.EV, res.BAC)
+	if res.ContractAmount != nil && *res.ContractAmount > 0 {
+		res.FinancialProgressPct = round2(res.AC / *res.ContractAmount * 100)
+	}
 	return res, nil
 }
 
