@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
@@ -25,10 +25,12 @@ const STATUS_STYLE: Record<string, string> = {
 export default function ProgressPaymentsPage() {
   const { current } = useProjects();
   const { can } = useAuth();
+  const nav = useNavigate();
   const [subs, setSubs] = useState<Sub[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [subFilter, setSubFilter] = useState<string>("");
   const [newSub, setNewSub] = useState<string>("");
+  const [creating, setCreating] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const pid = current?.id;
   const canFin = can("progress_payments.view_financials");
@@ -51,10 +53,21 @@ export default function ProgressPaymentsPage() {
 
   async function createDraft() {
     if (!newSub) return;
+    setErr(null);
+    setCreating(true);
     try {
-      await api(`/projects/${pid}/payments`, { method: "POST", projectId: pid, body: { subcontractor_id: newSub } });
-      setNewSub(""); load();
-    } catch { setErr("Taslak oluşturulamadı."); }
+      const res = await api<{ payment: { id: string } }>(
+        `/projects/${pid}/payments`, { method: "POST", projectId: pid, body: { subcontractor_id: newSub } }
+      );
+      setNewSub("");
+      // Taslak oluşur oluşmaz doğrudan giriş ekranına geç — sadece listeye
+      // dönmek kullanıcıya "hiçbir şey olmadı" hissi veriyordu.
+      nav(`/hakedis/${res.payment.id}`);
+    } catch {
+      setErr("Taslak oluşturulamadı.");
+    } finally {
+      setCreating(false);
+    }
   }
 
   if (!current) return <p className="text-beton-400">Önce üst bardan bir proje seçin.</p>;
@@ -84,10 +97,10 @@ export default function ProgressPaymentsPage() {
               {subs.map((s) => <option key={s.id} value={s.id}>{s.company_name}</option>)}
             </select>
             <button
-              onClick={createDraft} disabled={!newSub}
+              onClick={createDraft} disabled={!newSub || creating}
               className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-sm px-3 py-1.5 disabled:opacity-50"
             >
-              Yeni Taslak Hakediş
+              {creating ? "Oluşturuluyor…" : "Yeni Taslak Hakediş"}
             </button>
           </div>
         )}
