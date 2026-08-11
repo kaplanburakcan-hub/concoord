@@ -164,8 +164,8 @@ const DISC_COLORS: Record<string, string> = {
 };
 function discColor(d: string) { return DISC_COLORS[d] ?? "#6b7280"; }
 
-function SnapshotView({ sn, reportId, pid, hasPdf, status, nextWeekPlans }: {
-  sn: Snapshot; reportId: string; pid: string; hasPdf: boolean; status: WRStatus;
+function SnapshotView({ sn, reportId, pid, status, nextWeekPlans }: {
+  sn: Snapshot; reportId: string; pid: string; status: WRStatus;
   nextWeekPlans: SnapNextWeekPlan[];
 }) {
   const [showPdf, setShowPdf] = useState(false);
@@ -228,7 +228,7 @@ function SnapshotView({ sn, reportId, pid, hasPdf, status, nextWeekPlans }: {
         <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${WR_STATUS_STYLE[status]}`}>
           {WR_STATUS_LABEL[status]}
         </span>
-        {hasPdf && (
+        {status === "Ready" && (
           <button
             onClick={() => setShowPdf(true)}
             className="rounded-md border border-beton-700 px-2.5 py-1 text-xs text-beton-300 hover:border-emniyet-500 transition-colors"
@@ -984,13 +984,10 @@ export default function WeeklyReportsPage() {
                         <span className="text-sm text-yellow-300">Rapor verisi derleniyor…</span>
                       </div>
                     )}
-                    {r.status === "Ready" && !r.has_pdf && (
-                      <p className="text-[11px] text-beton-500">PDF hazırlanıyor — veriler aşağıda görüntülenebilir.</p>
-                    )}
                     {loadingSnap === r.id ? (
                       <p className="text-sm text-beton-500 py-3">Yükleniyor…</p>
                     ) : sn ? (
-                      <SnapshotView sn={sn} reportId={r.id} pid={pid} hasPdf={r.has_pdf} status={r.status}
+                      <SnapshotView sn={sn} reportId={r.id} pid={pid} status={r.status}
                         nextWeekPlans={nwPlans[r.id] ?? []} />
                     ) : (
                       <p className="text-sm text-beton-500 py-3">Veri yüklenemedi.</p>

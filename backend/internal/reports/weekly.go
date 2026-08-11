@@ -4,10 +4,13 @@ package reports
 //
 //   1. POST /weekly-reports — API, haftanın verisini SENKRON derleyip snapshot
 //      JSONB olarak dondurur (veri o anda sabitlenir; sonradan günlük rapor
-//      revize edilse bile PDF/snapshot değişmez) ve 'weekly_report_pdf' işini
-//      kuyruğa atar.
-//   2. Worker (ProcessWeeklyPDF) snapshot'tan PDF'i çizer, MinIO'ya yükler,
-//      files kaydı açar, weekly_reports'u Ready yapar ve üreteni bilgilendirir.
+//      revize edilse bile PDF/snapshot değişmez).
+//   2. GET /weekly-reports/{id}/download — PDF, kayıtlı snapshot'tan anlık
+//      (senkron) üretilir; ayrı bir worker/kuyruk YOK (production'da bu
+//      projenin arka plan worker servisi çalışmıyor — DownloadWeekly bilinçli
+//      olarak günlük rapor PDF endpoint'iyle aynı senkron deseni izler).
+//      ProcessWeeklyPDF/JobKindWeeklyPDF, ileride ayrı bir worker servisi
+//      kurulursa diye korunan, şu an hiçbir yerden çağrılmayan kod.
 //
 // Kabul kriteri karşılığı: "PDF rakamları snapshot'tan doğrulanabiliyor" —
 // PDF'e giren HER sayı snapshot'ta vardır; GET ucu snapshot'ı aynen döner.
@@ -20,7 +23,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -683,10 +685,9 @@ func (h *Handler) GenerateWeekly(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payload, _ := json.Marshal(weeklyJobPayload{WeeklyReportID: id.String()})
-	if err := notify.Enqueue(r.Context(), h.pool, JobKindWeeklyPDF, payload); err != nil {
-		h.log.Error("haftalık PDF işi kuyruğa atılamadı", "err", err, "weekly", id)
-	}
+	// PDF, indirme/önizleme anında snapshot'tan senkron üretilir (DownloadWeekly) —
+	// bu projede ayrı bir arka plan worker servisi çalışmadığından, üretimi
+	// bir iş kuyruğuna bırakmak yerine günlük rapor PDF'iyle aynı desen izlenir.
 
 	m := audit.MetaFrom(r.Context())
 	h.rec.Record(r.Context(), audit.Entry{
@@ -701,7 +702,9 @@ func (h *Handler) GenerateWeekly(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// DownloadWeekly — üretilen PDF'i MinIO'dan akıtır.
+// DownloadWeekly — kayıtlı snapshot'tan PDF'i anlık (senkron) üretip döner.
+// Günlük rapor PDF'iyle aynı desen: worker/kuyruk yok, tek raporluk üretim
+// isteğe bağlı anlık yapılır.
 func (h *Handler) DownloadWeekly(w http.ResponseWriter, r *http.Request) {
 	pid, ok := parseID(w, r, "projectID")
 	if !ok {
@@ -711,32 +714,32 @@ func (h *Handler) DownloadWeekly(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var key, name string
+	var snapJSON []byte
 	err := h.pool.QueryRow(r.Context(), `
-		SELECT f.storage_key, f.original_name
-		FROM weekly_reports wr
-		JOIN files f ON f.id = wr.generated_pdf_file_id
-		WHERE wr.id=$1 AND wr.project_id=$2 AND wr.deleted_at IS NULL
-		  AND wr.status='Ready'`, id, pid).Scan(&key, &name)
+		SELECT snapshot FROM weekly_reports
+		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL AND status='Ready'`,
+		id, pid).Scan(&snapJSON)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound,
-			"PDF henüz hazır değil ya da rapor bulunamadı.", nil)
+			"Rapor bulunamadı ya da henüz hazır değil.", nil)
 		return
 	}
 	if err != nil {
 		httpx.Internal(w, r)
 		return
 	}
-	obj, err := h.store.GetObject(r.Context(), key)
-	if err != nil {
-		h.log.Error("haftalık PDF okunamadı", "err", err, "key", key)
+	var sn Snapshot
+	if err := json.Unmarshal(snapJSON, &sn); err != nil {
 		httpx.Internal(w, r)
 		return
 	}
-	defer obj.Body.Close()
+
+	pdf := BuildWeeklyPDF(sn)
+	fname := fmt.Sprintf("haftalik-rapor-%s-H%02d.pdf", sn.ProjectCode, sn.WeekNo)
 	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, name))
-	_, _ = io.Copy(w, obj.Body)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename=%q`, fname))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(pdf)
 }
 
 func sha256Hex(b []byte) string {
