@@ -318,6 +318,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			// Hava durumu ön doldurma (opsiyonel; IPKS_WEATHER_ENABLED)
 			pr.With(mw.RequirePermission("reports.create_daily")).Get("/projects/{projectID}/daily-reports/weather", reportH.WeatherPrefill)
 			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/daily-reports/{id}", reportH.GetDaily)
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/daily-reports/{id}/pdf", reportH.DailyPDF)
 			pr.With(mw.RequirePermission("reports.create_daily")).Put("/projects/{projectID}/daily-reports/{id}", reportH.UpdateDaily)
 			pr.With(mw.RequirePermission("reports.create_daily")).Post("/projects/{projectID}/daily-reports/{id}/submit", reportH.SubmitDaily)
 			pr.With(mw.RequirePermission("reports.create_daily")).Post("/projects/{projectID}/daily-reports/{id}/revise", reportH.ReviseDaily)

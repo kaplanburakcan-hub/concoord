@@ -400,6 +400,48 @@ func (h *Handler) GetDaily(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{"daily_report": d})
 }
 
+// DailyPDF — tek bir günlük raporun PDF'ini senkron üretip döner (haftalık
+// rapordan farklı olarak kuyruk/worker gerektirmez — tek raporluk üretim
+// isteğe bağlı anlık yapılabilir; desen payments.SummaryPDF ile aynıdır).
+func (h *Handler) DailyPDF(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	id, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+	var projectName, projectCode string
+	if err := h.pool.QueryRow(r.Context(),
+		`SELECT name, code FROM projects WHERE id=$1 AND deleted_at IS NULL`, pid).
+		Scan(&projectName, &projectCode); err != nil {
+		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Proje bulunamadı.", nil)
+		return
+	}
+	var d dailyDTO
+	err := scanDaily(h.pool.QueryRow(r.Context(), drSelect+`
+		WHERE dr.id=$1 AND dr.project_id=$2 AND dr.deleted_at IS NULL`, id, pid), &d)
+	if errors.Is(err, pgx.ErrNoRows) {
+		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Günlük rapor bulunamadı.", nil)
+		return
+	}
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	if err := h.loadLines(r.Context(), &d); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+
+	pdf := BuildDailyPDF(projectName, projectCode, d)
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="gunluk-rapor-%s.pdf"`, d.ReportDate))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(pdf)
+}
+
 // CreateDaily — yeni taslak (revision_no=1). Aynı tarihte kayıt varsa 409.
 func (h *Handler) CreateDaily(w http.ResponseWriter, r *http.Request) {
 	pid, ok := parseID(w, r, "projectID")

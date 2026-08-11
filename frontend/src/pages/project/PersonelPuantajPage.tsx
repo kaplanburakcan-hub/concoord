@@ -88,6 +88,8 @@ export default function PersonelPuantajPage() {
   const [puantajMap, setPuantajMap] = useState<Map<string, PuantajEntry>>(new Map());
   const [puantajLoading, setPuantajLoading] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const [puantajErr, setPuantajErr] = useState<string | null>(null);
+  const [submittedDates, setSubmittedDates] = useState<Set<string>>(new Set());
 
   // Personel form
   const [addingPersonel, setAddingPersonel] = useState(false);
@@ -97,6 +99,31 @@ export default function PersonelPuantajPage() {
   const days = useMemo(() => weekDays(weekMon), [weekMon]);
   const fromISO = toISO(days[0]);
   const toISO2 = toISO(days[6]);
+
+  // Düzenleme penceresi: sadece bugün ve dün (backend'deki kuralla aynı).
+  // toISO(), UTC dönüşümü yaptığından pozitif UTC ofsetli dilimlerde (ör.
+  // Türkiye) yerel gece yarısını bir gün geriye kaydırır — days[] dizisiyle
+  // aynı sapmayı taşımak için "bugün"ü de weekStart ile aynı yöntemle
+  // (yerel saat sıfırlanmış bir Date) hesaplıyoruz, ham `new Date()` değil.
+  const startOfToday = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
+  const todayISO = toISO(startOfToday);
+  const yesterdayISO = toISO(addDays(startOfToday, -1));
+  const isLocked = useCallback(
+    (tarih: string) => (tarih !== todayISO && tarih !== yesterdayISO) || submittedDates.has(tarih),
+    [todayISO, yesterdayISO, submittedDates]
+  );
+  const lockReason = useCallback(
+    (tarih: string) => {
+      if (submittedDates.has(tarih)) {
+        return "İlgili günlük rapor basıldı, geçmişe dönük veri değişikliği yapmak için yöneticinize başvurun.";
+      }
+      if (tarih !== todayISO && tarih !== yesterdayISO) {
+        return "Sadece bugün ve dün için puantaj girişi yapılabilir.";
+      }
+      return "";
+    },
+    [todayISO, yesterdayISO, submittedDates]
+  );
 
   // ── Yükle ──────────────────────────────────────────────────────────────────
   const loadPersonel = useCallback(async () => {
@@ -128,15 +155,34 @@ export default function PersonelPuantajPage() {
     }
   }, [pid, fromISO, toISO2]);
 
+  const loadSubmittedDates = useCallback(async () => {
+    if (!pid) return;
+    try {
+      const data = await api<{ daily_reports: { report_date: string; status: string }[] }>(
+        `/projects/${pid}/daily-reports?from=${fromISO}&to=${toISO2}`,
+        { projectId: pid }
+      );
+      const s = new Set<string>();
+      for (const d of data.daily_reports ?? []) {
+        if (d.status === "Submitted") s.add(d.report_date);
+      }
+      setSubmittedDates(s);
+    } catch {
+      // sessiz — kilit sadece UI'da öncelikli görünürlük sağlar, gerçek
+      // kaynak doğrusu backend'dir (UpsertPuantaj kendi kontrolünü yapar).
+    }
+  }, [pid, fromISO, toISO2]);
+
   useEffect(() => { loadPersonel(); }, [loadPersonel]);
   useEffect(() => { loadPuantaj(); }, [loadPuantaj]);
+  useEffect(() => { loadSubmittedDates(); }, [loadSubmittedDates]);
 
   // ── Puantaj kaydı ──────────────────────────────────────────────────────────
   async function toggleDurum(personelId: string, tarih: string) {
-    if (!pid) return;
+    if (!pid || isLocked(tarih)) return;
     const key = `${personelId}|${tarih}`;
-    const cur = puantajMap.get(key);
-    const curDurum = cur?.durum ?? "mevcut";
+    const prevEntry = puantajMap.get(key);
+    const curDurum = prevEntry?.durum ?? "mevcut";
     const nextIdx = (DURUM_SIRA.indexOf(curDurum) + 1) % DURUM_SIRA.length;
     const nextDurum = DURUM_SIRA[nextIdx];
 
@@ -144,11 +190,12 @@ export default function PersonelPuantajPage() {
       personel_id: personelId,
       tarih,
       durum: nextDurum,
-      mesai_saat: cur?.mesai_saat ?? 0,
-      not_metin: cur?.not_metin ?? "",
+      mesai_saat: prevEntry?.mesai_saat ?? 0,
+      not_metin: prevEntry?.not_metin ?? "",
     };
 
     // Optimistic update
+    setPuantajErr(null);
     setPuantajMap((prev) => {
       const next = new Map(prev);
       next.set(key, entry);
@@ -158,22 +205,32 @@ export default function PersonelPuantajPage() {
     setSaving(key);
     try {
       await api(`/projects/${pid}/puantaj`, { method: "POST", body: entry, projectId: pid });
+    } catch (e) {
+      // Geri al ve backend'in Türkçe hata mesajını göster (kilit backend'de
+      // de doğrulanır — UI kilidi atlatılsa bile burada reddedilir).
+      setPuantajMap((prev) => {
+        const next = new Map(prev);
+        if (prevEntry) next.set(key, prevEntry); else next.delete(key);
+        return next;
+      });
+      setPuantajErr(e instanceof Error ? e.message : "Kaydedilemedi.");
     } finally {
       setSaving(null);
     }
   }
 
   async function setMesai(personelId: string, tarih: string, mesai: number) {
-    if (!pid) return;
+    if (!pid || isLocked(tarih)) return;
     const key = `${personelId}|${tarih}`;
-    const cur = puantajMap.get(key);
+    const prevEntry = puantajMap.get(key);
     const entry: PuantajEntry = {
       personel_id: personelId,
       tarih,
-      durum: cur?.durum ?? "mevcut",
+      durum: prevEntry?.durum ?? "mevcut",
       mesai_saat: mesai,
-      not_metin: cur?.not_metin ?? "",
+      not_metin: prevEntry?.not_metin ?? "",
     };
+    setPuantajErr(null);
     setPuantajMap((prev) => {
       const next = new Map(prev);
       next.set(key, entry);
@@ -182,6 +239,13 @@ export default function PersonelPuantajPage() {
     setSaving(key);
     try {
       await api(`/projects/${pid}/puantaj`, { method: "POST", body: entry, projectId: pid });
+    } catch (e) {
+      setPuantajMap((prev) => {
+        const next = new Map(prev);
+        if (prevEntry) next.set(key, prevEntry); else next.delete(key);
+        return next;
+      });
+      setPuantajErr(e instanceof Error ? e.message : "Kaydedilemedi.");
     } finally {
       setSaving(null);
     }
@@ -293,6 +357,12 @@ export default function PersonelPuantajPage() {
             {puantajLoading && <span className="text-beton-500 text-xs">Yükleniyor…</span>}
           </div>
 
+          {puantajErr && (
+            <p className="mb-3 text-sm text-red-400 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
+              {puantajErr}
+            </p>
+          )}
+
           {/* Grid */}
           {aktifPersonel.length === 0 ? (
             <p className="text-beton-500 text-sm text-center py-10">
@@ -327,15 +397,21 @@ export default function PersonelPuantajPage() {
                         const dm = DURUM_META[durum];
                         const key = `${p.id}|${iso}`;
                         const isSaving = saving === key;
+                        const locked = isLocked(iso);
                         return (
                           <td key={i} className="py-1 px-1 text-center">
                             <button
                               onClick={() => toggleDurum(p.id!, iso)}
-                              disabled={isSaving}
-                              title={dm.label}
-                              className={`w-10 h-8 rounded text-xs font-bold transition-colors disabled:opacity-50 ${dm.cellCls}`}
+                              disabled={isSaving || locked}
+                              title={locked ? lockReason(iso) : dm.label}
+                              className={`w-10 h-8 rounded text-xs font-bold transition-colors disabled:opacity-50 ${dm.cellCls} ${locked ? "cursor-not-allowed" : ""}`}
                             >
-                              {isSaving ? "…" : dm.short}
+                              {isSaving ? "…" : locked ? (
+                                <svg className="w-3.5 h-3.5 mx-auto opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                  <rect x="5" y="11" width="14" height="9" rx="1.5" />
+                                  <path d="M8 11V7a4 4 0 018 0v4" />
+                                </svg>
+                              ) : dm.short}
                             </button>
                           </td>
                         );

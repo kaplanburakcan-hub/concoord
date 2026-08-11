@@ -807,9 +807,9 @@ func ProcessWeeklyPDF(ctx context.Context, pool *pgxpool.Pool, store *storage.Cl
 
 	var fileID uuid.UUID
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO files (storage_key, original_name, mime, size_bytes, uploaded_by)
-		VALUES ($1,$2,'application/pdf',$3,$4) RETURNING id`,
-		key, fname, len(pdf), genBy).Scan(&fileID); err != nil {
+		INSERT INTO files (storage_key, original_name, mime, size_bytes, sha256, uploaded_by)
+		VALUES ($1,$2,'application/pdf',$3,$4,$5) RETURNING id`,
+		key, fname, len(pdf), sha, genBy).Scan(&fileID); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `

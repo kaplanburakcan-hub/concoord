@@ -5,6 +5,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../../projects/ProjectContext";
 import { apiWithOfflineFallback } from "../../offline/queue";
 import { DR_STATUS_LABEL, DR_STATUS_STYLE, formatDateTR } from "./DailyReportsPage";
+import PdfPreviewModal from "../../components/PdfPreviewModal";
 
 // Faz 6 — Günlük rapor formu (mobil öncelikli: tek kolon, büyük dokunma
 // hedefleri, bölüm bölüm satır ekleme). Aynı bileşen üç modda çalışır:
@@ -72,6 +73,7 @@ export default function DailyReportFormPage() {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
 
   // Form state
   const [reportDate, setReportDate] = useState(todayISO());
@@ -325,9 +327,9 @@ export default function DailyReportFormPage() {
               </h1>
               <div className="flex items-center gap-2">
                 {detail && (
-                  <button onClick={() => window.print()}
+                  <button onClick={() => setShowPdfPreview(true)}
                     className="no-print rounded-md border border-beton-700 px-2.5 py-1 text-xs text-beton-300 hover:border-emniyet-500 transition-colors">
-                    Yazdır
+                    PDF Rapor Üret
                   </button>
                 )}
                 {detail && (
@@ -342,6 +344,15 @@ export default function DailyReportFormPage() {
             canEdit={canEdit} onUploaded={load} />
         </div>
       </div>
+      {detail && (
+        <PdfPreviewModal
+          open={showPdfPreview}
+          onClose={() => setShowPdfPreview(false)}
+          title={`Günlük Rapor — ${formatDateTR(reportDate)}`}
+          fetchPath={`/projects/${pid}/daily-reports/${detail.id}/pdf`}
+          downloadName={`gunluk-rapor-${detail.report_date}.pdf`}
+        />
+      )}
 
       {err && <p className="text-red-400 text-sm">{err}</p>}
       {info && <p className="text-emniyet-500 text-sm">{info}</p>}
@@ -813,6 +824,7 @@ function ReadOnlyView({
   project?: { start_date?: string; end_date?: string } | null;
   pid?: string;
 }) {
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
   const totalPersonnel = (detail.manpower ?? []).reduce((s, m) => s + m.headcount, 0);
 
   // Proje günü hesabı
@@ -851,15 +863,22 @@ function ReadOnlyView({
                 <p className="text-sm text-beton-400 mt-0.5">{formatDateTR(detail.report_date)}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <button onClick={() => window.print()}
+                <button onClick={() => setShowPdfPreview(true)}
                   className="no-print rounded-md border border-beton-700 px-2.5 py-1 text-xs text-beton-300 hover:border-emniyet-500 transition-colors">
-                  Yazdır
+                  PDF Rapor Üret
                 </button>
                 <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${DR_STATUS_STYLE[detail.status]}`}>
                   {DR_STATUS_LABEL[detail.status]}
                 </span>
               </div>
             </div>
+            <PdfPreviewModal
+              open={showPdfPreview}
+              onClose={() => setShowPdfPreview(false)}
+              title={`Günlük Rapor — ${formatDateTR(detail.report_date)}`}
+              fetchPath={`/projects/${pid}/daily-reports/${detail.id}/pdf`}
+              downloadName={`gunluk-rapor-${detail.report_date}.pdf`}
+            />
 
             <div className="flex flex-wrap gap-x-5 gap-y-1.5">
               <div>

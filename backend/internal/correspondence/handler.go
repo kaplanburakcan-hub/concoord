@@ -57,6 +57,7 @@ type Correspondence struct {
 	IlgiliEvrakNo *string    `json:"ilgili_evrak_no,omitempty"`
 	Dagitim       *string    `json:"dagitim,omitempty"`
 	Notlar        *string    `json:"notlar,omitempty"`
+	TeslimYontemi string     `json:"teslim_yontemi"`
 	CreatedByName string     `json:"created_by_name"`
 	RowVersion    int        `json:"row_version"`
 	CreatedAt     time.Time  `json:"created_at"`
@@ -67,13 +68,13 @@ const listCols = `
 	to_char(c.tarih,'YYYY-MM-DD'), to_char(c.kayit_tarihi,'YYYY-MM-DD'),
 	c.kurum_kisi, c.konu, c.kategori, c.durum, c.cevap_gerekli,
 	to_char(c.cevap_tarihi,'YYYY-MM-DD'), c.ilgili_yazi_id, ic.evrak_no,
-	c.dagitim, c.notlar, u.full_name, c.row_version, c.created_at`
+	c.dagitim, c.notlar, c.teslim_yontemi, u.full_name, c.row_version, c.created_at`
 
 func scanRow(row pgx.Row, c *Correspondence) error {
 	return row.Scan(&c.ID, &c.ProjectID, &c.Direction, &c.EvrakNo, &c.KarsiEvrakNo,
 		&c.Tarih, &c.KayitTarihi, &c.KurumKisi, &c.Konu, &c.Kategori, &c.Durum, &c.CevapGerekli,
 		&c.CevapTarihi, &c.IlgiliYaziID, &c.IlgiliEvrakNo,
-		&c.Dagitim, &c.Notlar, &c.CreatedByName, &c.RowVersion, &c.CreatedAt)
+		&c.Dagitim, &c.Notlar, &c.TeslimYontemi, &c.CreatedByName, &c.RowVersion, &c.CreatedAt)
 }
 
 // ── List ──────────────────────────────────────────────────────────────────────
@@ -87,6 +88,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	direction := strings.TrimSpace(q.Get("direction"))
 	durum := strings.TrimSpace(q.Get("durum"))
 	kategori := strings.TrimSpace(q.Get("kategori"))
+	teslim := strings.TrimSpace(q.Get("teslim_yontemi"))
 	search := strings.TrimSpace(q.Get("q"))
 
 	rows, err := h.pool.Query(r.Context(), `
@@ -98,9 +100,10 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		  AND ($2='' OR c.direction=$2)
 		  AND ($3='' OR c.durum=$3)
 		  AND ($4='' OR c.kategori=$4)
+		  AND ($6='' OR c.teslim_yontemi=$6)
 		  AND ($5='' OR c.konu ILIKE '%'||$5||'%' OR c.kurum_kisi ILIKE '%'||$5||'%' OR c.evrak_no ILIKE '%'||$5||'%')
 		ORDER BY c.tarih DESC, c.created_at DESC`,
-		pid, direction, durum, kategori, search)
+		pid, direction, durum, kategori, search, teslim)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -148,23 +151,25 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 // ── Create ────────────────────────────────────────────────────────────────────
 
 type upsertReq struct {
-	Direction    string  `json:"direction"`
-	KarsiEvrakNo *string `json:"karsi_evrak_no"`
-	Tarih        string  `json:"tarih"`
-	KurumKisi    string  `json:"kurum_kisi"`
-	Konu         string  `json:"konu"`
-	Kategori     *string `json:"kategori"`
-	Durum        *string `json:"durum"`
-	CevapGerekli bool    `json:"cevap_gerekli"`
-	CevapTarihi  *string `json:"cevap_tarihi"`
-	IlgiliYaziID *string `json:"ilgili_yazi_id"`
-	Dagitim      *string `json:"dagitim"`
-	Notlar       *string `json:"notlar"`
-	RowVersion   int     `json:"row_version"`
+	Direction     string  `json:"direction"`
+	KarsiEvrakNo  *string `json:"karsi_evrak_no"`
+	Tarih         string  `json:"tarih"`
+	KurumKisi     string  `json:"kurum_kisi"`
+	Konu          string  `json:"konu"`
+	Kategori      *string `json:"kategori"`
+	Durum         *string `json:"durum"`
+	CevapGerekli  bool    `json:"cevap_gerekli"`
+	CevapTarihi   *string `json:"cevap_tarihi"`
+	IlgiliYaziID  *string `json:"ilgili_yazi_id"`
+	Dagitim       *string `json:"dagitim"`
+	Notlar        *string `json:"notlar"`
+	TeslimYontemi *string `json:"teslim_yontemi"`
+	RowVersion    int     `json:"row_version"`
 }
 
 var validKategori = map[string]bool{"Genel": true, "Teknik": true, "İdari": true, "Mali": true, "İSG": true, "Onay Talebi": true}
 var validDurum = map[string]bool{"Açık": true, "Cevaplandı": true, "Kapalı": true, "Bilgi Amaçlı": true}
+var validTeslim = map[string]bool{"eposta": true, "fiziksel": true}
 
 func validate(req upsertReq) map[string]string {
 	f := map[string]string{}
@@ -185,6 +190,9 @@ func validate(req upsertReq) map[string]string {
 	}
 	if req.Durum != nil && *req.Durum != "" && !validDurum[*req.Durum] {
 		f["durum"] = "geçersiz durum"
+	}
+	if req.TeslimYontemi != nil && *req.TeslimYontemi != "" && !validTeslim[*req.TeslimYontemi] {
+		f["teslim_yontemi"] = "geçersiz teslim yöntemi"
 	}
 	if req.CevapGerekli && (req.CevapTarihi == nil || strings.TrimSpace(*req.CevapTarihi) == "") {
 		f["cevap_tarihi"] = "cevap gerekliyse cevap tarihi zorunlu"
@@ -240,6 +248,10 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Durum != nil && *req.Durum != "" {
 		durum = *req.Durum
 	}
+	teslimYontemi := "eposta"
+	if req.TeslimYontemi != nil && *req.TeslimYontemi != "" {
+		teslimYontemi = *req.TeslimYontemi
+	}
 
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {
@@ -273,12 +285,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	err = tx.QueryRow(r.Context(), `
 		INSERT INTO correspondences
 			(project_id, direction, evrak_no, karsi_evrak_no, tarih, kurum_kisi, konu,
-			 kategori, durum, cevap_gerekli, cevap_tarihi, ilgili_yazi_id, dagitim, notlar, created_by)
+			 kategori, durum, cevap_gerekli, cevap_tarihi, ilgili_yazi_id, dagitim, notlar, teslim_yontemi, created_by)
 		VALUES ($1,$2,$3,NULLIF(btrim(coalesce($4,'')),''),$5::date,$6,$7,
-			$8,$9,$10,NULLIF($11,'')::date,$12,NULLIF(btrim(coalesce($13,'')),''),NULLIF(btrim(coalesce($14,'')),''),$15)
+			$8,$9,$10,NULLIF($11,'')::date,$12,NULLIF(btrim(coalesce($13,'')),''),NULLIF(btrim(coalesce($14,'')),''),$15,$16)
 		RETURNING id`,
 		pid, req.Direction, evrakNo, req.KarsiEvrakNo, req.Tarih, strings.TrimSpace(req.KurumKisi), strings.TrimSpace(req.Konu),
-		kategori, durum, req.CevapGerekli, strDeref(req.CevapTarihi), ilgiliID, req.Dagitim, req.Notlar, uid).Scan(&id)
+		kategori, durum, req.CevapGerekli, strDeref(req.CevapTarihi), ilgiliID, req.Dagitim, req.Notlar, teslimYontemi, uid).Scan(&id)
 	if err != nil {
 		if isFKViolation(err) {
 			httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "İlgili yazı bulunamadı.", nil)
@@ -324,6 +336,10 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.Durum != nil && *req.Durum != "" {
 		durum = *req.Durum
 	}
+	teslimYontemi := "eposta"
+	if req.TeslimYontemi != nil && *req.TeslimYontemi != "" {
+		teslimYontemi = *req.TeslimYontemi
+	}
 
 	var rowVersion int
 	err := h.pool.QueryRow(r.Context(),
@@ -356,10 +372,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			ilgili_yazi_id=$11,
 			dagitim=NULLIF(btrim(coalesce($12,'')),''),
 			notlar=NULLIF(btrim(coalesce($13,'')),''),
+			teslim_yontemi=$14,
 			row_version=row_version+1
 		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`,
 		id, pid, req.KarsiEvrakNo, req.Tarih, strings.TrimSpace(req.KurumKisi), strings.TrimSpace(req.Konu),
-		kategori, durum, req.CevapGerekli, strDeref(req.CevapTarihi), ilgiliID, req.Dagitim, req.Notlar)
+		kategori, durum, req.CevapGerekli, strDeref(req.CevapTarihi), ilgiliID, req.Dagitim, req.Notlar, teslimYontemi)
 	if err != nil {
 		if isFKViolation(err) {
 			httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "İlgili yazı bulunamadı.", nil)

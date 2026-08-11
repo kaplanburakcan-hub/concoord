@@ -27,6 +27,7 @@ type Correspondence = {
   ilgili_evrak_no?: string;
   dagitim?: string;
   notlar?: string;
+  teslim_yontemi: string;
   created_by_name: string;
   row_version: number;
   created_at: string;
@@ -37,6 +38,8 @@ type DocVersion = { id: string; version_no: number; original_name: string; size_
 
 const KATEGORILER = ["Genel", "Teknik", "İdari", "Mali", "İSG", "Onay Talebi"];
 const DURUMLAR = ["Açık", "Cevaplandı", "Kapalı", "Bilgi Amaçlı"];
+const TESLIM_YONTEMLERI = ["eposta", "fiziksel"];
+const TESLIM_LABEL: Record<string, string> = { eposta: "E-posta", fiziksel: "Fiziksel (imzalı/barkodlu)" };
 
 const DURUM_STYLE: Record<string, string> = {
   "Açık": "bg-yellow-500/15 text-yellow-300 border-yellow-500/40",
@@ -52,6 +55,29 @@ const KATEGORI_STYLE: Record<string, string> = {
   "İSG": "bg-red-500/15 text-red-300 border-red-500/40",
   "Onay Talebi": "bg-amber-500/15 text-amber-300 border-amber-500/40",
 };
+
+// Teslim yöntemi ikonu — e-posta için zarf, fiziksel (imzalı/barkodlu kağıt)
+// için damgalı belge simgesi. Liste başlıklarında ve filtre pillerinde kullanılır.
+function TeslimIcon({ type, className }: { type: string; className?: string }) {
+  if (type === "fiziksel") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+        <title>Fiziksel (imzalı/barkodlu kağıt)</title>
+        <rect x="4" y="3" width="13" height="18" rx="1.5" />
+        <path d="M8 8h5M8 12h5M8 16h3" />
+        <circle cx="18" cy="17" r="4" />
+        <path d="M16.3 17l1.1 1.1 2.1-2.1" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+      <title>E-posta</title>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3.5 6.5l8.5 6 8.5-6" />
+    </svg>
+  );
+}
 
 function fmtTR(iso?: string) {
   if (!iso) return "—";
@@ -80,6 +106,7 @@ type FormState = {
   ilgili_yazi_id: string;
   dagitim: string;
   notlar: string;
+  teslim_yontemi: string;
   row_version: number;
 };
 
@@ -87,7 +114,7 @@ function emptyForm(): FormState {
   return {
     karsi_evrak_no: "", tarih: todayISO(), kurum_kisi: "", konu: "",
     kategori: "Genel", durum: "Açık", cevap_gerekli: false, cevap_tarihi: "",
-    ilgili_yazi_id: "", dagitim: "", notlar: "", row_version: 0,
+    ilgili_yazi_id: "", dagitim: "", notlar: "", teslim_yontemi: "eposta", row_version: 0,
   };
 }
 
@@ -102,6 +129,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
 
   const [filterDurum, setFilterDurum] = useState("");
   const [filterKategori, setFilterKategori] = useState("");
+  const [filterTeslim, setFilterTeslim] = useState("");
   const [search, setSearch] = useState("");
 
   const [formOpen, setFormOpen] = useState(false);
@@ -125,6 +153,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
       const q = new URLSearchParams({ direction });
       if (filterDurum) q.set("durum", filterDurum);
       if (filterKategori) q.set("kategori", filterKategori);
+      if (filterTeslim) q.set("teslim_yontemi", filterTeslim);
       if (search.trim()) q.set("q", search.trim());
       const res = await api<{ correspondences: Correspondence[] }>(
         `/projects/${pid}/correspondences?${q.toString()}`, { projectId: pid }
@@ -135,7 +164,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
     } finally {
       setBusy(false);
     }
-  }, [pid, direction, filterDurum, filterKategori, search]);
+  }, [pid, direction, filterDurum, filterKategori, filterTeslim, search]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -167,6 +196,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
       ilgili_yazi_id: c.ilgili_yazi_id ?? "",
       dagitim: c.dagitim ?? "",
       notlar: c.notlar ?? "",
+      teslim_yontemi: c.teslim_yontemi || "eposta",
       row_version: c.row_version,
     });
     setSaveError(null);
@@ -190,6 +220,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
       ilgili_yazi_id: form.ilgili_yazi_id || null,
       dagitim: form.dagitim || null,
       notlar: form.notlar || null,
+      teslim_yontemi: form.teslim_yontemi,
       row_version: form.row_version,
     };
     try {
@@ -342,6 +373,20 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
             </button>
           ))}
         </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mr-1">Teslim Yöntemi</span>
+          <button onClick={() => setFilterTeslim("")}
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterTeslim === "" ? "bg-emniyet-500 border-emniyet-500 text-beton-950" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}>
+            Tümü
+          </button>
+          {TESLIM_YONTEMLERI.map((t) => (
+            <button key={t} onClick={() => setFilterTeslim(filterTeslim === t ? "" : t)}
+              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterTeslim === t ? "bg-emniyet-500 border-emniyet-500 text-beton-950" : "border-beton-700 text-beton-500 hover:border-beton-500"}`}>
+              <TeslimIcon type={t} className="w-3 h-3" />
+              {TESLIM_LABEL[t]}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Liste */}
@@ -376,7 +421,12 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
                         <td className={`${td} pl-4 font-medium whitespace-nowrap`}>{c.evrak_no}</td>
                         <td className={`${tdM} whitespace-nowrap tabular-nums`}>{fmtTR(c.tarih)}</td>
                         <td className={td}>{c.kurum_kisi}</td>
-                        <td className={`${td} max-w-[260px] truncate`}>{c.konu}</td>
+                        <td className={`${td} max-w-[260px]`}>
+                          <span className="flex items-center gap-1.5 truncate">
+                            <TeslimIcon type={c.teslim_yontemi} className="w-3.5 h-3.5 shrink-0 text-beton-500" />
+                            <span className="truncate">{c.konu}</span>
+                          </span>
+                        </td>
                         <td className={tdM}>{c.kategori}</td>
                         <td className={td}>
                           <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${DURUM_STYLE[c.durum] ?? ""}`}>
@@ -504,6 +554,13 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
                 <select className={input} value={form.durum}
                   onChange={(e) => setForm((f) => ({ ...f, durum: e.target.value }))}>
                   {DURUMLAR.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className={label}>Teslim Yöntemi</label>
+                <select className={input} value={form.teslim_yontemi}
+                  onChange={(e) => setForm((f) => ({ ...f, teslim_yontemi: e.target.value }))}>
+                  {TESLIM_YONTEMLERI.map((t) => <option key={t} value={t}>{TESLIM_LABEL[t]}</option>)}
                 </select>
               </div>
               <div className="col-span-2 flex items-center gap-2">

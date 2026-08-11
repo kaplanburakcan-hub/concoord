@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../../projects/ProjectContext";
+import PdfPreviewModal from "../../components/PdfPreviewModal";
 
 // ── Types — backend snapshot modeli ──────────────────────────────────────────
 
@@ -163,10 +164,11 @@ const DISC_COLORS: Record<string, string> = {
 };
 function discColor(d: string) { return DISC_COLORS[d] ?? "#6b7280"; }
 
-function SnapshotView({ sn, reportId, pid, hasPdf, nextWeekPlans }: {
-  sn: Snapshot; reportId: string; pid: string; hasPdf: boolean;
+function SnapshotView({ sn, reportId, pid, hasPdf, status, nextWeekPlans }: {
+  sn: Snapshot; reportId: string; pid: string; hasPdf: boolean; status: WRStatus;
   nextWeekPlans: SnapNextWeekPlan[];
 }) {
+  const [showPdf, setShowPdf] = useState(false);
   const days            = sn.days            ?? [];
   const deliveries      = sn.deliveries      ?? [];
   const stock           = sn.stock           ?? [];
@@ -220,6 +222,28 @@ function SnapshotView({ sn, reportId, pid, hasPdf, nextWeekPlans }: {
 
   return (
     <div className="space-y-3 pt-1">
+
+      {/* Durum + PDF aksiyonları — sağ üst köşe (günlük rapor ile aynı desen) */}
+      <div className="no-print flex items-center justify-end gap-2">
+        <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${WR_STATUS_STYLE[status]}`}>
+          {WR_STATUS_LABEL[status]}
+        </span>
+        {hasPdf && (
+          <button
+            onClick={() => setShowPdf(true)}
+            className="rounded-md border border-beton-700 px-2.5 py-1 text-xs text-beton-300 hover:border-emniyet-500 transition-colors"
+          >
+            PDF Rapor Üret
+          </button>
+        )}
+      </div>
+      <PdfPreviewModal
+        open={showPdf}
+        onClose={() => setShowPdf(false)}
+        title={`Haftalık Rapor — ${sn.project_name} (Hafta ${sn.week_no})`}
+        fetchPath={`/projects/${pid}/weekly-reports/${reportId}/download`}
+        downloadName={`haftalik-rapor-${sn.project_code}-hafta${sn.week_no}.pdf`}
+      />
 
       {/* Genel özet kartları */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -764,25 +788,6 @@ function SnapshotView({ sn, reportId, pid, hasPdf, nextWeekPlans }: {
         </div>
       )}
 
-      {/* Yazdır / PDF indir */}
-      <div className="no-print flex gap-2">
-        <button
-          onClick={() => window.print()}
-          className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-beton-700 bg-beton-900 px-4 py-2.5 text-sm text-beton-200 hover:border-emniyet-500 hover:text-white transition-colors"
-        >
-          Yazdır
-        </button>
-        {hasPdf && (
-          <a
-            href={`/api/projects/${pid}/weekly-reports/${reportId}/download`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-beton-700 bg-beton-900 px-4 py-2.5 text-sm text-beton-200 hover:border-emniyet-500 hover:text-white transition-colors"
-          >
-            PDF İndir
-          </a>
-        )}
-      </div>
     </div>
   );
 }
@@ -985,7 +990,7 @@ export default function WeeklyReportsPage() {
                     {loadingSnap === r.id ? (
                       <p className="text-sm text-beton-500 py-3">Yükleniyor…</p>
                     ) : sn ? (
-                      <SnapshotView sn={sn} reportId={r.id} pid={pid} hasPdf={r.has_pdf}
+                      <SnapshotView sn={sn} reportId={r.id} pid={pid} hasPdf={r.has_pdf} status={r.status}
                         nextWeekPlans={nwPlans[r.id] ?? []} />
                     ) : (
                       <p className="text-sm text-beton-500 py-3">Veri yüklenemedi.</p>

@@ -3,6 +3,7 @@ package personnel
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -227,6 +228,38 @@ func (h *Handler) UpsertPuantaj(w http.ResponseWriter, r *http.Request) {
 	personelID, err := uuid.Parse(body.PersonelID)
 	if err != nil {
 		httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "Geçersiz personel ID.", nil)
+		return
+	}
+
+	// Düzenleme penceresi: sadece bugün ve dün. Daha eski günler, gerçek
+	// sahadaki gibi, yönetici müdahalesi olmadan değiştirilemez.
+	today := time.Now().Format("2006-01-02")
+	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	if body.Tarih != today && body.Tarih != yesterday {
+		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
+			"Sadece bugün ve dün için puantaj girişi yapılabilir. Daha eski günler için yöneticinize başvurun.", nil)
+		return
+	}
+
+	// İlgili güne ait günlük rapor zaten gönderilmişse (Submitted), puantaj
+	// da o günün kaydı sayılır ve değiştirilemez.
+	var submitted bool
+	if err := h.db.QueryRow(r.Context(), `
+		SELECT EXISTS (
+		    SELECT 1 FROM daily_reports dr
+		    WHERE dr.project_id=$1 AND dr.report_date=$2::date AND dr.deleted_at IS NULL
+		      AND dr.status='Submitted'
+		      AND dr.revision_no = (
+		          SELECT max(x.revision_no) FROM daily_reports x
+		          WHERE x.project_id=dr.project_id AND x.report_date=dr.report_date
+		            AND x.deleted_at IS NULL))`,
+		pid, body.Tarih).Scan(&submitted); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	if submitted {
+		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
+			"İlgili günlük rapor basıldı, geçmişe dönük veri değişikliği yapmak için yöneticinize başvurun.", nil)
 		return
 	}
 
