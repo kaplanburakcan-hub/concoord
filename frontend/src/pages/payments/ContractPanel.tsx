@@ -28,8 +28,11 @@ type Contract = {
   revised_end_date?: string | null;
   is_multi_year: boolean;
   withholding_pct: number;
+  default_payment_method?: string | null;
   row_version: number;
 };
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = { nakit: "Nakit", havale: "Havale", cek: "Çek" };
 
 const empty = {
   contract_no: "",
@@ -44,6 +47,7 @@ const empty = {
   revised_end_date: "",
   is_multi_year: false,
   withholding_pct: "5",
+  default_payment_method: "",
 };
 
 export default function ContractPanel({
@@ -96,6 +100,7 @@ export default function ContractPanel({
       revised_end_date: c.revised_end_date?.slice(0, 10) ?? "",
       is_multi_year: c.is_multi_year,
       withholding_pct: String(c.withholding_pct ?? "5"),
+      default_payment_method: c.default_payment_method ?? "",
     });
   }
 
@@ -116,6 +121,7 @@ export default function ContractPanel({
       revised_end_date: f.revised_end_date || null,
       is_multi_year: f.is_multi_year,
       withholding_pct: Number(f.withholding_pct) || 0,
+      default_payment_method: f.default_payment_method || "",
     };
     try {
       if (editing) {
@@ -164,6 +170,7 @@ export default function ContractPanel({
               <th className="py-1 pr-2 text-right">Teminat %</th>
               <th className="py-1 pr-2">Süre</th>
               <th className="py-1 pr-2">Stopaj</th>
+              <th className="py-1 pr-2">Ödeme</th>
               <th />
             </tr>
           </thead>
@@ -195,6 +202,9 @@ export default function ContractPanel({
                     ) : (
                       <span className="text-beton-500">Yok</span>
                     )}
+                  </td>
+                  <td className="py-1.5 pr-2 text-xs text-beton-400">
+                    {c.default_payment_method ? PAYMENT_METHOD_LABEL[c.default_payment_method] : "—"}
                   </td>
                   <td className="py-1.5 text-right">
                     {canManage && (
@@ -322,6 +332,19 @@ export default function ContractPanel({
                 value={f.withholding_pct}
                 onChange={(e) => setF({ ...f, withholding_pct: e.target.value })}
               />
+            </div>
+            <div>
+              <label className={labelCls}>Varsayılan ödeme şekli</label>
+              <select
+                className={inputCls}
+                value={f.default_payment_method}
+                onChange={(e) => setF({ ...f, default_payment_method: e.target.value })}
+              >
+                <option value="">Belirtilmemiş</option>
+                <option value="nakit">Nakit</option>
+                <option value="havale">Havale</option>
+                <option value="cek">Çek</option>
+              </select>
             </div>
             <label className="flex items-start gap-2 sm:col-span-1 mt-5">
               <input

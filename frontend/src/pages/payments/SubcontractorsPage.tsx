@@ -16,8 +16,11 @@ type WorkItem = {
 
 type Tedarikci = {
   id: string; company_name: string; trade?: string; contact_person?: string;
-  phone?: string; email?: string; tax_no?: string; row_version: number;
+  phone?: string; email?: string; tax_no?: string; default_payment_method?: string | null;
+  row_version: number;
 };
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = { nakit: "Nakit", havale: "Havale", cek: "Çek" };
 
 type ActiveType = "taseron" | "tedarikci";
 
@@ -112,6 +115,11 @@ export default function SubcontractorsPage() {
             {selTedarikci.phone && <p className="text-beton-400 text-sm">Tel: {selTedarikci.phone}</p>}
             {selTedarikci.email && <p className="text-beton-400 text-sm">E-posta: {selTedarikci.email}</p>}
             {selTedarikci.tax_no && <p className="text-beton-400 text-sm">Vergi No: {selTedarikci.tax_no}</p>}
+            {selTedarikci.default_payment_method && (
+              <p className="text-beton-400 text-sm">
+                Varsayılan ödeme şekli: {PAYMENT_METHOD_LABEL[selTedarikci.default_payment_method]}
+              </p>
+            )}
             <Link
               to={`/tedarikci-ekstreler?tedarikci=${encodeURIComponent(selTedarikci.company_name)}`}
               className="mt-4 inline-block text-xs text-emniyet-500 hover:underline"
@@ -200,6 +208,7 @@ function TedarikciPanel({ projectId, tedarikciler, selected, onSelect, canManage
 }) {
   const [name, setName] = useState("");
   const [trade, setTrade] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function add() {
@@ -208,9 +217,9 @@ function TedarikciPanel({ projectId, tedarikciler, selected, onSelect, canManage
     try {
       await api(`/projects/${projectId}/tedarikciler`, {
         method: "POST", projectId,
-        body: { company_name: name.trim(), trade: trade.trim() || null },
+        body: { company_name: name.trim(), trade: trade.trim() || null, default_payment_method: paymentMethod || null },
       });
-      setName(""); setTrade(""); onChanged();
+      setName(""); setTrade(""); setPaymentMethod(""); onChanged();
     } finally { setBusy(false); }
   }
 
@@ -253,6 +262,15 @@ function TedarikciPanel({ projectId, tedarikciler, selected, onSelect, canManage
             value={trade} onChange={(e) => setTrade(e.target.value)} placeholder="Branş / Ürün grubu"
             className="w-full rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-white"
           />
+          <select
+            value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}
+            className="w-full rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-white"
+          >
+            <option value="">Varsayılan ödeme şekli — belirtilmemiş</option>
+            <option value="nakit">Nakit</option>
+            <option value="havale">Havale</option>
+            <option value="cek">Çek</option>
+          </select>
           <button
             onClick={add} disabled={busy}
             className="w-full rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-sm py-1.5 disabled:opacity-50"

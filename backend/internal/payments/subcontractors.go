@@ -301,20 +301,23 @@ type contractDTO struct {
 	RevisedEndDate   *time.Time `json:"revised_end_date,omitempty"`
 	IsMultiYear      bool       `json:"is_multi_year"`
 	WithholdingPct   float64    `json:"withholding_pct"`
-	RowVersion       int        `json:"row_version"`
-	CreatedAt        time.Time  `json:"created_at"`
+	// DefaultPaymentMethod — Nakit Akış Faz A: PO/hakediş/ekstre ödeme
+	// planlarının varsayılan ödeme şeklini buradan alması içindir.
+	DefaultPaymentMethod *string   `json:"default_payment_method,omitempty"`
+	RowVersion           int       `json:"row_version"`
+	CreatedAt            time.Time `json:"created_at"`
 }
 
 const contractCols = `id, project_id, subcontractor_id, contract_no, type, parent_contract_id,
 	amount::float8, advance_amount::float8, retention_pct::float8, advance_rate_pct::float8,
 	sign_date, document_id, start_date, end_date, revised_end_date,
-	is_multi_year, withholding_pct::float8, row_version, created_at`
+	is_multi_year, withholding_pct::float8, default_payment_method, row_version, created_at`
 
 func scanContract(row pgx.Row, c *contractDTO) error {
 	return row.Scan(&c.ID, &c.ProjectID, &c.SubcontractorID, &c.ContractNo, &c.Type, &c.ParentContractID,
 		&c.Amount, &c.AdvanceAmount, &c.RetentionPct, &c.AdvanceRatePct,
 		&c.SignDate, &c.DocumentID, &c.StartDate, &c.EndDate, &c.RevisedEndDate,
-		&c.IsMultiYear, &c.WithholdingPct, &c.RowVersion, &c.CreatedAt)
+		&c.IsMultiYear, &c.WithholdingPct, &c.DefaultPaymentMethod, &c.RowVersion, &c.CreatedAt)
 }
 
 // maskFinancials — view_financials yoksa tutar alanlarını gizler (Plan §4).
@@ -379,7 +382,23 @@ type contractReq struct {
 	RevisedEndDate   *string  `json:"revised_end_date"`
 	IsMultiYear      *bool    `json:"is_multi_year"`
 	WithholdingPct   *float64 `json:"withholding_pct"`
-	RowVersion       int      `json:"row_version"`
+	// DefaultPaymentMethod — Nakit Akış Faz A (nakit|havale|cek).
+	DefaultPaymentMethod *string `json:"default_payment_method"`
+	RowVersion           int     `json:"row_version"`
+}
+
+// normalizePaymentMethod — boş/whitespace ise nil (DB CHECK'i nullable
+// bırakır); aksi halde trim edilmiş değeri döner (geçersiz değer varsa DB
+// CHECK constraint'i reddeder).
+func normalizePaymentMethod(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	t := strings.TrimSpace(*s)
+	if t == "" {
+		return nil
+	}
+	return &t
 }
 
 func optUUID(s *string) (*uuid.UUID, bool) {
@@ -442,7 +461,7 @@ func (h *Handler) CreateContract(w http.ResponseWriter, r *http.Request) {
 	err = scanContract(tx.QueryRow(r.Context(), `
 		INSERT INTO contracts (project_id, subcontractor_id, contract_no, type, parent_contract_id,
 			amount, advance_amount, retention_pct, advance_rate_pct, sign_date, document_id,
-			is_multi_year, withholding_pct, start_date, end_date, revised_end_date)
+			is_multi_year, withholding_pct, start_date, end_date, revised_end_date, default_payment_method)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NULLIF($10,'')::date, $11,
 			-- Yıllara sari varsayılanı: açıkça verilmemişse proje takviminden
 			-- türetilir (başlangıç ve bitiş yılı farklıysa iş yıllara saridir).
@@ -452,11 +471,12 @@ func (h *Handler) CreateContract(w http.ResponseWriter, r *http.Request) {
 				FROM projects p WHERE p.id = $1
 			), false),
 			COALESCE($13, 5.00),
-			NULLIF($14,'')::date, NULLIF($15,'')::date, NULLIF($16,'')::date)
+			NULLIF($14,'')::date, NULLIF($15,'')::date, NULLIF($16,'')::date, $17)
 		RETURNING `+contractCols,
 		pid, subID, req.ContractNo, ctype, parentID, req.Amount, advAmount, retention, advRate,
 		strDeref(req.SignDate), docID, req.IsMultiYear, req.WithholdingPct,
-		strDeref(req.StartDate), strDeref(req.EndDate), strDeref(req.RevisedEndDate)), &c)
+		strDeref(req.StartDate), strDeref(req.EndDate), strDeref(req.RevisedEndDate),
+		normalizePaymentMethod(req.DefaultPaymentMethod)), &c)
 	if err != nil {
 		if isUniqueViolation(err) {
 			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "Bu sözleşme no zaten kullanımda.", nil)
@@ -554,6 +574,10 @@ func (h *Handler) UpdateContract(w http.ResponseWriter, r *http.Request) {
 	if req.AdvanceAmount != nil {
 		advAmount = *req.AdvanceAmount
 	}
+	paymentMethod := before.DefaultPaymentMethod
+	if req.DefaultPaymentMethod != nil {
+		paymentMethod = normalizePaymentMethod(req.DefaultPaymentMethod)
+	}
 
 	var c contractDTO
 	err = scanContract(tx.QueryRow(r.Context(), `
@@ -565,12 +589,13 @@ func (h *Handler) UpdateContract(w http.ResponseWriter, r *http.Request) {
 			start_date=NULLIF($12,'')::date,
 			end_date=NULLIF($13,'')::date,
 			revised_end_date=NULLIF($14,'')::date,
+			default_payment_method=$15,
 			row_version=row_version+1
 		WHERE id=$1 AND project_id=$2
 		RETURNING `+contractCols,
 		cid, pid, contractNo, ctype, amount, advAmount, retention, advRate, strDeref(req.SignDate),
 		req.IsMultiYear, req.WithholdingPct,
-		strDeref(req.StartDate), strDeref(req.EndDate), strDeref(req.RevisedEndDate)), &c)
+		strDeref(req.StartDate), strDeref(req.EndDate), strDeref(req.RevisedEndDate), paymentMethod), &c)
 	if err != nil {
 		if isUniqueViolation(err) {
 			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "Bu sözleşme no zaten kullanımda.", nil)

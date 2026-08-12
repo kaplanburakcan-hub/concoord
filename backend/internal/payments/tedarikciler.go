@@ -29,15 +29,19 @@ type tedarikciDTO struct {
 	Phone         *string   `json:"phone,omitempty"`
 	Email         *string   `json:"email,omitempty"`
 	Trade         *string   `json:"trade,omitempty"`
-	RowVersion    int       `json:"row_version"`
-	CreatedAt     time.Time `json:"created_at"`
+	// DefaultPaymentMethod — Nakit Akış Faz A: PO ödeme planlarının
+	// varsayılan ödeme şeklini buradan alması içindir (nakit|havale|cek).
+	DefaultPaymentMethod *string   `json:"default_payment_method,omitempty"`
+	RowVersion           int       `json:"row_version"`
+	CreatedAt            time.Time `json:"created_at"`
 }
 
-const tedCols = `id, project_id, company_name, tax_no, contact_person, phone, email, trade, row_version, created_at`
+const tedCols = `id, project_id, company_name, tax_no, contact_person, phone, email, trade,
+	default_payment_method, row_version, created_at`
 
 func scanTed(row pgx.Row, t *tedarikciDTO) error {
 	return row.Scan(&t.ID, &t.ProjectID, &t.CompanyName, &t.TaxNo, &t.ContactPerson,
-		&t.Phone, &t.Email, &t.Trade, &t.RowVersion, &t.CreatedAt)
+		&t.Phone, &t.Email, &t.Trade, &t.DefaultPaymentMethod, &t.RowVersion, &t.CreatedAt)
 }
 
 func (h *Handler) ListTedarikciler(w http.ResponseWriter, r *http.Request) {
@@ -67,13 +71,14 @@ func (h *Handler) ListTedarikciler(w http.ResponseWriter, r *http.Request) {
 }
 
 type tedReq struct {
-	CompanyName   string  `json:"company_name"`
-	TaxNo         *string `json:"tax_no"`
-	ContactPerson *string `json:"contact_person"`
-	Phone         *string `json:"phone"`
-	Email         *string `json:"email"`
-	Trade         *string `json:"trade"`
-	RowVersion    int     `json:"row_version"`
+	CompanyName          string  `json:"company_name"`
+	TaxNo                *string `json:"tax_no"`
+	ContactPerson        *string `json:"contact_person"`
+	Phone                *string `json:"phone"`
+	Email                *string `json:"email"`
+	Trade                *string `json:"trade"`
+	DefaultPaymentMethod *string `json:"default_payment_method"`
+	RowVersion           int     `json:"row_version"`
 }
 
 func (h *Handler) CreateTedarikci(w http.ResponseWriter, r *http.Request) {
@@ -99,10 +104,11 @@ func (h *Handler) CreateTedarikci(w http.ResponseWriter, r *http.Request) {
 
 	var t tedarikciDTO
 	err = scanTed(tx.QueryRow(r.Context(), `
-		INSERT INTO tedarikciler (project_id, company_name, tax_no, contact_person, phone, email, trade)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)
+		INSERT INTO tedarikciler (project_id, company_name, tax_no, contact_person, phone, email, trade, default_payment_method)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 		RETURNING `+tedCols,
-		pid, req.CompanyName, req.TaxNo, req.ContactPerson, req.Phone, req.Email, req.Trade), &t)
+		pid, req.CompanyName, req.TaxNo, req.ContactPerson, req.Phone, req.Email, req.Trade,
+		normalizePaymentMethod(req.DefaultPaymentMethod)), &t)
 	if err != nil {
 		if isFKViolation(err) {
 			httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Proje bulunamadı.", nil)
@@ -193,6 +199,10 @@ func (h *Handler) UpdateTedarikci(w http.ResponseWriter, r *http.Request) {
 		httpx.ValidationFailed(w, r, f)
 		return
 	}
+	paymentMethod := before.DefaultPaymentMethod
+	if req.DefaultPaymentMethod != nil {
+		paymentMethod = normalizePaymentMethod(req.DefaultPaymentMethod)
+	}
 	var t tedarikciDTO
 	err = scanTed(tx.QueryRow(r.Context(), `
 		UPDATE tedarikciler SET
@@ -202,10 +212,11 @@ func (h *Handler) UpdateTedarikci(w http.ResponseWriter, r *http.Request) {
 			phone=COALESCE($6, phone),
 			email=COALESCE($7, email),
 			trade=COALESCE($8, trade),
+			default_payment_method=$9,
 			row_version=row_version+1
 		WHERE id=$1 AND project_id=$2
 		RETURNING `+tedCols,
-		tid, pid, name, req.TaxNo, req.ContactPerson, req.Phone, req.Email, req.Trade), &t)
+		tid, pid, name, req.TaxNo, req.ContactPerson, req.Phone, req.Email, req.Trade, paymentMethod), &t)
 	if err != nil {
 		httpx.Internal(w, r)
 		return

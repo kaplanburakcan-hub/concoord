@@ -265,7 +265,10 @@ func (h *Handler) loadLines(ctx context.Context, d *dailyDTO) error {
 }
 
 // insertLines — satırları tek tx içinde yazar (create / draft-update / revise ortak).
-func insertLines(ctx context.Context, tx pgx.Tx, reportID uuid.UUID, in dailyInput) error {
+// projectID/reportDate/createdBy yalnızca kasa harcamalarını Nakit Akış
+// defterine (cash_events) yazmak için kullanılır — kullanıcı kararı: kasa
+// fişi çıkışı, fişin girildiği an değil, günlük raporun saha tarihinde sayılır.
+func insertLines(ctx context.Context, tx pgx.Tx, projectID, reportID uuid.UUID, reportDate string, createdBy uuid.UUID, in dailyInput) error {
 	for _, m := range in.Manpower {
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO daily_manpower (daily_report_id, subcontractor_id, trade, headcount)
@@ -290,10 +293,19 @@ func insertLines(ctx context.Context, tx pgx.Tx, reportID uuid.UUID, in dailyInp
 		}
 	}
 	for _, ce := range in.CashExpenses {
+		desc := strings.TrimSpace(ce.Description)
+		cat := strings.TrimSpace(ce.Category)
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO daily_cash_expenses (daily_report_id, description, category, amount, receipt_no)
 			VALUES ($1,$2,$3,$4,NULLIF(btrim(COALESCE($5,'')),''))`,
-			reportID, strings.TrimSpace(ce.Description), strings.TrimSpace(ce.Category), ce.Amount, ce.ReceiptNo); err != nil {
+			reportID, desc, cat, ce.Amount, ce.ReceiptNo); err != nil {
+			return err
+		}
+		// Nakit Akış Faz A — kasa fişi otomatik olarak nakit hareketi defterine yazılır.
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO cash_events (project_id, direction, source_entity, source_id, description, amount, event_date, created_by)
+			VALUES ($1,'out','kasa_fisi',$2,$3,$4,$5::date,$6)`,
+			projectID, reportID, cat+" — "+desc, ce.Amount, reportDate, createdBy); err != nil {
 			return err
 		}
 	}
@@ -491,7 +503,7 @@ func (h *Handler) CreateDaily(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w, r)
 		return
 	}
-	if err := insertLines(r.Context(), tx, id, in); err != nil {
+	if err := insertLines(r.Context(), tx, pid, id, in.ReportDate, uid, in); err != nil {
 		httpx.Internal(w, r)
 		return
 	}
@@ -517,6 +529,10 @@ func (h *Handler) UpdateDaily(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+	uid, ok := requireUser(w, r)
 	if !ok {
 		return
 	}
@@ -575,7 +591,13 @@ func (h *Handler) UpdateDaily(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := insertLines(r.Context(), tx, id, in); err != nil {
+	// Kasa fişleri değiştiğinde, önceki nakit hareketi defteri satırları da
+	// temizlenir — insertLines aşağıda güncel satırlarla yeniden yazar.
+	if _, err := tx.Exec(r.Context(), `DELETE FROM cash_events WHERE source_entity='kasa_fisi' AND source_id=$1`, id); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	if err := insertLines(r.Context(), tx, pid, id, in.ReportDate, uid, in); err != nil {
 		httpx.Internal(w, r)
 		return
 	}
@@ -761,6 +783,15 @@ func (h *Handler) ReviseDaily(w http.ResponseWriter, r *http.Request) {
 			httpx.Internal(w, r)
 			return
 		}
+	}
+	// Kasa fişlerinin nakit hareketi defteri kayıtları da yeni revizyona kopyalanır.
+	if _, err := tx.Exec(r.Context(), `
+		INSERT INTO cash_events (project_id, direction, source_entity, source_id, description, amount, event_date, created_by)
+		SELECT $3, 'out', 'kasa_fisi', $2, category||' — '||description, amount, $4::date, $5
+		FROM daily_cash_expenses WHERE daily_report_id=$1 AND deleted_at IS NULL`,
+		id, newID, pid, reportDate, uid); err != nil {
+		httpx.Internal(w, r)
+		return
 	}
 
 	if _, err := tx.Exec(r.Context(), `
