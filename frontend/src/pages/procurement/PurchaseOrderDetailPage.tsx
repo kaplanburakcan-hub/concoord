@@ -73,14 +73,14 @@ export default function PurchaseOrderDetailPage() {
       // 1) İki zorunlu fotoğraf doküman motoruna yüklenir (Faz 2):
       //    irsaliye = tedarikçinin beyanı, malzeme = sahanın tespiti.
       const uploadPhoto = async (file: File, title: string) => {
-        const doc = await api<{ id: string }>(`/projects/${pid}/documents`, {
+        const doc = await api<{ document: { id: string } }>(`/projects/${pid}/documents`, {
           method: "POST", projectId: pid,
           body: { title, doc_category: "Delivery" },
         });
         const fd = new FormData();
         fd.append("file", file);
-        await apiUpload(`/projects/${pid}/documents/${doc.id}/versions`, fd);
-        return doc.id;
+        await apiUpload(`/projects/${pid}/documents/${doc.document.id}/versions`, fd);
+        return doc.document.id;
       };
 
       const noteFile = fileRef.current?.files?.[0];

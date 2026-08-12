@@ -270,14 +270,14 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
     if (!file || !pid) return;
     setDocBusy(true);
     try {
-      const doc = await api<{ id: string }>(`/projects/${pid}/documents`, {
+      const doc = await api<{ document: { id: string } }>(`/projects/${pid}/documents`, {
         method: "POST", projectId: pid,
         body: { title: `${c.evrak_no} — ${file.name}`, doc_category: "Other",
                 entity_type: "correspondence", entity_id: c.id },
       });
       const fd = new FormData();
       fd.append("file", file);
-      await apiUpload(`/projects/${pid}/documents/${doc.id}/versions`, fd);
+      await apiUpload(`/projects/${pid}/documents/${doc.document.id}/versions`, fd);
       if (fileRef.current) fileRef.current.value = "";
       const d = await api<{ documents: Doc[] }>(
         `/projects/${pid}/documents?entity_type=correspondence&entity_id=${c.id}`, { projectId: pid }

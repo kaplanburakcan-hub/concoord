@@ -78,14 +78,14 @@ export default function RetentionPanel({
     try {
       let documentId: string | undefined;
       if (file) {
-        const doc = await api<{ id: string }>(`/projects/${projectId}/documents`, {
+        const doc = await api<{ document: { id: string } }>(`/projects/${projectId}/documents`, {
           method: "POST", projectId,
           body: { title: `Teminat iadesi — ${STAGE_LABEL[f.stage]}`, doc_category: "Contract" },
         });
         const fd = new FormData();
         fd.append("file", file);
-        await apiUpload(`/projects/${projectId}/documents/${doc.id}/versions`, fd);
-        documentId = doc.id;
+        await apiUpload(`/projects/${projectId}/documents/${doc.document.id}/versions`, fd);
+        documentId = doc.document.id;
       }
       await api(`/projects/${projectId}/subcontractors/${sel}/refunds`, {
         method: "POST", projectId,

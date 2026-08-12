@@ -159,14 +159,14 @@ export default function ProgressPaymentDetailPage() {
     // Kesin hakediş işaretliyse geçici kabul tutanağı yüklenir (zorunlu).
     let paDocId: string | undefined;
     if (pmt.is_final && paFile) {
-      const doc = await api<{ id: string }>(`/projects/${pid}/documents`, {
+      const doc = await api<{ document: { id: string } }>(`/projects/${pid}/documents`, {
         method: "POST", projectId: pid,
         body: { title: `Geçici kabul tutanağı — ${pmt.period_no}. hakediş`, doc_category: "Contract" },
       });
       const fd = new FormData();
       fd.append("file", paFile);
-      await apiUpload(`/projects/${pid}/documents/${doc.id}/versions`, fd);
-      paDocId = doc.id;
+      await apiUpload(`/projects/${pid}/documents/${doc.document.id}/versions`, fd);
+      paDocId = doc.document.id;
     }
 
     const body = {

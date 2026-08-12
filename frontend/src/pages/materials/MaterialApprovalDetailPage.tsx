@@ -46,14 +46,14 @@ export default function MaterialApprovalDetailPage() {
     setBusy(true);
     try {
       // 1) MAR'a bağlı doküman kaydı, 2) ilk versiyon dosyası.
-      const doc = await api<{ id: string }>(`/projects/${pid}/documents`, {
+      const doc = await api<{ document: { id: string } }>(`/projects/${pid}/documents`, {
         method: "POST", projectId: pid,
         body: { title: `${mar.mar_no} — ${file.name}`, doc_category: "Submittal",
                 entity_type: "material_approval", entity_id: mar.id },
       });
       const fd = new FormData();
       fd.append("file", file);
-      await apiUpload(`/projects/${pid}/documents/${doc.id}/versions`, fd);
+      await apiUpload(`/projects/${pid}/documents/${doc.document.id}/versions`, fd);
       if (fileRef.current) fileRef.current.value = "";
       await load();
     } catch { setErr("Ek yüklenemedi."); }
