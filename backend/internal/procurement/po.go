@@ -64,6 +64,8 @@ type poDTO struct {
 	PRNo          *string       `json:"pr_no,omitempty"`
 	PONo          string        `json:"po_no"`
 	SupplierName  string        `json:"supplier_name"`
+	TedarikciID   *uuid.UUID    `json:"tedarikci_id,omitempty"`
+	TedarikciName *string       `json:"tedarikci_name,omitempty"`
 	Amount        *float64      `json:"amount,omitempty"`
 	Currency      string        `json:"currency"`
 	Status        string        `json:"status"`
@@ -80,6 +82,7 @@ type poDTO struct {
 
 const poSelect = `
 	SELECT o.id, o.project_id, o.pr_id, pr.pr_no, o.po_no, o.supplier_name,
+	       o.tedarikci_id, t.company_name,
 	       o.amount, o.currency, o.status,
 	       to_char(o.expected_date,'YYYY-MM-DD'), o.note,
 	       o.created_by, cu.full_name,
@@ -90,11 +93,13 @@ const poSelect = `
 	       o.row_version, o.created_at
 	FROM purchase_orders o
 	JOIN users cu ON cu.id = o.created_by
-	LEFT JOIN purchase_requests pr ON pr.id = o.pr_id`
+	LEFT JOIN purchase_requests pr ON pr.id = o.pr_id
+	LEFT JOIN tedarikciler t ON t.id = o.tedarikci_id`
 
 func scanPO(row pgx.Row, o *poDTO) error {
 	var cnt int64
 	err := row.Scan(&o.ID, &o.ProjectID, &o.PRID, &o.PRNo, &o.PONo, &o.SupplierName,
+		&o.TedarikciID, &o.TedarikciName,
 		&o.Amount, &o.Currency, &o.Status, &o.ExpectedDate, &o.Note,
 		&o.CreatedBy, &o.CreatedByName, &o.Overdue, &cnt, &o.RowVersion, &o.CreatedAt)
 	o.DeliveryCount = int(cnt)
@@ -259,13 +264,19 @@ func (h *Handler) insertPO(ctx context.Context, tx pgx.Tx, pid uuid.UUID, prID *
 	if req.Currency != nil && strings.TrimSpace(*req.Currency) != "" {
 		currency = strings.ToUpper(strings.TrimSpace(*req.Currency))
 	}
+	var tedarikciID *uuid.UUID
+	if req.TedarikciID != nil && strings.TrimSpace(*req.TedarikciID) != "" {
+		if d, perr := uuid.Parse(strings.TrimSpace(*req.TedarikciID)); perr == nil {
+			tedarikciID = &d
+		}
+	}
 	var id uuid.UUID
 	err := tx.QueryRow(ctx, `
 		INSERT INTO purchase_orders
-			(project_id, pr_id, po_no, supplier_name, amount, currency, expected_date, note, created_by)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF(btrim(coalesce($8,'')),''),$9)
+			(project_id, pr_id, po_no, supplier_name, tedarikci_id, amount, currency, expected_date, note, created_by)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULLIF(btrim(coalesce($9,'')),''),$10)
 		RETURNING id`,
-		pid, prID, poNo, strings.TrimSpace(req.SupplierName), req.Amount, currency,
+		pid, prID, poNo, strings.TrimSpace(req.SupplierName), tedarikciID, req.Amount, currency,
 		expected, req.Note, uid).Scan(&id)
 	if err != nil {
 		return uuid.Nil, "", err
@@ -390,16 +401,22 @@ func (h *Handler) UpdatePO(w http.ResponseWriter, r *http.Request) {
 	if req.Currency != nil && strings.TrimSpace(*req.Currency) != "" {
 		currency = strings.ToUpper(strings.TrimSpace(*req.Currency))
 	}
+	var tedarikciID *uuid.UUID
+	if req.TedarikciID != nil && strings.TrimSpace(*req.TedarikciID) != "" {
+		if d, perr := uuid.Parse(strings.TrimSpace(*req.TedarikciID)); perr == nil {
+			tedarikciID = &d
+		}
+	}
 	ct, err := h.pool.Exec(r.Context(), `
 		UPDATE purchase_orders
-		SET supplier_name=$3, amount=$4, currency=$5, expected_date=$6,
+		SET supplier_name=$3, tedarikci_id=$8, amount=$4, currency=$5, expected_date=$6,
 		    note=NULLIF(btrim(coalesce($7,'')),''),
 		    overdue_notified_at=CASE WHEN expected_date IS DISTINCT FROM $6 THEN NULL
 		                             ELSE overdue_notified_at END,
 		    row_version=row_version+1
 		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL
 		  AND status IN ('Ordered','PartiallyDelivered')`,
-		id, pid, strings.TrimSpace(req.SupplierName), req.Amount, currency, expected, req.Note)
+		id, pid, strings.TrimSpace(req.SupplierName), req.Amount, currency, expected, req.Note, tedarikciID)
 	if err != nil {
 		httpx.Internal(w, r)
 		return

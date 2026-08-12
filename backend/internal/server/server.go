@@ -302,6 +302,10 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("progress_payments.approve")).Post("/projects/{projectID}/payments/{id}/reject", payH.RejectPayment)
 			pr.With(mw.RequirePermission("progress_payments.finalize")).Post("/projects/{projectID}/payments/{id}/finalize", payH.FinalizePayment)
 			pr.With(mw.RequirePermission("progress_payments.view_financials")).Get("/projects/{projectID}/payments/{id}/summary.pdf", payH.SummaryPDF)
+			// Faz B (Nakit Akış) — hakediş ödeme planı (kısmi ödeme).
+			pr.With(mw.RequirePermission("progress_payments.view_financials")).Get("/projects/{projectID}/payments/{paymentID}/disbursements", payH.ListDisbursements)
+			pr.With(mw.RequirePermission("progress_payments.finalize")).Post("/projects/{projectID}/payments/{paymentID}/disbursements", payH.CreateDisbursement)
+			pr.With(mw.RequirePermission("progress_payments.finalize")).Delete("/projects/{projectID}/disbursements/{id}", payH.DeleteDisbursement)
 		})
 
 		// ---- Faz 5: Malzeme Onay Süreci (Submittals / MAR) ----
@@ -375,6 +379,10 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("procurement.manage_po")).Patch("/projects/{projectID}/purchase-orders/{id}", procH.UpdatePO)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Post("/projects/{projectID}/purchase-orders/{id}/cancel", procH.CancelPO)
 			pr.With(mw.RequirePermission("procurement.upload_delivery")).Post("/projects/{projectID}/purchase-orders/{id}/deliveries", procH.AddDelivery)
+			// Faz B (Nakit Akış) — sipariş ödeme planı (kısmi ödeme).
+			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/purchase-orders/{id}/payments", procH.ListPOPayments)
+			pr.With(mw.RequirePermission("procurement.manage_po")).Post("/projects/{projectID}/purchase-orders/{id}/payments", procH.CreatePOPayment)
+			pr.With(mw.RequirePermission("procurement.manage_po")).Delete("/projects/{projectID}/purchase-order-payments/{paymentID}", procH.DeletePOPayment)
 		})
 
 		// ---- Faz 8: İSG (checklist şablonları, denetimler, bulgular, cezalar) ----
@@ -480,6 +488,10 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("contracts.upload")).Post("/projects/{projectID}/supplier-statements", statementsH.Create)
 			pr.With(mw.RequirePermission("contracts.upload")).Patch("/projects/{projectID}/supplier-statements/{id}", statementsH.Update)
 			pr.With(mw.RequirePermission("contracts.delete")).Delete("/projects/{projectID}/supplier-statements/{id}", statementsH.Delete)
+			// Faz B (Nakit Akış) — ekstre ödeme planı (kısmi ödeme).
+			pr.With(mw.RequirePermission("contracts.view")).Get("/projects/{projectID}/supplier-statements/{id}/payments", statementsH.ListStatementPayments)
+			pr.With(mw.RequirePermission("contracts.upload")).Post("/projects/{projectID}/supplier-statements/{id}/payments", statementsH.CreateStatementPayment)
+			pr.With(mw.RequirePermission("contracts.delete")).Delete("/projects/{projectID}/supplier-statement-payments/{paymentID}", statementsH.DeleteStatementPayment)
 		})
 
 		// ---- Faz 4: Görevler (Kanban) + Bildirimler ----

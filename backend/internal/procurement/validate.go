@@ -59,6 +59,7 @@ func validatePR(req prReq) (time.Time, map[string]string) {
 
 type poReq struct {
 	SupplierName string   `json:"supplier_name"`
+	TedarikciID  *string  `json:"tedarikci_id"`
 	Amount       *float64 `json:"amount"`
 	Currency     *string  `json:"currency"`
 	ExpectedDate *string  `json:"expected_date"` // YYYY-MM-DD | null

@@ -49,6 +49,13 @@ type PenaltySuggestion = {
   issued_at: string; amount: number; already_added: boolean;
 };
 type WorkItem = { id: string; poz_no: string; description: string; unit: string; unit_price?: number };
+// Faz B (Nakit Akış) — hakediş ödeme planı (kısmi ödeme).
+type Disbursement = {
+  id: string; amount: number; payment_method: string; event_date: string;
+  cek_keside_tarihi?: string | null; note?: string | null; created_at: string;
+};
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = { nakit: "Nakit", havale: "Havale", cek: "Çek" };
 
 const STATUS_LABEL: Record<string, string> = {
   Draft: "Taslak", Submitted: "Gönderildi", SiteApproved: "Saha Onaylı",
@@ -103,6 +110,15 @@ export default function ProgressPaymentDetailPage() {
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
+  // Faz B (Nakit Akış) — ödeme planı.
+  const [disbursements, setDisbursements] = useState<Disbursement[]>([]);
+  const [defaultMethod, setDefaultMethod] = useState<string | null>(null);
+  const [dForm, setDForm] = useState({
+    amount: "", payment_method: "", event_date: "", cek_keside_tarihi: "", note: "",
+  });
+  const [dErr, setDErr] = useState<string | null>(null);
+  const canPay = can("progress_payments.finalize");
+
   const load = useCallback(async () => {
     if (!pid || !id) return;
     setErr(null);
@@ -139,8 +155,54 @@ export default function ProgressPaymentDetailPage() {
           `/projects/${pid}/tutanaklar?taseron_id=${r.payment.subcontractor_id}&durum=onaylandi`, { projectId: pid });
         setOnayliTutanaklar(tt.tutanaklar ?? []);
       } catch { setOnayliTutanaklar([]); }
+      // Faz B — sözleşmedeki varsayılan ödeme şekli (formu önceden doldurur).
+      try {
+        const cs = await api<{ contracts: { default_payment_method?: string | null }[] }>(
+          `/projects/${pid}/contracts?subcontractor_id=${r.payment.subcontractor_id}`, { projectId: pid });
+        const m = cs.contracts.find((c) => c.default_payment_method)?.default_payment_method ?? null;
+        setDefaultMethod(m);
+        setDForm((f) => ({ ...f, payment_method: f.payment_method || m || "" }));
+      } catch { /* sözleşme yoksa serbest seçim yine çalışır */ }
     } catch { setErr("Hakediş yüklenemedi ya da erişim yetkiniz yok."); }
   }, [pid, id]);
+
+  const loadDisbursements = useCallback(async () => {
+    if (!pid || !id) return;
+    try {
+      const r = await api<{ disbursements: Disbursement[] }>(
+        `/projects/${pid}/payments/${id}/disbursements`, { projectId: pid });
+      setDisbursements(r.disbursements ?? []);
+    } catch { setDisbursements([]); }
+  }, [pid, id]);
+
+  useEffect(() => { loadDisbursements(); }, [loadDisbursements]);
+
+  async function addDisbursement() {
+    if (!pid || !id) return;
+    setDErr(null);
+    try {
+      await api(`/projects/${pid}/payments/${id}/disbursements`, {
+        method: "POST", projectId: pid,
+        body: {
+          amount: Number(dForm.amount) || 0,
+          payment_method: dForm.payment_method,
+          event_date: dForm.event_date,
+          cek_keside_tarihi: dForm.payment_method === "cek" ? dForm.cek_keside_tarihi : undefined,
+          note: dForm.note || undefined,
+        },
+      });
+      setDForm({ amount: "", payment_method: defaultMethod || "", event_date: "", cek_keside_tarihi: "", note: "" });
+      loadDisbursements();
+    } catch { setDErr("Ödeme eklenemedi. Alanları kontrol edin."); }
+  }
+
+  async function deleteDisbursement(did: string) {
+    if (!pid) return;
+    try {
+      await api(`/projects/${pid}/disbursements/${did}`, { method: "DELETE", projectId: pid });
+      loadDisbursements();
+    } catch { setDErr("Ödeme silinemedi."); }
+  }
 
   useEffect(() => { load(); }, [load]);
 
@@ -545,6 +607,83 @@ export default function ProgressPaymentDetailPage() {
             <p className="mt-2 text-sm text-beton-400">Finansal değerleri görüntüleme yetkiniz yok (yalnızca metraj).</p>
           )}
         </div>
+      </div>
+
+      {/* Faz B (Nakit Akış) — Ödeme Planı */}
+      <div className="mt-4 rounded-lg border border-beton-800 bg-beton-900 p-3">
+        <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide">Ödeme Planı</h2>
+        <p className="text-xs text-beton-400 mt-1">
+          Bu hakedişe yapılan kısmi ödemeler. Çekte nakit çıkışı keşide tarihinde,
+          diğerlerinde ödeme tarihinde nakit akışına yansır.
+        </p>
+        {dErr && <p className="mt-2 text-sm text-red-400">{dErr}</p>}
+        <table className="mt-2 w-full text-sm">
+          <thead>
+            <tr className="text-beton-400 text-left border-b border-beton-800">
+              <th className="py-1 pr-2 text-right">Tutar</th>
+              <th className="py-1 pr-2">Ödeme Şekli</th>
+              <th className="py-1 pr-2">Ödeme Tarihi</th>
+              <th className="py-1 pr-2">Keşide Tarihi</th>
+              <th className="py-1 pr-2">Not</th>
+              {canPay && <th className="py-1 pr-2" />}
+            </tr>
+          </thead>
+          <tbody>
+            {disbursements.map((d) => (
+              <tr key={d.id} className="border-b border-beton-800/50 text-beton-200">
+                <td className="py-1 pr-2 text-right tabular-nums">{d.amount.toLocaleString("tr-TR")}</td>
+                <td className="py-1 pr-2">{PAYMENT_METHOD_LABEL[d.payment_method] || d.payment_method}</td>
+                <td className="py-1 pr-2">{d.event_date}</td>
+                <td className="py-1 pr-2">{d.cek_keside_tarihi || "—"}</td>
+                <td className="py-1 pr-2 text-beton-400">{d.note || "—"}</td>
+                {canPay && (
+                  <td className="py-1 pr-2">
+                    <button onClick={() => deleteDisbursement(d.id)} className="text-red-400 hover:text-red-300 text-xs">Sil</button>
+                  </td>
+                )}
+              </tr>
+            ))}
+            {!disbursements.length && (
+              <tr><td colSpan={6} className="py-3 text-beton-400 text-center">Henüz ödeme kaydedilmedi.</td></tr>
+            )}
+          </tbody>
+        </table>
+        {canPay && (
+          <div className="mt-3 border-t border-beton-800 pt-3 flex flex-wrap gap-2 items-center">
+            <input value={dForm.amount} placeholder="Tutar" inputMode="decimal"
+              onChange={(e) => setDForm({ ...dForm, amount: e.target.value })}
+              className="w-24 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100 text-right" />
+            <select value={dForm.payment_method}
+              onChange={(e) => setDForm({ ...dForm, payment_method: e.target.value })}
+              className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100">
+              <option value="">— şekil —</option>
+              <option value="nakit">Nakit</option>
+              <option value="havale">Havale</option>
+              <option value="cek">Çek</option>
+            </select>
+            <input type="date" value={dForm.event_date}
+              onChange={(e) => setDForm({ ...dForm, event_date: e.target.value })}
+              title="Ödeme tarihi"
+              className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
+            <input type="date" value={dForm.cek_keside_tarihi}
+              onChange={(e) => setDForm({ ...dForm, cek_keside_tarihi: e.target.value })}
+              disabled={dForm.payment_method !== "cek"}
+              title="Çek keşide tarihi"
+              className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100 disabled:opacity-40" />
+            <input value={dForm.note} placeholder="Not (opsiyonel)"
+              onChange={(e) => setDForm({ ...dForm, note: e.target.value })}
+              className="flex-1 min-w-[140px] rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
+            <button onClick={addDisbursement}
+              className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-xs px-3 py-1.5">
+              Ekle
+            </button>
+          </div>
+        )}
+        {defaultMethod && (
+          <p className="mt-1 text-[10px] text-beton-500">
+            Sözleşme varsayılan ödeme şekli: {PAYMENT_METHOD_LABEL[defaultMethod] || defaultMethod}
+          </p>
+        )}
       </div>
 
       {/* Aksiyonlar */}

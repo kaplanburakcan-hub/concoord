@@ -12,6 +12,13 @@ import { PO, PO_STATUS_LABEL, PO_STATUS_STYLE } from "./PurchaseOrdersPage";
 
 type DocVersion = { version_no: number; original_name: string };
 
+// Faz B (Nakit Akış) — sipariş ödeme planı (kısmi ödeme).
+type POPayment = {
+  id: string; amount: number; payment_method: string; event_date: string;
+  cek_keside_tarihi?: string | null; note?: string | null;
+};
+const PAYMENT_METHOD_LABEL: Record<string, string> = { nakit: "Nakit", havale: "Havale", cek: "Çek" };
+
 // Mal kabul durumu etiketleri (Faz 11).
 const COND_LABEL: Record<string, string> = {
   Complete: "Tam ve sağlam", Short: "Eksik", Damaged: "Hasarlı",
@@ -52,6 +59,12 @@ export default function PurchaseOrderDetailPage() {
   const [hasMatFile, setHasMatFile] = useState(false);
   const pid = current?.id;
 
+  // Faz B (Nakit Akış) — ödeme planı.
+  const [payments, setPayments] = useState<POPayment[]>([]);
+  const [defaultMethod, setDefaultMethod] = useState<string | null>(null);
+  const [pForm, setPForm] = useState({ amount: "", payment_method: "", event_date: "", cek_keside_tarihi: "", note: "" });
+  const [pErr, setPErr] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     if (!pid || !id) return;
     setErr(null);
@@ -62,6 +75,55 @@ export default function PurchaseOrderDetailPage() {
   }, [pid, id]);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadPayments = useCallback(async () => {
+    if (!pid || !id) return;
+    try {
+      const r = await api<{ payments: POPayment[] }>(
+        `/projects/${pid}/purchase-orders/${id}/payments`, { projectId: pid });
+      setPayments(r.payments ?? []);
+    } catch { setPayments([]); }
+  }, [pid, id]);
+
+  useEffect(() => { loadPayments(); }, [loadPayments]);
+
+  useEffect(() => {
+    if (!pid || !po?.tedarikci_id) { setDefaultMethod(null); return; }
+    api<{ default_payment_method?: string | null }>(
+      `/projects/${pid}/tedarikciler/${po.tedarikci_id}`, { projectId: pid })
+      .then((t) => {
+        setDefaultMethod(t.default_payment_method ?? null);
+        setPForm((f) => ({ ...f, payment_method: f.payment_method || t.default_payment_method || "" }));
+      })
+      .catch(() => setDefaultMethod(null));
+  }, [pid, po?.tedarikci_id]);
+
+  async function addPayment() {
+    if (!pid || !id) return;
+    setPErr(null);
+    try {
+      await api(`/projects/${pid}/purchase-orders/${id}/payments`, {
+        method: "POST", projectId: pid,
+        body: {
+          amount: Number(pForm.amount) || 0,
+          payment_method: pForm.payment_method,
+          event_date: pForm.event_date,
+          cek_keside_tarihi: pForm.payment_method === "cek" ? pForm.cek_keside_tarihi : undefined,
+          note: pForm.note || undefined,
+        },
+      });
+      setPForm({ amount: "", payment_method: defaultMethod || "", event_date: "", cek_keside_tarihi: "", note: "" });
+      loadPayments();
+    } catch { setPErr("Ödeme eklenemedi. Alanları kontrol edin."); }
+  }
+
+  async function deletePayment(payId: string) {
+    if (!pid) return;
+    try {
+      await api(`/projects/${pid}/purchase-order-payments/${payId}`, { method: "DELETE", projectId: pid });
+      loadPayments();
+    } catch { setPErr("Ödeme silinemedi."); }
+  }
 
   const open = po?.status === "Ordered" || po?.status === "PartiallyDelivered";
 
@@ -179,7 +241,7 @@ export default function PurchaseOrderDetailPage() {
       {err && <p className="text-sm text-red-400">{err}</p>}
 
       <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 text-sm text-beton-300 space-y-1">
-        <p>Tedarikçi: <span className="text-beton-100">{po.supplier_name}</span></p>
+        <p>Tedarikçi: <span className="text-beton-100">{po.tedarikci_name ?? po.supplier_name}</span></p>
         <p>Tutar: <span className="text-beton-100">
           {po.amount != null ? `${po.amount.toLocaleString("tr-TR")} ${po.currency}` : "—"}</span></p>
         <p>Beklenen teslim: <span className="text-beton-100">{po.expected_date ?? "—"}</span></p>
@@ -244,6 +306,71 @@ export default function PurchaseOrderDetailPage() {
         ))}
         {(po.deliveries ?? []).length === 0 && (
           <p className="px-3 py-4 text-sm text-beton-500">Henüz teslimat yok.</p>
+        )}
+      </div>
+
+      <h2 className="text-sm font-semibold text-white">Ödeme Planı</h2>
+      <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 space-y-3">
+        <p className="text-xs text-beton-500">
+          Bu siparişe yapılan kısmi ödemeler. Çekte nakit çıkışı keşide tarihinde,
+          diğerlerinde ödeme tarihinde nakit akışına yansır.
+        </p>
+        {pErr && <p className="text-sm text-red-400">{pErr}</p>}
+        {payments.length > 0 && (
+          <table className="w-full text-xs">
+            <tbody>
+              {payments.map((p) => (
+                <tr key={p.id} className="border-b border-beton-800/50">
+                  <td className="py-1 pr-2 text-right font-mono text-beton-200">{p.amount.toLocaleString("tr-TR")}</td>
+                  <td className="py-1 pr-2 text-beton-400">{PAYMENT_METHOD_LABEL[p.payment_method] || p.payment_method}</td>
+                  <td className="py-1 pr-2 text-beton-400">{p.event_date}</td>
+                  <td className="py-1 pr-2 text-beton-500">{p.cek_keside_tarihi || "—"}</td>
+                  <td className="py-1 pr-2 text-beton-500">{p.note || "—"}</td>
+                  {can("procurement.manage_po") && (
+                    <td className="py-1 pr-2">
+                      <button onClick={() => deletePayment(p.id)} className="text-red-400 hover:text-red-300">Sil</button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {!payments.length && <p className="text-sm text-beton-500">Henüz ödeme kaydedilmedi.</p>}
+        {can("procurement.manage_po") && (
+          <div className="border-t border-beton-800 pt-3 flex flex-wrap gap-2 items-center">
+            <input value={pForm.amount} placeholder="Tutar" inputMode="decimal"
+              onChange={(e) => setPForm({ ...pForm, amount: e.target.value })}
+              className="w-24 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100 text-right" />
+            <select value={pForm.payment_method}
+              onChange={(e) => setPForm({ ...pForm, payment_method: e.target.value })}
+              className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100">
+              <option value="">— şekil —</option>
+              <option value="nakit">Nakit</option>
+              <option value="havale">Havale</option>
+              <option value="cek">Çek</option>
+            </select>
+            <input type="date" value={pForm.event_date}
+              onChange={(e) => setPForm({ ...pForm, event_date: e.target.value })}
+              title="Ödeme tarihi"
+              className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
+            <input type="date" value={pForm.cek_keside_tarihi}
+              onChange={(e) => setPForm({ ...pForm, cek_keside_tarihi: e.target.value })}
+              disabled={pForm.payment_method !== "cek"} title="Çek keşide tarihi"
+              className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100 disabled:opacity-40" />
+            <input value={pForm.note} placeholder="Not (opsiyonel)"
+              onChange={(e) => setPForm({ ...pForm, note: e.target.value })}
+              className="flex-1 min-w-[140px] rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
+            <button onClick={addPayment}
+              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
+              Ekle
+            </button>
+          </div>
+        )}
+        {defaultMethod && (
+          <p className="text-[10px] text-beton-500">
+            Tedarikçi varsayılan ödeme şekli: {PAYMENT_METHOD_LABEL[defaultMethod] || defaultMethod}
+          </p>
         )}
       </div>
 

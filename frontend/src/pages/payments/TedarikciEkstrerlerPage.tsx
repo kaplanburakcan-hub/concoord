@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
@@ -16,6 +16,13 @@ type Statement = {
   odeme_durumu: string;
   aciklama: string;
 };
+
+// Faz B (Nakit Akış) — ekstre ödeme planı (kısmi ödeme).
+type StatementPayment = {
+  id: string; amount: number; payment_method: string; event_date: string;
+  cek_keside_tarihi?: string | null; note?: string | null;
+};
+const PAYMENT_METHOD_LABEL: Record<string, string> = { nakit: "Nakit", havale: "Havale", cek: "Çek" };
 
 // ── Sabitler ─────────────────────────────────────────────────────────────────
 const DURUM_META: Record<string, { label: string; cls: string }> = {
@@ -162,6 +169,99 @@ function StatementForm({
   );
 }
 
+// ── Ödeme Planı (kısmi ödeme) ────────────────────────────────────────────────
+function StatementPaymentsPanel({ pid, statementId }: { pid: string; statementId: string }) {
+  const [payments, setPayments] = useState<StatementPayment[]>([]);
+  const [form, setForm] = useState({ amount: "", payment_method: "", event_date: "", cek_keside_tarihi: "", note: "" });
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await api<{ payments: StatementPayment[] }>(
+        `/projects/${pid}/supplier-statements/${statementId}/payments`, { projectId: pid });
+      setPayments(r.payments ?? []);
+    } catch { setPayments([]); }
+  }, [pid, statementId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function add() {
+    setErr(null);
+    try {
+      await api(`/projects/${pid}/supplier-statements/${statementId}/payments`, {
+        method: "POST", projectId: pid,
+        body: {
+          amount: Number(form.amount) || 0,
+          payment_method: form.payment_method,
+          event_date: form.event_date,
+          cek_keside_tarihi: form.payment_method === "cek" ? form.cek_keside_tarihi : undefined,
+          note: form.note || undefined,
+        },
+      });
+      setForm({ amount: "", payment_method: "", event_date: "", cek_keside_tarihi: "", note: "" });
+      load();
+    } catch { setErr("Ödeme eklenemedi. Alanları kontrol edin."); }
+  }
+
+  async function del(id: string) {
+    try {
+      await api(`/projects/${pid}/supplier-statement-payments/${id}`, { method: "DELETE", projectId: pid });
+      load();
+    } catch { setErr("Ödeme silinemedi."); }
+  }
+
+  return (
+    <div className="p-3 bg-beton-950/60">
+      <p className="text-xs text-beton-500 mb-2">Ödeme Planı — kısmi ödemeler</p>
+      {err && <p className="text-xs text-red-400 mb-2">{err}</p>}
+      {payments.length > 0 && (
+        <table className="w-full text-xs mb-2">
+          <tbody>
+            {payments.map((p) => (
+              <tr key={p.id} className="border-b border-beton-800/50">
+                <td className="py-1 pr-2 text-right font-mono text-beton-200">{fmt(p.amount)}</td>
+                <td className="py-1 pr-2 text-beton-400">{PAYMENT_METHOD_LABEL[p.payment_method] || p.payment_method}</td>
+                <td className="py-1 pr-2 text-beton-400">{isoToDisplay(p.event_date)}</td>
+                <td className="py-1 pr-2 text-beton-500">{p.cek_keside_tarihi ? isoToDisplay(p.cek_keside_tarihi) : "—"}</td>
+                <td className="py-1 pr-2 text-beton-500">{p.note || "—"}</td>
+                <td className="py-1 pr-2">
+                  <button onClick={() => del(p.id)} className="text-red-500 hover:text-red-400">Sil</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <div className="flex flex-wrap gap-2 items-center">
+        <input value={form.amount} placeholder="Tutar" inputMode="decimal"
+          onChange={(e) => setForm({ ...form, amount: e.target.value })}
+          className={`${inpBase} w-24 text-right`} />
+        <select value={form.payment_method}
+          onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
+          className={inpBase}>
+          <option value="">— şekil —</option>
+          <option value="nakit">Nakit</option>
+          <option value="havale">Havale</option>
+          <option value="cek">Çek</option>
+        </select>
+        <input type="date" value={form.event_date}
+          onChange={(e) => setForm({ ...form, event_date: e.target.value })}
+          title="Ödeme tarihi" className={inpBase} />
+        <input type="date" value={form.cek_keside_tarihi}
+          onChange={(e) => setForm({ ...form, cek_keside_tarihi: e.target.value })}
+          disabled={form.payment_method !== "cek"} title="Çek keşide tarihi"
+          className={`${inpBase} disabled:opacity-40`} />
+        <input value={form.note} placeholder="Not (opsiyonel)"
+          onChange={(e) => setForm({ ...form, note: e.target.value })}
+          className={`${inpBase} flex-1 min-w-[140px]`} />
+        <button onClick={add} className="px-3 py-1.5 bg-emniyet-600 hover:bg-emniyet-500 text-white text-xs rounded-md">
+          Ekle
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Ana Bileşen ───────────────────────────────────────────────────────────────
 export default function TedarikciEkstrerlerPage() {
   const { current: currentProject } = useProjects();
@@ -177,6 +277,7 @@ export default function TedarikciEkstrerlerPage() {
   // bir FK değil (supplier_statements serbest metin tedarikci_adi kullanıyor).
   const [filterTedarikci, setFilterTedarikci] = useState(() => searchParams.get("tedarikci") ?? "");
   const [filterDurum, setFilterDurum] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -341,7 +442,8 @@ export default function TedarikciEkstrerlerPage() {
                 const dm = DURUM_META[s.odeme_durumu] ?? DURUM_META.bekliyor;
                 const bakiye = s.toplam_tutar - s.odenen_tutar;
                 return (
-                  <tr key={s.id} className="border-b border-beton-800/50 hover:bg-beton-900/30 group">
+                  <Fragment key={s.id}>
+                  <tr className="border-b border-beton-800/50 hover:bg-beton-900/30 group">
                     <td className="py-2 px-3 text-beton-200 text-sm font-medium">{s.tedarikci_adi}</td>
                     <td className="py-2 px-3 text-beton-400 text-xs font-mono">{s.ekstre_no}</td>
                     <td className="py-2 px-3 text-beton-400 text-xs">{isoToDisplay(s.ekstre_tarihi)}</td>
@@ -359,6 +461,12 @@ export default function TedarikciEkstrerlerPage() {
                     <td className="py-2 px-3">
                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
+                          onClick={() => s.id && setExpandedId(expandedId === s.id ? null : s.id)}
+                          className="text-xs text-beton-400 hover:text-beton-200"
+                        >
+                          Ödemeler
+                        </button>
+                        <button
                           onClick={() => { setEditing(s); setAdding(false); }}
                           className="text-xs text-emniyet-400 hover:text-emniyet-300"
                         >
@@ -373,6 +481,14 @@ export default function TedarikciEkstrerlerPage() {
                       </div>
                     </td>
                   </tr>
+                  {s.id && expandedId === s.id && (
+                    <tr className="border-b border-beton-800/50">
+                      <td colSpan={9} className="p-0">
+                        {pid && <StatementPaymentsPanel pid={pid} statementId={s.id} />}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>

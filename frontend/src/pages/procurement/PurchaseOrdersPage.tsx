@@ -25,7 +25,8 @@ export type Delivery = {
 };
 export type PO = {
   id: string; po_no: string; pr_id?: string; pr_no?: string;
-  supplier_name: string; amount?: number; currency: string; status: string;
+  supplier_name: string; tedarikci_id?: string; tedarikci_name?: string;
+  amount?: number; currency: string; status: string;
   expected_date?: string; note?: string; created_by_name: string;
   overdue: boolean; delivery_count: number; deliveries?: Delivery[];
   row_version: number; created_at: string;
@@ -56,6 +57,8 @@ export default function PurchaseOrdersPage() {
   const [err, setErr] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [supplier, setSupplier] = useState("");
+  const [tedarikciId, setTedarikciId] = useState("");
+  const [tedarikciler, setTedarikciler] = useState<{ id: string; company_name: string }[]>([]);
   const [amount, setAmount] = useState("");
   const [expected, setExpected] = useState("");
   const [note, setNote] = useState("");
@@ -74,6 +77,13 @@ export default function PurchaseOrdersPage() {
   }, [pid]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!pid) return;
+    api<{ tedarikciler: { id: string; company_name: string }[] }>(`/projects/${pid}/tedarikciler`, { projectId: pid })
+      .then((r) => setTedarikciler(r.tedarikciler ?? []))
+      .catch(() => setTedarikciler([]));
+  }, [pid]);
 
   // Akış panosundaki "Yeni ..." düğmesi buraya ?yeni=1 ile gelir ve formu açar.
   // Parametre açıldıktan HEMEN SONRA temizlenir; iki sebeple:
@@ -96,12 +106,13 @@ export default function PurchaseOrdersPage() {
         method: "POST", projectId: pid,
         body: {
           supplier_name: supplier.trim(),
+          tedarikci_id: tedarikciId || undefined,
           amount: amount ? Number(amount) : undefined,
           expected_date: expected || undefined,
           note: note.trim() || undefined,
         },
       });
-      setSupplier(""); setAmount(""); setExpected(""); setNote(""); setShowForm(false);
+      setSupplier(""); setTedarikciId(""); setAmount(""); setExpected(""); setNote(""); setShowForm(false);
       load();
     } catch { setErr("Sipariş oluşturulamadı."); }
   }
@@ -140,6 +151,21 @@ export default function PurchaseOrdersPage() {
             Tedarikçi
             <input value={supplier} onChange={(e) => setSupplier(e.target.value)}
               className="mt-1 block rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
+          </label>
+          <label className="text-xs text-beton-300">
+            Kayıtlı tedarikçi (ödeme planı için)
+            <select value={tedarikciId}
+              onChange={(e) => {
+                setTedarikciId(e.target.value);
+                const t = tedarikciler.find((x) => x.id === e.target.value);
+                if (t && !supplier.trim()) setSupplier(t.company_name);
+              }}
+              className="mt-1 block rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100">
+              <option value="">— bağlama —</option>
+              {tedarikciler.map((t) => (
+                <option key={t.id} value={t.id}>{t.company_name}</option>
+              ))}
+            </select>
           </label>
           <label className="text-xs text-beton-300">
             Tutar
