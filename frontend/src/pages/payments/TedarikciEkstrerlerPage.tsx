@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 
@@ -165,12 +166,16 @@ function StatementForm({
 export default function TedarikciEkstrerlerPage() {
   const { current: currentProject } = useProjects();
   const pid = currentProject?.id;
+  const [searchParams] = useSearchParams();
 
   const [statements, setStatements] = useState<Statement[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Statement | null>(null);
-  const [filterTedarikci, setFilterTedarikci] = useState("");
+  // ?tedarikci= ile önceden filtrelenmiş açılabilir (Taşeronlar sayfasındaki
+  // "Ekstreleri Görüntüle" bağlantısından geldiğinde) — isim eşleşmesi, gerçek
+  // bir FK değil (supplier_statements serbest metin tedarikci_adi kullanıyor).
+  const [filterTedarikci, setFilterTedarikci] = useState(() => searchParams.get("tedarikci") ?? "");
   const [filterDurum, setFilterDurum] = useState("");
 
   const load = useCallback(async () => {

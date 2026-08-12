@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import type { User } from "../../api/client";
+import { useProjects } from "../../projects/ProjectContext";
 
 type MatrixRow = {
   code: string;
@@ -14,6 +15,7 @@ type MatrixRow = {
 };
 
 export default function PermissionMatrixPage() {
+  const { projects } = useProjects();
   const [params, setParams] = useSearchParams();
   const userId = params.get("user") || "";
   const [projectId, setProjectId] = useState("");
@@ -90,12 +92,16 @@ export default function PermissionMatrixPage() {
         </div>
         <div>
           <label className="block text-xs text-beton-400 mb-1">Proje kapsamı (opsiyonel)</label>
-          <input
+          <select
             value={projectId}
-            onChange={(e) => setProjectId(e.target.value.trim())}
-            placeholder="boş = global · Faz 2'de proje seçici gelir"
+            onChange={(e) => setProjectId(e.target.value)}
             className="w-80 rounded-md bg-beton-900 border border-beton-800 px-3 py-1.5 text-sm text-beton-200 outline-none focus:border-emniyet-500"
-          />
+          >
+            <option value="">Global (tüm projeler)</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 

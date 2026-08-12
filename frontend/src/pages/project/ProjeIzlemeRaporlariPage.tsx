@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { api } from "../../api/client";
 import { useProjects } from "../../projects/ProjectContext";
 
 // Proje İzleme Raporları — finansal ve operasyonel izleme raporları.
-// Nakit Akışı, Maliyet Takip, Malzeme/Stok varsayılan olarak gelir;
-// kullanıcı özel rapor türleri ekleyebilir.
+// Maliyet Takip ve Malzeme/Stok kartları gerçek sayfalara bağlanır (Aylık
+// Rapor / Depo); Nakit Akış Raporu için henüz karşılık gelen bir sayfa yok,
+// dürüstçe "Yakında" olarak işaretlenir. Özel raporlar artık backend'de
+// kalıcı (önceden yalnızca bu oturumda React state'inde tutuluyordu).
 
 type ReportCard = {
   id: string;
@@ -11,7 +15,7 @@ type ReportCard = {
   desc: string;
   color: string;
   default: boolean;
-  custom?: boolean;
+  path?: string;
 };
 
 const DEFAULT_REPORTS: ReportCard[] = [
@@ -28,6 +32,7 @@ const DEFAULT_REPORTS: ReportCard[] = [
     desc: "Bütçe vs gerçekleşen maliyet karşılaştırması. EVM verileriyle (AC/EV/CPI) desteklenir.",
     color: "border-green-500/40 bg-green-500/5",
     default: true,
+    path: "/aylik-raporlar",
   },
   {
     id: "material",
@@ -35,47 +40,63 @@ const DEFAULT_REPORTS: ReportCard[] = [
     desc: "Depo giriş/çıkışları, mevcut stok durumu ve bekleyen siparişlerin özeti.",
     color: "border-amber-500/40 bg-amber-500/5",
     default: true,
+    path: "/proje/depo",
   },
+];
+
+type CustomReportDTO = { id: string; label: string; description?: string };
+
+const COLORS = [
+  "border-violet-500/40 bg-violet-500/5",
+  "border-sky-500/40 bg-sky-500/5",
+  "border-rose-500/40 bg-rose-500/5",
+  "border-teal-500/40 bg-teal-500/5",
 ];
 
 export default function ProjeIzlemeRaporlariPage() {
   const { current } = useProjects();
-  const [custom, setCustom] = useState<ReportCard[]>([]);
+  const pid = current?.id;
+  const [custom, setCustom] = useState<CustomReportDTO[]>([]);
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!pid) return;
+    try {
+      const r = await api<{ custom_reports: CustomReportDTO[] }>(
+        `/projects/${pid}/custom-reports`, { projectId: pid });
+      setCustom(r.custom_reports ?? []);
+    } catch { setCustom([]); }
+  }, [pid]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function addCustom() {
+    if (!newLabel.trim() || !pid) return;
+    setBusy(true);
+    try {
+      await api(`/projects/${pid}/custom-reports`, {
+        method: "POST", projectId: pid,
+        body: { label: newLabel.trim(), description: newDesc.trim() || null },
+      });
+      setNewLabel("");
+      setNewDesc("");
+      setAdding(false);
+      await load();
+    } finally { setBusy(false); }
+  }
+
+  async function removeCustom(id: string) {
+    if (!pid) return;
+    await api(`/projects/${pid}/custom-reports/${id}`, { method: "DELETE", projectId: pid });
+    await load();
+  }
 
   if (!current) {
     return <p className="text-sm text-beton-400">Önce bir proje seçin.</p>;
   }
-
-  const COLORS = [
-    "border-violet-500/40 bg-violet-500/5",
-    "border-sky-500/40 bg-sky-500/5",
-    "border-rose-500/40 bg-rose-500/5",
-    "border-teal-500/40 bg-teal-500/5",
-  ];
-
-  function addCustom() {
-    if (!newLabel.trim()) return;
-    setCustom([...custom, {
-      id: "custom-" + Date.now(),
-      label: newLabel.trim(),
-      desc: newDesc.trim() || "Özel izleme raporu.",
-      color: COLORS[custom.length % COLORS.length],
-      default: false,
-      custom: true,
-    }]);
-    setNewLabel("");
-    setNewDesc("");
-    setAdding(false);
-  }
-
-  function removeCustom(id: string) {
-    setCustom(custom.filter((c) => c.id !== id));
-  }
-
-  const allReports = [...DEFAULT_REPORTS, ...custom];
 
   return (
     <div className="space-y-6">
@@ -95,21 +116,36 @@ export default function ProjeIzlemeRaporlariPage() {
 
       {/* Varsayılan + özel raporlar */}
       <div className="grid gap-3 sm:grid-cols-3">
-        {allReports.map((r) => (
-          <div key={r.id}
-            className={"relative rounded-xl border p-4 " + r.color +
-              (r.custom ? " cursor-default" : " cursor-pointer hover:brightness-110 transition")}>
-            {r.custom && (
-              <button
-                onClick={() => removeCustom(r.id)}
-                className="absolute top-3 right-3 text-beton-500 hover:text-red-400 text-xs"
-                title="Kaldır">✕</button>
-            )}
+        {DEFAULT_REPORTS.map((r) =>
+          r.path ? (
+            <Link key={r.id} to={r.path}
+              className={"relative rounded-xl border p-4 cursor-pointer hover:brightness-110 transition " + r.color}>
+              <p className="font-medium text-beton-100 text-sm pr-4">{r.label}</p>
+              <p className="mt-1 text-xs text-beton-400 leading-relaxed">{r.desc}</p>
+              <span className="mt-3 inline-flex items-center gap-1 text-[10px] text-beton-500">● Varsayılan</span>
+            </Link>
+          ) : (
+            <div key={r.id}
+              className={"relative rounded-xl border p-4 opacity-50 cursor-not-allowed select-none " + r.color}
+              title="Yakında kullanılabilir olacak">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium text-beton-100 text-sm">{r.label}</p>
+                <span className="rounded-full border border-beton-700 px-2 py-0.5 text-[10px] text-beton-500 bg-beton-900 shrink-0">Yakında</span>
+              </div>
+              <p className="mt-1 text-xs text-beton-400 leading-relaxed">{r.desc}</p>
+            </div>
+          )
+        )}
+
+        {custom.map((r) => (
+          <div key={r.id} className={"relative rounded-xl border p-4 cursor-default " + COLORS[custom.indexOf(r) % COLORS.length]}>
+            <button
+              onClick={() => removeCustom(r.id)}
+              className="absolute top-3 right-3 text-beton-500 hover:text-red-400 text-xs"
+              title="Kaldır">✕</button>
             <p className="font-medium text-beton-100 text-sm pr-4">{r.label}</p>
-            <p className="mt-1 text-xs text-beton-400 leading-relaxed">{r.desc}</p>
-            <span className="mt-3 inline-flex items-center gap-1 text-[10px] text-beton-500">
-              {r.default ? "● Varsayılan" : "● Özel"}
-            </span>
+            <p className="mt-1 text-xs text-beton-400 leading-relaxed">{r.description || "Özel izleme raporu."}</p>
+            <span className="mt-3 inline-flex items-center gap-1 text-[10px] text-beton-500">● Özel</span>
           </div>
         ))}
 
@@ -143,10 +179,10 @@ export default function ProjeIzlemeRaporlariPage() {
             />
             <div className="flex gap-2">
               <button onClick={addCustom}
-                disabled={!newLabel.trim()}
+                disabled={!newLabel.trim() || busy}
                 className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-50
                            text-beton-950 text-xs font-medium px-3 py-1.5">
-                Ekle
+                {busy ? "Ekleniyor…" : "Ekle"}
               </button>
               <button onClick={() => { setAdding(false); setNewLabel(""); setNewDesc(""); }}
                 className="rounded-md border border-beton-700 text-beton-300 text-xs px-3 py-1.5">
@@ -156,10 +192,6 @@ export default function ProjeIzlemeRaporlariPage() {
           </div>
         )}
       </div>
-
-      <p className="text-xs text-beton-500">
-        Özel rapor türleri bu oturumda görünür. İleride sunucu tarafında kayıt özelliği eklenecek.
-      </p>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, apiUpload } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
@@ -111,7 +112,12 @@ export default function SubcontractorsPage() {
             {selTedarikci.phone && <p className="text-beton-400 text-sm">Tel: {selTedarikci.phone}</p>}
             {selTedarikci.email && <p className="text-beton-400 text-sm">E-posta: {selTedarikci.email}</p>}
             {selTedarikci.tax_no && <p className="text-beton-400 text-sm">Vergi No: {selTedarikci.tax_no}</p>}
-            <p className="text-xs text-beton-500 mt-4">Tedarikçi sözleşme ve ekstreler yakında eklenecek.</p>
+            <Link
+              to={`/tedarikci-ekstreler?tedarikci=${encodeURIComponent(selTedarikci.company_name)}`}
+              className="mt-4 inline-block text-xs text-emniyet-500 hover:underline"
+            >
+              Ekstreleri Görüntüle →
+            </Link>
           </div>
         ) : (
           <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 text-beton-400 text-sm">

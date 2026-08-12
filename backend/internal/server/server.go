@@ -16,6 +16,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/config"
 	"github.com/ipks/ipks/backend/internal/contracts"
 	"github.com/ipks/ipks/backend/internal/correspondence"
+	"github.com/ipks/ipks/backend/internal/customreports"
 	"github.com/ipks/ipks/backend/internal/dashboard"
 	"github.com/ipks/ipks/backend/internal/design"
 	"github.com/ipks/ipks/backend/internal/documents"
@@ -120,6 +121,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	meetingsH := meetings.NewHandler(pool)
 	tutanaklarH := tutanaklar.NewHandler(pool)
 	stakeholdersH := stakeholders.NewHandler(pool)
+	customReportsH := customreports.NewHandler(pool)
 
 	// --- Faz 21: Personel & Puantaj ---
 	personnelH := personnel.NewHandler(pool)
@@ -553,6 +555,16 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/stakeholders/bulk", stakeholdersH.BulkCreate)
 			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/stakeholders/{id}", stakeholdersH.Update)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/stakeholders/{id}", stakeholdersH.Delete)
+		})
+
+		// Özel Raporlar (Proje İzleme Raporları'ndaki "özel rapor ekle") —
+		// önceden yalnızca React state'inde tutulan, sayfa yenilenince
+		// kaybolan bir listeydi.
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/custom-reports", customReportsH.List)
+			pr.With(mw.RequirePermission("reports.view")).Post("/projects/{projectID}/custom-reports", customReportsH.Create)
+			pr.With(mw.RequirePermission("reports.view")).Delete("/projects/{projectID}/custom-reports/{id}", customReportsH.Delete)
 		})
 
 		// Faz 26 — Makine & Ekipman
