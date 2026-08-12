@@ -20,7 +20,7 @@ type Statement = {
 // Faz B (Nakit Akış) — ekstre ödeme planı (kısmi ödeme).
 type StatementPayment = {
   id: string; amount: number; payment_method: string; event_date: string;
-  cek_keside_tarihi?: string | null; note?: string | null;
+  cek_keside_tarihi?: string | null; note?: string | null; pending_approval?: boolean;
 };
 const PAYMENT_METHOD_LABEL: Record<string, string> = { nakit: "Nakit", havale: "Havale", cek: "Çek" };
 
@@ -220,7 +220,14 @@ function StatementPaymentsPanel({ pid, statementId }: { pid: string; statementId
             {payments.map((p) => (
               <tr key={p.id} className="border-b border-beton-800/50">
                 <td className="py-1 pr-2 text-right font-mono text-beton-200">{fmt(p.amount)}</td>
-                <td className="py-1 pr-2 text-beton-400">{PAYMENT_METHOD_LABEL[p.payment_method] || p.payment_method}</td>
+                <td className="py-1 pr-2 text-beton-400">
+                  {PAYMENT_METHOD_LABEL[p.payment_method] || p.payment_method}
+                  {p.pending_approval && (
+                    <span className="ml-2 rounded bg-amber-500/15 text-amber-400 text-[10px] px-1.5 py-0.5 align-middle">
+                      Onay Bekliyor
+                    </span>
+                  )}
+                </td>
                 <td className="py-1 pr-2 text-beton-400">{isoToDisplay(p.event_date)}</td>
                 <td className="py-1 pr-2 text-beton-500">{p.cek_keside_tarihi ? isoToDisplay(p.cek_keside_tarihi) : "—"}</td>
                 <td className="py-1 pr-2 text-beton-500">{p.note || "—"}</td>

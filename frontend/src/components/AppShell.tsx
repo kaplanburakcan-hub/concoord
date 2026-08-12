@@ -91,6 +91,7 @@ const GROUPS: NavGroup[] = [
       { to: "/documents", label: "Dokümanlar", perm: "documents.view", icon: I.dok },
       { to: "/hakedis", label: "Taşeron Hakedişleri", perm: "progress_payments.view", icon: I.hakedis, end: true },
       { to: "/tedarikci-ekstreler", label: "Tedarikçi Ekstreler", perm: "contracts.view", icon: I.ekstrem },
+      { to: "/odeme-plani-onaylari", label: "Ödeme Planı Onayları", perm: "payments.approve_plan_change", icon: I.izin },
     ],
   },
   {

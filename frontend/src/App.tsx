@@ -54,6 +54,7 @@ import AnaSozlesmePage from "./pages/project/AnaSozlesmePage";
 import TasarimVeProjelerPage from "./pages/project/TasarimVeProjelerPage";
 import PersonelPuantajPage from "./pages/project/PersonelPuantajPage";
 import TedarikciEkstrerlerPage from "./pages/payments/TedarikciEkstrerlerPage";
+import PaymentPlanApprovalsPage from "./pages/payments/PaymentPlanApprovalsPage";
 import GelenEvrakPage from "./pages/project/GelenEvrakPage";
 import GidenEvrakPage from "./pages/project/GidenEvrakPage";
 
@@ -342,6 +343,7 @@ export default function App() {
                       <Route path="/proje/ana-sozlesme" element={<RequirePerm perm="projects.view"><AnaSozlesmePage /></RequirePerm>} />
                       <Route path="/proje/tasarim-projeler" element={<RequirePerm perm="projects.view"><TasarimVeProjelerPage /></RequirePerm>} />
                       <Route path="/tedarikci-ekstreler" element={<RequirePerm perm="contracts.view"><TedarikciEkstrerlerPage /></RequirePerm>} />
+                      <Route path="/odeme-plani-onaylari" element={<RequirePerm perm="payments.approve_plan_change"><PaymentPlanApprovalsPage /></RequirePerm>} />
                       <Route path="/proje/personel-puantaj" element={<RequirePerm perm="reports.view"><PersonelPuantajPage /></RequirePerm>} />
                       <Route path="/saha/tutanaklar" element={<RequirePerm perm="reports.view"><SahaTutanaklariPage /></RequirePerm>} />
                       {/* ── YAZIŞMALAR ── */}

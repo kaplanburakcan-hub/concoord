@@ -11,11 +11,17 @@ import (
 
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/notify"
+	"github.com/ipks/ipks/backend/internal/paymentplans"
 )
 
-// Tedarikçi ekstresi ödeme planı (kısmi ödeme) — Nakit Akış Faz B.
-// Her satır oluşturulduğunda cash_events'e bir "out" satırı yazılır — çekte
-// olay tarihi keşide tarihidir, diğerlerinde ödeme tarihidir.
+// Tedarikçi ekstresi ödeme planı (kısmi ödeme) — Nakit Akış Faz B/C.
+// Girilen ödeme şekli, ekstredeki tedarikçi adına isim eşleşmesiyle bulunan
+// `tedarikciler` kaydının varsayılanıyla AYNIYSA (ya da eşleşen kayıt/
+// varsayılan yoksa) cash_events'e doğrudan yazılır. FARKLIYSA bir onay
+// talebi açılır (Faz C). Not: supplier_statements'ta gerçek bir tedarikci_id
+// FK'si yok (serbest metin isim) — bu yüzden eşleşme isim bazlı, mevcut
+// mimarideki aynı desenin devamı.
 
 type StatementPayment struct {
 	ID              string  `json:"id"`
@@ -26,15 +32,19 @@ type StatementPayment struct {
 	CekKesideTarihi *string `json:"cek_keside_tarihi,omitempty"`
 	Note            *string `json:"note,omitempty"`
 	CreatedAt       string  `json:"created_at"`
+	PendingApproval bool    `json:"pending_approval"`
 }
 
 const stmtPayCols = `id, statement_id, amount::float8, payment_method,
 	to_char(event_date,'YYYY-MM-DD'), to_char(cek_keside_tarihi,'YYYY-MM-DD'), note,
-	to_char(created_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"')`
+	to_char(created_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+	EXISTS(SELECT 1 FROM payment_plan_change_requests c
+	       WHERE c.source_entity='supplier_payment'
+	         AND c.source_id=supplier_statement_payments.id AND c.status='pending')`
 
 func scanStmtPay(row pgx.Row, p *StatementPayment) error {
 	return row.Scan(&p.ID, &p.StatementID, &p.Amount, &p.PaymentMethod,
-		&p.EventDate, &p.CekKesideTarihi, &p.Note, &p.CreatedAt)
+		&p.EventDate, &p.CekKesideTarihi, &p.Note, &p.CreatedAt, &p.PendingApproval)
 }
 
 func (h *Handler) ListStatementPayments(w http.ResponseWriter, r *http.Request) {
@@ -137,6 +147,16 @@ func (h *Handler) CreateStatementPayment(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// İsim eşleşmesiyle varsayılan ödeme şekli (gerçek FK yok).
+	var defaultMethod *string
+	if err := tx.QueryRow(r.Context(), `
+		SELECT default_payment_method FROM tedarikciler
+		WHERE project_id=$1 AND company_name=$2 AND deleted_at IS NULL AND default_payment_method IS NOT NULL
+		ORDER BY created_at DESC LIMIT 1`, pid, tedarikciAdi).Scan(&defaultMethod); err != nil && err != pgx.ErrNoRows {
+		httpx.Internal(w, r)
+		return
+	}
+
 	var p StatementPayment
 	cekVal := ""
 	if req.CekKesideTarihi != nil {
@@ -152,18 +172,42 @@ func (h *Handler) CreateStatementPayment(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if _, err := tx.Exec(r.Context(), `
-		INSERT INTO cash_events (project_id, direction, source_entity, source_id, description, amount, event_date, payment_method, created_by)
-		VALUES ($1,'out','supplier_payment',$2,$3,$4,$5::date,$6,$7)`,
-		pid, p.ID, tedarikciAdi+" — "+ekstreNo, req.Amount, cashDate, req.PaymentMethod, uid); err != nil {
-		httpx.Internal(w, r)
-		return
+	description := tedarikciAdi + " — " + ekstreNo
+	pendingApproval := defaultMethod != nil && *defaultMethod != req.PaymentMethod
+	if pendingApproval {
+		if _, err := tx.Exec(r.Context(), `
+			INSERT INTO payment_plan_change_requests
+				(project_id, source_entity, source_id, amount_snapshot, description_snapshot, default_method, requested_method, requested_by)
+			VALUES ($1,'supplier_payment',$2,$3,$4,$5,$6,$7)`,
+			pid, p.ID, req.Amount, description, *defaultMethod, req.PaymentMethod, uid); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+	} else {
+		if _, err := tx.Exec(r.Context(), `
+			INSERT INTO cash_events (project_id, direction, source_entity, source_id, description, amount, event_date, payment_method, created_by)
+			VALUES ($1,'out','supplier_payment',$2,$3,$4,$5::date,$6,$7)`,
+			pid, p.ID, description, req.Amount, cashDate, req.PaymentMethod, uid); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
 	}
 	if err := tx.Commit(r.Context()); err != nil {
 		httpx.Internal(w, r)
 		return
 	}
-	httpx.JSON(w, http.StatusCreated, map[string]any{"payment": p})
+
+	if pendingApproval {
+		payID, err := uuid.Parse(p.ID)
+		if err == nil {
+			paymentplans.NotifyApprovers(r.Context(), h.db, h.nt, pid, uid, notify.Input{
+				Type: notify.TypePaymentPlanRequested, Title: description + " — ödeme şekli değişikliği onay bekliyor",
+				Body:       "Varsayılan: " + *defaultMethod + " · İstenen: " + req.PaymentMethod,
+				EntityType: "supplier_payment", EntityID: &payID, ProjectID: &pid,
+			})
+		}
+	}
+	httpx.JSON(w, http.StatusCreated, map[string]any{"payment": p, "pending_approval": pendingApproval})
 }
 
 func (h *Handler) DeleteStatementPayment(w http.ResponseWriter, r *http.Request) {
@@ -198,6 +242,12 @@ func (h *Handler) DeleteStatementPayment(w http.ResponseWriter, r *http.Request)
 	}
 	if _, err := tx.Exec(r.Context(),
 		`DELETE FROM cash_events WHERE source_entity='supplier_payment' AND source_id=$1`, payID); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	if _, err := tx.Exec(r.Context(), `
+		DELETE FROM payment_plan_change_requests
+		WHERE source_entity='supplier_payment' AND source_id=$1 AND status='pending'`, payID); err != nil {
 		httpx.Internal(w, r)
 		return
 	}

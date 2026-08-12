@@ -41,6 +41,10 @@ const (
 	TypeOHSPenaltyIssued  = "ohs_penalty_issued"  // ceza tutanağı kesildi → taşeron temsilcisi + PY
 	TypeOHSFindingOverdue = "ohs_finding_overdue" // bulgu termini geçti → raporlayan
 
+	// Nakit Akış Faz C — ödeme planı değişikliği onay akışı
+	TypePaymentPlanRequested = "payment_plan_requested" // varsayılan dışı ödeme şekli onaya sunuldu → onay yetkilileri
+	TypePaymentPlanDecided   = "payment_plan_decided"   // karar verildi → talep sahibi
+
 	// Faz 9 — Dashboard, EVM ve yönetim raporlaması
 	TypeMonthlyReportReady  = "monthly_report_ready"  // aylık PDF üretildi → üreten kullanıcı
 	TypeMonthlyReportFailed = "monthly_report_failed" // aylık PDF başarısız → üreten kullanıcı

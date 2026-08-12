@@ -53,6 +53,7 @@ type WorkItem = { id: string; poz_no: string; description: string; unit: string;
 type Disbursement = {
   id: string; amount: number; payment_method: string; event_date: string;
   cek_keside_tarihi?: string | null; note?: string | null; created_at: string;
+  pending_approval?: boolean;
 };
 
 const PAYMENT_METHOD_LABEL: Record<string, string> = { nakit: "Nakit", havale: "Havale", cek: "Çek" };
@@ -632,7 +633,14 @@ export default function ProgressPaymentDetailPage() {
             {disbursements.map((d) => (
               <tr key={d.id} className="border-b border-beton-800/50 text-beton-200">
                 <td className="py-1 pr-2 text-right tabular-nums">{d.amount.toLocaleString("tr-TR")}</td>
-                <td className="py-1 pr-2">{PAYMENT_METHOD_LABEL[d.payment_method] || d.payment_method}</td>
+                <td className="py-1 pr-2">
+                  {PAYMENT_METHOD_LABEL[d.payment_method] || d.payment_method}
+                  {d.pending_approval && (
+                    <span className="ml-2 rounded bg-amber-500/15 text-amber-400 text-[10px] px-1.5 py-0.5 align-middle">
+                      Onay Bekliyor
+                    </span>
+                  )}
+                </td>
                 <td className="py-1 pr-2">{d.event_date}</td>
                 <td className="py-1 pr-2">{d.cek_keside_tarihi || "—"}</td>
                 <td className="py-1 pr-2 text-beton-400">{d.note || "—"}</td>

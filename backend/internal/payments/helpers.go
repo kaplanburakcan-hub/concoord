@@ -16,6 +16,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/audit"
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/notify"
 	"github.com/ipks/ipks/backend/internal/rbac"
 )
 
@@ -25,11 +26,12 @@ type Handler struct {
 	pool *pgxpool.Pool
 	eval *rbac.Evaluator
 	rec  *audit.Recorder
+	nt   *notify.Service
 	log  *slog.Logger
 }
 
-func NewHandler(pool *pgxpool.Pool, eval *rbac.Evaluator, rec *audit.Recorder, log *slog.Logger) *Handler {
-	return &Handler{pool: pool, eval: eval, rec: rec, log: log}
+func NewHandler(pool *pgxpool.Pool, eval *rbac.Evaluator, rec *audit.Recorder, nt *notify.Service, log *slog.Logger) *Handler {
+	return &Handler{pool: pool, eval: eval, rec: rec, nt: nt, log: log}
 }
 
 func parseID(w http.ResponseWriter, r *http.Request, param string) (uuid.UUID, bool) {

@@ -9,11 +9,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/notify"
 )
 
-type Handler struct{ db *pgxpool.Pool }
+type Handler struct {
+	db *pgxpool.Pool
+	nt *notify.Service
+}
 
-func NewHandler(pool *pgxpool.Pool) *Handler { return &Handler{db: pool} }
+func NewHandler(pool *pgxpool.Pool, nt *notify.Service) *Handler { return &Handler{db: pool, nt: nt} }
 
 type Statement struct {
 	ID           string  `json:"id,omitempty"`

@@ -26,6 +26,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/meetings"
 	"github.com/ipks/ipks/backend/internal/notify"
 	"github.com/ipks/ipks/backend/internal/ohs"
+	"github.com/ipks/ipks/backend/internal/paymentplans"
 	"github.com/ipks/ipks/backend/internal/payments"
 	"github.com/ipks/ipks/backend/internal/personnel"
 	"github.com/ipks/ipks/backend/internal/procurement"
@@ -85,12 +86,15 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	projectH := projects.NewHandler(pool, eval, recorder, log)
 	docH := documents.NewHandler(pool, store, recorder, log)
 
-	// --- Faz 3 bağımlılıkları (taşeron + hakediş finansal çekirdeği) ---
-	payH := payments.NewHandler(pool, eval, recorder, log)
-
 	// --- Faz 4 bağımlılıkları (görev yönetimi + merkezi bildirim motoru) ---
+	// Not: payments/statements Faz 3'ten ama Nakit Akış Faz C'nin onay akışı
+	// bildirim gönderdiği için notifySvc'ye ihtiyaç duyuyor — bu yüzden öne alındı.
 	notifySvc := notify.NewService(pool, log)
 	notifyH := notify.NewHandler(pool, log)
+
+	// --- Faz 3 bağımlılıkları (taşeron + hakediş finansal çekirdeği) ---
+	payH := payments.NewHandler(pool, eval, recorder, notifySvc, log)
+	paymentPlansH := paymentplans.NewHandler(pool, recorder, notifySvc)
 	taskH := tasks.NewHandler(pool, eval, recorder, notifySvc, log)
 
 	// --- Faz 5 bağımlılıkları (malzeme onay süreci / MAR) ---
@@ -127,7 +131,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	personnelH := personnel.NewHandler(pool)
 
 	// --- Faz 22: Tedarikçi Ekstreler ---
-	statementsH := statements.NewHandler(pool)
+	statementsH := statements.NewHandler(pool, notifySvc)
 
 	// --- Faz 26: Makine & Ekipman ---
 	machinesH := machines.NewHandler(pool)
@@ -306,6 +310,14 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("progress_payments.view_financials")).Get("/projects/{projectID}/payments/{paymentID}/disbursements", payH.ListDisbursements)
 			pr.With(mw.RequirePermission("progress_payments.finalize")).Post("/projects/{projectID}/payments/{paymentID}/disbursements", payH.CreateDisbursement)
 			pr.With(mw.RequirePermission("progress_payments.finalize")).Delete("/projects/{projectID}/disbursements/{id}", payH.DeleteDisbursement)
+		})
+
+		// Faz C (Nakit Akış) — ödeme planı değişikliği onay akışı.
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("payments.approve_plan_change")).Get("/projects/{projectID}/payment-plan-changes", paymentPlansH.ListPending)
+			pr.With(mw.RequirePermission("payments.approve_plan_change")).Post("/projects/{projectID}/payment-plan-changes/{id}/approve", paymentPlansH.Approve)
+			pr.With(mw.RequirePermission("payments.approve_plan_change")).Post("/projects/{projectID}/payment-plan-changes/{id}/reject", paymentPlansH.Reject)
 		})
 
 		// ---- Faz 5: Malzeme Onay Süreci (Submittals / MAR) ----

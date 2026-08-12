@@ -74,6 +74,8 @@ var AllPermissions = []PermissionDef{
 	{"procurement", "manage_po", "Sipariş (PO) yönet"},
 	{"procurement", "upload_delivery", "İrsaliye/teslimat yükle"},
 
+	{"payments", "approve_plan_change", "Ödeme planı değişikliği (varsayılan dışı ödeme şekli) onayla"},
+
 	{"ohs", "view", "İSG kayıtlarını görüntüle"},
 	{"ohs", "perform_inspection", "İSG denetimi yap"},
 	{"ohs", "issue_penalty", "İSG ceza tutanağı kes"},
@@ -118,6 +120,7 @@ var roleDefaults = map[string][]string{
 		"tasks.view", "tasks.create", "tasks.edit_own", "tasks.edit_all", "tasks.assign",
 		"reports.view", "reports.create_daily", "reports.generate_weekly", "reports.view_financial_reports",
 		"procurement.view", "procurement.create_pr", "procurement.approve_pr", "procurement.manage_po", "procurement.upload_delivery",
+		"payments.approve_plan_change",
 		"ohs.view", "ohs.issue_penalty", "ohs.manage_checklists",
 		"admin.view_audit_log",
 	},

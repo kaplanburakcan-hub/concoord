@@ -11,17 +11,20 @@ import (
 	"github.com/ipks/ipks/backend/internal/audit"
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/notify"
+	"github.com/ipks/ipks/backend/internal/paymentplans"
 )
 
 // ---------------------------------------------------------------------------
-// Hakediş Ödeme Planı (kısmi ödeme) — Nakit Akış Faz B.
+// Hakediş Ödeme Planı (kısmi ödeme) — Nakit Akış Faz B/C.
 //
-// Bir hakedişin birden çok kısmi ödemesi olabilir (nakit/havale/çek).
-// Her satır oluşturulduğunda merkezi nakit hareketi defterine (cash_events)
-// bir "out" satırı yazılır — çekte olay tarihi keşide tarihidir, diğerlerinde
-// kullanıcının girdiği ödeme tarihidir. Ödeme şekli sözleşme varsayılanından
-// farklıysa onay akışına düşürme (Faz C) henüz uygulanmadı — bu fazda her
-// satır doğrudan deftere yazılır.
+// Bir hakedişin birden çok kısmi ödemesi olabilir (nakit/havale/çek). Girilen
+// ödeme şekli, taşeronun sözleşmesindeki varsayılanla AYNIYSA (veya sözleşmede
+// varsayılan tanımlı değilse) satır doğrudan merkezi nakit hareketi defterine
+// (cash_events) bir "out" satırı olarak yazılır — çekte olay tarihi keşide
+// tarihidir, diğerlerinde kullanıcının girdiği ödeme tarihidir. FARKLIYSA,
+// deftere hemen yazılmaz; bir onay talebi açılır (Faz C, `paymentplans`
+// paketi) ve `payments.approve_plan_change` yetkisi olanlara bildirim gider.
 // ---------------------------------------------------------------------------
 
 type disbursementDTO struct {
@@ -33,14 +36,18 @@ type disbursementDTO struct {
 	CekKesideTarihi   *string   `json:"cek_keside_tarihi,omitempty"`
 	Note              *string   `json:"note,omitempty"`
 	CreatedAt         time.Time `json:"created_at"`
+	PendingApproval   bool      `json:"pending_approval"`
 }
 
 const disbCols = `id, progress_payment_id, amount::float8, payment_method,
-	to_char(event_date,'YYYY-MM-DD'), to_char(cek_keside_tarihi,'YYYY-MM-DD'), note, created_at`
+	to_char(event_date,'YYYY-MM-DD'), to_char(cek_keside_tarihi,'YYYY-MM-DD'), note, created_at,
+	EXISTS(SELECT 1 FROM payment_plan_change_requests c
+	       WHERE c.source_entity='progress_payment_disbursement'
+	         AND c.source_id=progress_payment_disbursements.id AND c.status='pending')`
 
 func scanDisb(row pgx.Row, d *disbursementDTO) error {
 	return row.Scan(&d.ID, &d.ProgressPaymentID, &d.Amount, &d.PaymentMethod,
-		&d.EventDate, &d.CekKesideTarihi, &d.Note, &d.CreatedAt)
+		&d.EventDate, &d.CekKesideTarihi, &d.Note, &d.CreatedAt, &d.PendingApproval)
 }
 
 func (h *Handler) ListDisbursements(w http.ResponseWriter, r *http.Request) {
@@ -135,13 +142,24 @@ func (h *Handler) CreateDisbursement(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 
 	var periodNo int
+	var subID uuid.UUID
 	if err := tx.QueryRow(r.Context(),
-		`SELECT period_no FROM progress_payments WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`,
-		ppid, pid).Scan(&periodNo); err != nil {
+		`SELECT period_no, subcontractor_id FROM progress_payments WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`,
+		ppid, pid).Scan(&periodNo, &subID); err != nil {
 		if err == pgx.ErrNoRows {
 			httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Hakediş bulunamadı.", nil)
 			return
 		}
+		httpx.Internal(w, r)
+		return
+	}
+
+	// Sözleşmedeki varsayılan ödeme şekli — en güncel sözleşme esas alınır.
+	var defaultMethod *string
+	if err := tx.QueryRow(r.Context(), `
+		SELECT default_payment_method FROM contracts
+		WHERE subcontractor_id=$1 AND project_id=$2 AND deleted_at IS NULL AND default_payment_method IS NOT NULL
+		ORDER BY created_at DESC LIMIT 1`, subID, pid).Scan(&defaultMethod); err != nil && err != pgx.ErrNoRows {
 		httpx.Internal(w, r)
 		return
 	}
@@ -158,12 +176,25 @@ func (h *Handler) CreateDisbursement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := tx.Exec(r.Context(), `
-		INSERT INTO cash_events (project_id, direction, source_entity, source_id, description, amount, event_date, payment_method, created_by)
-		VALUES ($1,'out','progress_payment_disbursement',$2,$3,$4,$5::date,$6,$7)`,
-		pid, d.ID, "Hakediş #"+itoa(periodNo)+" ödemesi", req.Amount, cashDate, req.PaymentMethod, uid); err != nil {
-		httpx.Internal(w, r)
-		return
+	description := "Hakediş #" + itoa(periodNo) + " ödemesi"
+	pendingApproval := defaultMethod != nil && *defaultMethod != req.PaymentMethod
+	if pendingApproval {
+		if _, err := tx.Exec(r.Context(), `
+			INSERT INTO payment_plan_change_requests
+				(project_id, source_entity, source_id, amount_snapshot, description_snapshot, default_method, requested_method, requested_by)
+			VALUES ($1,'progress_payment_disbursement',$2,$3,$4,$5,$6,$7)`,
+			pid, d.ID, req.Amount, description, *defaultMethod, req.PaymentMethod, uid); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+	} else {
+		if _, err := tx.Exec(r.Context(), `
+			INSERT INTO cash_events (project_id, direction, source_entity, source_id, description, amount, event_date, payment_method, created_by)
+			VALUES ($1,'out','progress_payment_disbursement',$2,$3,$4,$5::date,$6,$7)`,
+			pid, d.ID, description, req.Amount, cashDate, req.PaymentMethod, uid); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
 	}
 
 	m := audit.MetaFrom(r.Context())
@@ -175,7 +206,16 @@ func (h *Handler) CreateDisbursement(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w, r)
 		return
 	}
-	httpx.JSON(w, http.StatusCreated, map[string]any{"disbursement": d})
+
+	if pendingApproval {
+		did := d.ID
+		paymentplans.NotifyApprovers(r.Context(), h.pool, h.nt, pid, uid, notify.Input{
+			Type: notify.TypePaymentPlanRequested, Title: description + " — ödeme şekli değişikliği onay bekliyor",
+			Body:       "Varsayılan: " + *defaultMethod + " · İstenen: " + req.PaymentMethod,
+			EntityType: "progress_payment_disbursement", EntityID: &did, ProjectID: &pid,
+		})
+	}
+	httpx.JSON(w, http.StatusCreated, map[string]any{"disbursement": d, "pending_approval": pendingApproval})
 }
 
 func (h *Handler) DeleteDisbursement(w http.ResponseWriter, r *http.Request) {
@@ -208,6 +248,12 @@ func (h *Handler) DeleteDisbursement(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := tx.Exec(r.Context(),
 		`DELETE FROM cash_events WHERE source_entity='progress_payment_disbursement' AND source_id=$1`, id); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	if _, err := tx.Exec(r.Context(), `
+		DELETE FROM payment_plan_change_requests
+		WHERE source_entity='progress_payment_disbursement' AND source_id=$1 AND status='pending'`, id); err != nil {
 		httpx.Internal(w, r)
 		return
 	}
