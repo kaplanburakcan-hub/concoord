@@ -182,13 +182,13 @@ export default function SahaTutanaklariPage() {
     try {
       for (const file of Array.from(files)) {
         if (file.size > 10 * 1024 * 1024) { alert(`${file.name} 10MB sınırını aşıyor.`); continue; }
-        const doc = await api<{ id: string }>(`/projects/${pid}/documents`, {
+        const doc = await api<{ document: { id: string } }>(`/projects/${pid}/documents`, {
           method: "POST", projectId: pid,
           body: { title: file.name, doc_category: "SahaTutanagi", entity_type: "saha_tutanagi", entity_id: secili.id },
         });
         const fd = new FormData();
         fd.append("file", file);
-        await apiUpload(`/projects/${pid}/documents/${doc.id}/versions`, fd);
+        await apiUpload(`/projects/${pid}/documents/${doc.document.id}/versions`, fd);
       }
       await loadFotograflar(secili);
     } catch {
@@ -226,13 +226,13 @@ export default function SahaTutanaklariPage() {
       // Staged fotoğrafları şimdi yükle (tutanak id'si artık var).
       for (const f of formFotograflar) {
         if (!f.file) continue;
-        const doc = await api<{ id: string }>(`/projects/${pid}/documents`, {
+        const doc = await api<{ document: { id: string } }>(`/projects/${pid}/documents`, {
           method: "POST", projectId: pid,
           body: { title: f.ad, doc_category: "SahaTutanagi", entity_type: "saha_tutanagi", entity_id: res.id },
         });
         const fd = new FormData();
         fd.append("file", f.file);
-        await apiUpload(`/projects/${pid}/documents/${doc.id}/versions`, fd);
+        await apiUpload(`/projects/${pid}/documents/${doc.document.id}/versions`, fd);
       }
       formFotograflar.forEach((f) => URL.revokeObjectURL(f.url));
       setForm({ ...BOŞ_FORM });
