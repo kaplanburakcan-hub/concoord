@@ -835,14 +835,14 @@ function ReadOnlyView({
     ? daysBetween(detail.report_date, project.end_date)
     : null;
 
-  // Tutanaklar (localStorage)
-  const tutanaklar: TutanakMin[] = (() => {
-    if (!pid) return [];
-    try {
-      const all: TutanakMin[] = JSON.parse(localStorage.getItem(`ipks_saha_tutanaklar_${pid}`) || "[]");
-      return all.filter((t) => t.tarih === detail.report_date);
-    } catch { return []; }
-  })();
+  // Tutanaklar — artık backend'den (Saha Tutanakları localStorage'dan taşındı).
+  const [tutanaklar, setTutanaklar] = useState<TutanakMin[]>([]);
+  useEffect(() => {
+    if (!pid) { setTutanaklar([]); return; }
+    api<{ tutanaklar: TutanakMin[] }>(`/projects/${pid}/tutanaklar`, { projectId: pid })
+      .then((r) => setTutanaklar((r.tutanaklar ?? []).filter((t) => t.tarih === detail.report_date)))
+      .catch(() => setTutanaklar([]));
+  }, [pid, detail.report_date]);
 
   return (
     <div className="max-w-3xl mx-auto pb-24 space-y-3">

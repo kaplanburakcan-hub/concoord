@@ -57,6 +57,10 @@ type CalcLineInput struct {
 	ContractQty float64
 	PrevCumQty  float64
 	CumQty      float64
+	// TutanakID — "tutanaklı imalat": bu dönemki miktarın hangi Saha
+	// Tutanağı ile belgelendiği (opsiyonel). Hesaba katılmaz, salt taşınır
+	// (PozNo/Description gibi referans veri).
+	TutanakID *string
 }
 
 // CalcLine — bir poz için hesaplanmış sonuç.
@@ -72,6 +76,7 @@ type CalcLine struct {
 	CumQty        float64 `json:"cum_qty"`
 	CumAmount     float64 `json:"cum_amount"`
 	ThisAmount    float64 `json:"this_amount"`
+	TutanakID     *string `json:"tutanak_id,omitempty"`
 }
 
 // ContractTerms — kesinti hesabını süren sözleşme parametreleri. Oranlar YÜZDE
@@ -102,17 +107,17 @@ type ContractTerms struct {
 // Amount doğrudan verilir; rate_pct yalnızca kayıt/gösterim içindir.
 type ExtraDeduction struct {
 	// Nature/ReducesCost boş bırakılırsa DeductionNature(Type) ile türetilir.
-	Nature      string   `json:"nature,omitempty"`
-	ReducesCost *bool    `json:"reduces_cost,omitempty"`
-	GroupCode   string   `json:"group_code,omitempty"`
-	CatalogCode string   `json:"catalog_code,omitempty"`
-	VatPct      float64  `json:"vat_pct,omitempty"` // kesintinin kendi KDV oranı (Amount KDV dahil)
-	Type        string   `json:"type"` // Withholding | Tax | OHSPenalty | Other
-	Description string   `json:"description"`
-	RatePct     *float64 `json:"rate_pct,omitempty"`
-	Amount      float64  `json:"amount"`
-	SourceEntity *string `json:"source_entity,omitempty"`
-	SourceID     *string `json:"source_id,omitempty"`
+	Nature       string   `json:"nature,omitempty"`
+	ReducesCost  *bool    `json:"reduces_cost,omitempty"`
+	GroupCode    string   `json:"group_code,omitempty"`
+	CatalogCode  string   `json:"catalog_code,omitempty"`
+	VatPct       float64  `json:"vat_pct,omitempty"` // kesintinin kendi KDV oranı (Amount KDV dahil)
+	Type         string   `json:"type"`              // Withholding | Tax | OHSPenalty | Other
+	Description  string   `json:"description"`
+	RatePct      *float64 `json:"rate_pct,omitempty"`
+	Amount       float64  `json:"amount"`
+	SourceEntity *string  `json:"source_entity,omitempty"`
+	SourceID     *string  `json:"source_id,omitempty"`
 }
 
 // DeductionLine — hesaplanmış tek kesinti satırı (payment_deductions'a yazılır).
@@ -143,7 +148,7 @@ type DeductionLine struct {
 // AdditionLine — hakedişte ödenecek tutarı ARTIRAN kalem (teminat iadesi vb.).
 // Kesintinin aynadaki karşılığıdır: kesinti düşer, ilave ekler.
 type AdditionLine struct {
-	Type        string  `json:"type"`         // RetentionRefund | Other
+	Type        string  `json:"type"` // RetentionRefund | Other
 	Description string  `json:"description"`
 	Amount      float64 `json:"amount"`
 	RefundID    string  `json:"refund_id,omitempty"`
@@ -152,10 +157,10 @@ type AdditionLine struct {
 
 // CalcResult — bir hakediş döneminin tam hesap sonucu (Plan §6.4 A–I).
 type CalcResult struct {
-	Lines           []CalcLine      `json:"lines"`
-	GrossCum        float64         `json:"gross_cum"`        // A
-	GrossPrev       float64         `json:"gross_prev"`       // B
-	GrossThis       float64         `json:"gross_this"`       // C
+	Lines     []CalcLine `json:"lines"`
+	GrossCum  float64    `json:"gross_cum"`  // A
+	GrossPrev float64    `json:"gross_prev"` // B
+	GrossThis float64    `json:"gross_this"` // C
 	// --- KDV (dönem brütü üzerinden) ---
 	VatPct       float64 `json:"vat_pct"`
 	VatAmount    float64 `json:"vat_amount"`    // hesaplanan KDV = C × oran
@@ -209,6 +214,7 @@ func ComputeWith(inputs []CalcLineInput, grossPrev float64, terms ContractTerms,
 			CumQty:        in.CumQty,
 			CumAmount:     cumAmount,
 			ThisAmount:    thisAmount,
+			TutanakID:     in.TutanakID,
 		})
 	}
 	res.GrossCum = round2(grossCum)

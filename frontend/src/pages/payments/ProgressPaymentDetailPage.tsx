@@ -25,7 +25,11 @@ type ItemView = {
   work_item_id: string; poz_no: string; description: string; unit: string;
   unit_price?: number; prev_cum_qty: number; this_period_qty: number; cum_qty: number;
   cum_amount?: number; this_amount?: number;
+  tutanak_id?: string; tutanak_baslik?: string;
 };
+// "Tutanaklı imalat": bu dönemki metraja dayanak gösterilebilecek, aynı
+// taşerona ait onaylanmış Saha Tutanakları.
+type TutanakOption = { id: string; baslik: string; tip: string };
 // Faz 11 — kesinti kataloğu (gruplu kalem listesi). Kalem seçilince türü, KDV
 // oranı ve niteliği otomatik gelir; böylece hakediş girişinde kalem atlanmaz.
 type CatalogItem = {
@@ -87,6 +91,8 @@ export default function ProgressPaymentDetailPage() {
   const [deductions, setDeductions] = useState<DeductionView[]>([]);
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
   const [qty, setQty] = useState<Record<string, string>>({});
+  const [tutanakId, setTutanakId] = useState<Record<string, string>>({});
+  const [onayliTutanaklar, setOnayliTutanaklar] = useState<TutanakOption[]>([]);
   const [extras, setExtras] = useState<{
     type: string; description: string; amount: string;
     source_entity?: string; source_id?: string;
@@ -110,8 +116,13 @@ export default function ProgressPaymentDetailPage() {
       setItems(r.items);
       setDeductions(r.deductions);
       const q: Record<string, string> = {};
-      r.items.forEach((it) => { q[it.work_item_id] = String(it.cum_qty); });
+      const t: Record<string, string> = {};
+      r.items.forEach((it) => {
+        q[it.work_item_id] = String(it.cum_qty);
+        if (it.tutanak_id) t[it.work_item_id] = it.tutanak_id;
+      });
       setQty(q);
+      setTutanakId(t);
       setExtras(r.deductions
         .filter((d) => d.type !== "AdvanceOffset" && d.type !== "Retention")
         .map((d) => ({
@@ -121,6 +132,13 @@ export default function ProgressPaymentDetailPage() {
       const wi = await api<{ work_items: WorkItem[] }>(
         `/projects/${pid}/subcontractors/${r.payment.subcontractor_id}/work-items`, { projectId: pid });
       setWorkItems(wi.work_items);
+      // "Tutanaklı imalat": aynı taşerona ait, onaylanmış tutanaklar —
+      // metraj satırlarına dayanak olarak seçilebilir.
+      try {
+        const tt = await api<{ tutanaklar: TutanakOption[] }>(
+          `/projects/${pid}/tutanaklar?taseron_id=${r.payment.subcontractor_id}&durum=onaylandi`, { projectId: pid });
+        setOnayliTutanaklar(tt.tutanaklar ?? []);
+      } catch { setOnayliTutanaklar([]); }
     } catch { setErr("Hakediş yüklenemedi ya da erişim yetkiniz yok."); }
   }, [pid, id]);
 
@@ -159,7 +177,10 @@ export default function ProgressPaymentDetailPage() {
       provisional_acceptance_document_id: paDocId ?? undefined,
       items: workItems
         .filter((w) => qty[w.id] !== undefined && qty[w.id] !== "")
-        .map((w) => ({ work_item_id: w.id, cum_qty: Number(qty[w.id]) || 0 })),
+        .map((w) => ({
+          work_item_id: w.id, cum_qty: Number(qty[w.id]) || 0,
+          tutanak_id: tutanakId[w.id] || undefined,
+        })),
       deductions: extras
         .filter((e) => e.type && Number(e.amount))
         .map((e) => ({
@@ -229,6 +250,7 @@ export default function ProgressPaymentDetailPage() {
               <th className="py-1 pr-2 text-right">Önceki Küm.</th>
               <th className="py-1 pr-2 text-right">Kümülatif</th>
               <th className="py-1 pr-2 text-right">Bu Dönem</th>
+              <th className="py-1 pr-2">Tutanak</th>
               {canFin && <th className="py-1 pr-2 text-right">Bu Dönem Tutar</th>}
             </tr>
           </thead>
@@ -257,6 +279,27 @@ export default function ProgressPaymentDetailPage() {
                     )}
                   </td>
                   <td className="py-1 pr-2 text-right tabular-nums">{thisQty}</td>
+                  <td className="py-1 pr-2">
+                    {editable ? (
+                      <select
+                        value={tutanakId[w.id] ?? ""}
+                        onChange={(e) => setTutanakId({ ...tutanakId, [w.id]: e.target.value })}
+                        title="Bu dönemki miktarı belgeleyen tutanak (opsiyonel)"
+                        className="w-28 rounded bg-beton-950 border border-beton-800 px-1.5 py-1 text-[11.5px] text-beton-200"
+                      >
+                        <option value="">—</option>
+                        {onayliTutanaklar.map((t) => (
+                          <option key={t.id} value={t.id}>{t.baslik}</option>
+                        ))}
+                      </select>
+                    ) : iv?.tutanak_baslik ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-beton-400" title={iv.tutanak_baslik}>
+                        📎 {iv.tutanak_baslik}
+                      </span>
+                    ) : (
+                      <span className="text-beton-600">—</span>
+                    )}
+                  </td>
                   {canFin && <td className="py-1 pr-2 text-right tabular-nums">{iv?.this_amount?.toLocaleString("tr-TR") ?? "—"}</td>}
                 </tr>
               );

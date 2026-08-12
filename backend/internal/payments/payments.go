@@ -34,24 +34,24 @@ type paymentDTO struct {
 	NetPayable      *float64   `json:"net_payable,omitempty"`
 	// Stopaj (Faz 11): nil = sözleşme varsayılanını izle (yıllara sari),
 	// true/false = bu hakediş için elle geçersiz kılma.
-	WithholdingApplied *bool   `json:"withholding_applied,omitempty"`
+	WithholdingApplied *bool `json:"withholding_applied,omitempty"`
 	// KDV tevkifatı (0=yok, 0.4=4/10) ve %0 KDV'de istisna gerekçesi.
 	VatWithholdingRatio float64 `json:"vat_withholding_ratio"`
 	VatExemptionCode    *string `json:"vat_exemption_code,omitempty"`
-	VatAmount     float64 `json:"vat_amount"`
-	VatWithheld   float64 `json:"vat_withheld"`
-	VatCollected  float64 `json:"vat_collected"`
-	PayableGross  float64 `json:"payable_gross"`
-	ActualCost    float64 `json:"actual_cost"`
-	TotalAdditions float64 `json:"total_additions"`
+	VatAmount           float64 `json:"vat_amount"`
+	VatWithheld         float64 `json:"vat_withheld"`
+	VatCollected        float64 `json:"vat_collected"`
+	PayableGross        float64 `json:"payable_gross"`
+	ActualCost          float64 `json:"actual_cost"`
+	TotalAdditions      float64 `json:"total_additions"`
 	// Kesin hakediş: hesabı kapatır; geçici kabul belgesi zorunludur.
 	IsFinal                         bool       `json:"is_final"`
 	ProvisionalAcceptanceDocumentID *uuid.UUID `json:"provisional_acceptance_document_id,omitempty"`
 	ProvisionalAcceptanceDate       *time.Time `json:"provisional_acceptance_date,omitempty"`
-	CurrentStepNo int     `json:"current_step_no"`
-	FinalizedAt     *time.Time `json:"finalized_at,omitempty"`
-	RowVersion      int        `json:"row_version"`
-	CreatedAt       time.Time  `json:"created_at"`
+	CurrentStepNo                   int        `json:"current_step_no"`
+	FinalizedAt                     *time.Time `json:"finalized_at,omitempty"`
+	RowVersion                      int        `json:"row_version"`
+	CreatedAt                       time.Time  `json:"created_at"`
 }
 
 const paymentCols = `id, project_id, subcontractor_id, period_no, period_start, period_end, status,
@@ -122,10 +122,10 @@ func (h *Handler) ListPayments(w http.ResponseWriter, r *http.Request) {
 }
 
 type createPaymentReq struct {
-	SubcontractorID string  `json:"subcontractor_id"`
-	PeriodNo        *int    `json:"period_no"`
-	PeriodStart     *string `json:"period_start"`
-	PeriodEnd       *string `json:"period_end"`
+	SubcontractorID string   `json:"subcontractor_id"`
+	PeriodNo        *int     `json:"period_no"`
+	PeriodStart     *string  `json:"period_start"`
+	PeriodEnd       *string  `json:"period_end"`
 	VatPct          *float64 `json:"vat_pct"`
 }
 
@@ -252,6 +252,9 @@ type paymentItemView struct {
 	CumQty        float64   `json:"cum_qty"`
 	CumAmount     *float64  `json:"cum_amount,omitempty"`
 	ThisAmount    *float64  `json:"this_amount,omitempty"`
+	// "Tutanaklı imalat": bu dönemki miktarı belgeleyen Saha Tutanağı (varsa).
+	TutanakID     *uuid.UUID `json:"tutanak_id,omitempty"`
+	TutanakBaslik *string    `json:"tutanak_baslik,omitempty"`
 }
 
 type deductionView struct {
@@ -306,9 +309,10 @@ func (h *Handler) GetPayment(w http.ResponseWriter, r *http.Request) {
 	itemRows, err := h.pool.Query(r.Context(), `
 		SELECT ppi.work_item_id, wi.poz_no, wi.description, wi.unit, wi.unit_price::float8,
 		       ppi.prev_cum_qty::float8, ppi.this_period_qty::float8, ppi.cum_qty::float8,
-		       ppi.cum_amount::float8, ppi.this_amount::float8
+		       ppi.cum_amount::float8, ppi.this_amount::float8, ppi.tutanak_id, t.baslik
 		FROM progress_payment_items ppi
 		JOIN work_items wi ON wi.id = ppi.work_item_id
+		LEFT JOIN saha_tutanaklari t ON t.id = ppi.tutanak_id
 		WHERE ppi.progress_payment_id=$1
 		ORDER BY wi.poz_no`, ppID)
 	if err != nil {
@@ -321,7 +325,8 @@ func (h *Handler) GetPayment(w http.ResponseWriter, r *http.Request) {
 		var iv paymentItemView
 		var unitPrice, cumAmount, thisAmount float64
 		if err := itemRows.Scan(&iv.WorkItemID, &iv.PozNo, &iv.Description, &iv.Unit, &unitPrice,
-			&iv.PrevCumQty, &iv.ThisPeriodQty, &iv.CumQty, &cumAmount, &thisAmount); err != nil {
+			&iv.PrevCumQty, &iv.ThisPeriodQty, &iv.CumQty, &cumAmount, &thisAmount,
+			&iv.TutanakID, &iv.TutanakBaslik); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
@@ -425,6 +430,9 @@ func (h *Handler) ohsPenaltySuggestions(ctx context.Context, ppID, subID uuid.UU
 type itemEntry struct {
 	WorkItemID uuid.UUID
 	CumQty     float64
+	// TutanakID — "tutanaklı imalat": bu dönemki miktarı belgeleyen Saha
+	// Tutanağı (opsiyonel).
+	TutanakID *uuid.UUID
 }
 
 // computeForPayment — verilen kalem kümülatiflerinden (entries) ve ekstra
@@ -514,9 +522,15 @@ func (h *Handler) computeForPayment(ctx context.Context, q pgxQuerier, pp *payme
 		if err != nil {
 			return CalcResult{}, err
 		}
+		var tutanakID *string
+		if e.TutanakID != nil {
+			s := e.TutanakID.String()
+			tutanakID = &s
+		}
 		inputs = append(inputs, CalcLineInput{
 			WorkItemID: e.WorkItemID.String(), PozNo: poz, Description: desc, Unit: unit,
 			UnitPrice: price, ContractQty: cqty, PrevCumQty: prevCum[e.WorkItemID], CumQty: e.CumQty,
+			TutanakID: tutanakID,
 		})
 	}
 	// Bu hakedişe bağlanmış teminat iadeleri ilave olarak hesaba girer:
@@ -557,11 +571,17 @@ func (h *Handler) persistCalc(ctx context.Context, tx pgx.Tx, ppID uuid.UUID, re
 		if err != nil {
 			return err
 		}
+		var tutanakID *uuid.UUID
+		if l.TutanakID != nil {
+			if tid, err := uuid.Parse(*l.TutanakID); err == nil {
+				tutanakID = &tid
+			}
+		}
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO progress_payment_items
-			  (progress_payment_id, work_item_id, prev_cum_qty, this_period_qty, cum_qty, cum_amount, this_amount)
-			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-			ppID, wid, l.PrevCumQty, l.ThisPeriodQty, l.CumQty, l.CumAmount, l.ThisAmount); err != nil {
+			  (progress_payment_id, work_item_id, prev_cum_qty, this_period_qty, cum_qty, cum_amount, this_amount, tutanak_id)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+			ppID, wid, l.PrevCumQty, l.ThisPeriodQty, l.CumQty, l.CumAmount, l.ThisAmount, tutanakID); err != nil {
 			return err
 		}
 	}
@@ -597,8 +617,8 @@ func (h *Handler) persistCalc(ctx context.Context, tx pgx.Tx, ppID uuid.UUID, re
 }
 
 type updateDraftReq struct {
-	PeriodStart *string `json:"period_start"`
-	PeriodEnd   *string `json:"period_end"`
+	PeriodStart *string  `json:"period_start"`
+	PeriodEnd   *string  `json:"period_end"`
 	VatPct      *float64 `json:"vat_pct"`
 	// Stopaj tiki (Faz 11). Gönderilmezse mevcut değer korunur; gönderilirse
 	// bu hakediş için sözleşme varsayılanını geçersiz kılar.
@@ -610,10 +630,13 @@ type updateDraftReq struct {
 	IsFinal                         *bool   `json:"is_final"`
 	ProvisionalAcceptanceDocumentID *string `json:"provisional_acceptance_document_id"`
 	ProvisionalAcceptanceDate       *string `json:"provisional_acceptance_date"`
-	RowVersion  int      `json:"row_version"`
-	Items       []struct {
+	RowVersion                      int     `json:"row_version"`
+	Items                           []struct {
 		WorkItemID string  `json:"work_item_id"`
 		CumQty     float64 `json:"cum_qty"`
+		// TutanakID — "tutanaklı imalat": bu dönemki miktarı belgeleyen Saha
+		// Tutanağı (opsiyonel).
+		TutanakID *string `json:"tutanak_id"`
 	} `json:"items"`
 	Deductions []struct {
 		Type         string   `json:"type"`
@@ -623,9 +646,9 @@ type updateDraftReq struct {
 		SourceEntity *string  `json:"source_entity"` // Faz 8: 'ohs_penalties'
 		SourceID     *string  `json:"source_id"`
 		// Faz 11 — katalog seçimi (grup + kalem kodu). Boş bırakılırsa tipten türetilir.
-		GroupCode    string   `json:"group_code"`
-		CatalogCode  string   `json:"catalog_code"`
-		VatPct       float64  `json:"vat_pct"` // kesintinin kendi KDV oranı (Amount KDV dahil)
+		GroupCode   string  `json:"group_code"`
+		CatalogCode string  `json:"catalog_code"`
+		VatPct      float64 `json:"vat_pct"` // kesintinin kendi KDV oranı (Amount KDV dahil)
 	} `json:"deductions"`
 }
 
@@ -699,7 +722,16 @@ func (h *Handler) UpdatePaymentDraft(w http.ResponseWriter, r *http.Request) {
 			httpx.ValidationFailed(w, r, map[string]string{"items": "geçersiz work_item_id"})
 			return
 		}
-		entries = append(entries, itemEntry{WorkItemID: wid, CumQty: it.CumQty})
+		var tutanakID *uuid.UUID
+		if it.TutanakID != nil && strings.TrimSpace(*it.TutanakID) != "" {
+			tid, err := uuid.Parse(strings.TrimSpace(*it.TutanakID))
+			if err != nil {
+				httpx.ValidationFailed(w, r, map[string]string{"items": "geçersiz tutanak_id"})
+				return
+			}
+			tutanakID = &tid
+		}
+		entries = append(entries, itemEntry{WorkItemID: wid, CumQty: it.CumQty, TutanakID: tutanakID})
 	}
 	extras := make([]ExtraDeduction, 0, len(req.Deductions))
 	for _, d := range req.Deductions {
@@ -818,7 +850,7 @@ func (h *Handler) UpdatePaymentDraft(w http.ResponseWriter, r *http.Request) {
 	_ = h.rec.RecordTx(r.Context(), tx, audit.Entry{
 		ActorID: m.ActorID, Entity: "progress_payments", EntityID: ppID.String(), Action: audit.ActionUpdate,
 		After: map[string]interface{}{"gross_this": res.GrossThis, "net_payable": res.NetPayable, "items": len(res.Lines)},
-		IP: m.IP, ReqID: m.ReqID,
+		IP:    m.IP, ReqID: m.ReqID,
 	})
 	if err := tx.Commit(r.Context()); err != nil {
 		httpx.Internal(w, r)
@@ -973,7 +1005,7 @@ var errNoItems = errors.New("kalem yok")
 // kayıtlı manuel kesintilerle yeniden hesaplar ve yazar (auto D/E tazelenir).
 func (h *Handler) finalizeRecompute(ctx context.Context, tx pgx.Tx, pp *paymentDTO) error {
 	rows, err := tx.Query(ctx,
-		`SELECT work_item_id, cum_qty::float8 FROM progress_payment_items WHERE progress_payment_id=$1`, pp.ID)
+		`SELECT work_item_id, cum_qty::float8, tutanak_id FROM progress_payment_items WHERE progress_payment_id=$1`, pp.ID)
 	if err != nil {
 		return err
 	}
@@ -981,11 +1013,12 @@ func (h *Handler) finalizeRecompute(ctx context.Context, tx pgx.Tx, pp *paymentD
 	for rows.Next() {
 		var wid uuid.UUID
 		var cq float64
-		if err := rows.Scan(&wid, &cq); err != nil {
+		var tutanakID *uuid.UUID
+		if err := rows.Scan(&wid, &cq, &tutanakID); err != nil {
 			rows.Close()
 			return err
 		}
-		entries = append(entries, itemEntry{WorkItemID: wid, CumQty: cq})
+		entries = append(entries, itemEntry{WorkItemID: wid, CumQty: cq, TutanakID: tutanakID})
 	}
 	rows.Close()
 	if len(entries) == 0 {
@@ -1022,10 +1055,18 @@ func (h *Handler) finalizeRecompute(ctx context.Context, tx pgx.Tx, pp *paymentD
 	return h.persistCalc(ctx, tx, pp.ID, res)
 }
 
-func (h *Handler) SubmitPayment(w http.ResponseWriter, r *http.Request)   { h.transition(w, r, "Submitted") }
-func (h *Handler) ApprovePayment(w http.ResponseWriter, r *http.Request)  { h.transition(w, r, "SiteApproved") }
-func (h *Handler) FinalizePayment(w http.ResponseWriter, r *http.Request) { h.transition(w, r, "Finalized") }
-func (h *Handler) RejectPayment(w http.ResponseWriter, r *http.Request)   { h.transition(w, r, "Rejected") }
+func (h *Handler) SubmitPayment(w http.ResponseWriter, r *http.Request) {
+	h.transition(w, r, "Submitted")
+}
+func (h *Handler) ApprovePayment(w http.ResponseWriter, r *http.Request) {
+	h.transition(w, r, "SiteApproved")
+}
+func (h *Handler) FinalizePayment(w http.ResponseWriter, r *http.Request) {
+	h.transition(w, r, "Finalized")
+}
+func (h *Handler) RejectPayment(w http.ResponseWriter, r *http.Request) {
+	h.transition(w, r, "Rejected")
+}
 
 // SummaryPDF — hakediş özet PDF'i (application/pdf). view_financials gerektirir.
 func (h *Handler) SummaryPDF(w http.ResponseWriter, r *http.Request) {
@@ -1119,4 +1160,3 @@ type pgxQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
-

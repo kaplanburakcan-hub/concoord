@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, apiFetchBlob, apiUpload } from "../../api/client";
 import { useProjects } from "../../projects/ProjectContext";
 
+// Saha Tutanakları — önceden tamamen tarayıcı localStorage'ındaydı (hiç
+// kullanıcı/cihaz arasında paylaşılmıyordu, fotoğraflar base64 olarak JSON
+// içine gömülüydü). Artık gerçek bir backend varlığı: onay zinciri sunucuda
+// hesaplanır (Submit/Decide uçları), fotoğraflar mevcut polimorfik documents
+// motoru üzerinden bağlanır (entity_type='saha_tutanagi').
+
 // ── Tipler ───────────────────────────────────────────────────────────
-type TutanakTip =
-  | "kaza_yangin_hirsizlik"
-  | "ek_imalat"
-  | "mesai"
-  | "yevmiyeli";
+type TutanakTip = "kaza_yangin_hirsizlik" | "ek_imalat" | "mesai" | "yevmiyeli";
 
 type OnayAdim = {
   rol: string;
@@ -14,13 +17,6 @@ type OnayAdim = {
   durum: "bekliyor" | "onaylandi" | "reddedildi";
   tarih?: string;
   not?: string;
-};
-
-type Fotograf = {
-  id: string;
-  ad: string;
-  base64: string;
-  tarih: string;
 };
 
 type Tutanak = {
@@ -37,11 +33,17 @@ type Tutanak = {
   miktar?: number;
   durum: "taslak" | "onay_sureci" | "onaylandi" | "reddedildi";
   onay_zinciri: OnayAdim[];
-  fotograflar: Fotograf[];
   hakedise_eklendi: boolean;
-  olusturan: string;
-  olusturma_tarihi: string;
+  created_by_name: string;
+  created_at: string;
+  row_version: number;
 };
+
+type Sub = { id: string; company_name: string };
+type DocItem = { id: string; title: string; latest_version?: number };
+// Önizleme için çözümlenmiş fotoğraf: yeni-tutanak formunda henüz yüklenmemiş
+// (staged) bir File ya da kaydedilmiş bir documents kaydından gelen blob URL.
+type Foto = { key: string; ad: string; url: string; docId?: string; file?: File };
 
 const TIP_LABEL: Record<TutanakTip, string> = {
   kaza_yangin_hirsizlik: "Kaza / Yangın / Hırsızlık",
@@ -81,29 +83,6 @@ const DURUM_STYLE: Record<string, string> = {
 };
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
-function storageKey(pid: string) { return `ipks_saha_tutanaklar_${pid}`; }
-function load(pid: string): Tutanak[] {
-  try { return JSON.parse(localStorage.getItem(storageKey(pid)) || "[]"); } catch { return []; }
-}
-function save(pid: string, data: Tutanak[]) {
-  localStorage.setItem(storageKey(pid), JSON.stringify(data));
-}
-function onayZinciriOlustur(kisimVar: boolean): OnayAdim[] {
-  const zincir: OnayAdim[] = [];
-  if (kisimVar) zincir.push({ rol: "Kısım Şefi", ad: "", durum: "bekliyor" });
-  zincir.push({ rol: "Şantiye Şefi", ad: "", durum: "bekliyor" });
-  zincir.push({ rol: "Proje Müdürü", ad: "", durum: "bekliyor" });
-  return zincir;
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result as string);
-    r.onerror = () => rej(new Error("Dosya okunamadı"));
-    r.readAsDataURL(file);
-  });
-}
 
 const BOŞ_FORM = {
   tip: "ek_imalat" as TutanakTip,
@@ -121,135 +100,192 @@ const BOŞ_FORM = {
 // ── Ana Bileşen ───────────────────────────────────────────────────────
 export default function SahaTutanaklariPage() {
   const { current } = useProjects();
-  const pid = current?.id ?? "demo";
+  const pid = current?.id;
 
   const [tutanaklar, setTutanaklar] = useState<Tutanak[]>([]);
+  const [subs, setSubs] = useState<Sub[]>([]);
   const [formAcik, setFormAcik] = useState(false);
   const [form, setForm] = useState({ ...BOŞ_FORM });
-  const [formFotograflar, setFormFotograflar] = useState<Fotograf[]>([]);
+  const [formFotograflar, setFormFotograflar] = useState<Foto[]>([]);
   const [secili, setSecili] = useState<Tutanak | null>(null);
+  const [seciliFotograflar, setSeciliFotograflar] = useState<Foto[]>([]);
   const [onayModal, setOnayModal] = useState(false);
   const [onayNot, setOnayNot] = useState("");
   const [filtre, setFiltre] = useState<TutanakTip | "hepsi">("hepsi");
-  const [fotografBuyuk, setFotografBuyuk] = useState<Fotograf | null>(null);
+  const [fotografBuyuk, setFotografBuyuk] = useState<Foto | null>(null);
   const [fotYukleniyor, setFotYukleniyor] = useState(false);
+  const [olusturuluyor, setOlusturuluyor] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const formFotoRef = useRef<HTMLInputElement>(null);
   const detayFotoRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setTutanaklar(load(pid)); }, [pid]);
+  const subName = (id?: string) => subs.find((s) => s.id === id)?.company_name;
 
-  function kaydet(data: Tutanak[]) {
-    setTutanaklar(data);
-    save(pid, data);
+  const load = useCallback(async () => {
+    if (!pid) return;
+    setErr(null);
+    try {
+      const [t, s] = await Promise.all([
+        api<{ tutanaklar: Tutanak[] }>(`/projects/${pid}/tutanaklar`, { projectId: pid }),
+        api<{ subcontractors: Sub[] }>(`/projects/${pid}/subcontractors`, { projectId: pid }),
+      ]);
+      setTutanaklar(t.tutanaklar ?? []);
+      setSubs(s.subcontractors ?? []);
+    } catch {
+      setErr("Tutanaklar yüklenemedi ya da erişim yetkiniz yok.");
+    }
+  }, [pid]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Seçili tutanağın fotoğrafları: documents listesi + her biri için blob URL.
+  const loadFotograflar = useCallback(async (t: Tutanak) => {
+    if (!pid) return;
+    try {
+      const d = await api<{ documents: DocItem[] }>(
+        `/projects/${pid}/documents?entity_type=saha_tutanagi&entity_id=${t.id}`, { projectId: pid });
+      const withUrls = await Promise.all(
+        (d.documents ?? []).filter((doc) => doc.latest_version).map(async (doc) => {
+          const url = await apiFetchBlob(`/projects/${pid}/documents/${doc.id}/versions/${doc.latest_version}/download`);
+          return { key: doc.id, ad: doc.title, url, docId: doc.id } as Foto;
+        })
+      );
+      setSeciliFotograflar(withUrls);
+    } catch {
+      setSeciliFotograflar([]);
+    }
+  }, [pid]);
+
+  function sec(t: Tutanak) {
+    setSecili(t);
+    loadFotograflar(t);
   }
 
-  // Form fotoğraf ekle
+  // Form fotoğraf ekle — henüz sunucuya yüklenmez (tutanak id'si yok), sadece
+  // yerel önizleme için staged tutulur; tutanakOlustur() sırasında yüklenir.
   async function formFotoEkle(files: FileList | null) {
     if (!files) return;
-    setFotYukleniyor(true);
-    const yeniler: Fotograf[] = [];
+    const yeniler: Foto[] = [];
     for (const file of Array.from(files)) {
       if (file.size > 10 * 1024 * 1024) { alert(`${file.name} 10MB sınırını aşıyor.`); continue; }
-      const base64 = await fileToBase64(file);
-      yeniler.push({ id: uid(), ad: file.name, base64, tarih: new Date().toISOString() });
+      yeniler.push({ key: uid(), ad: file.name, url: URL.createObjectURL(file), file });
     }
-    setFormFotograflar(prev => [...prev, ...yeniler]);
-    setFotYukleniyor(false);
+    setFormFotograflar((prev) => [...prev, ...yeniler]);
     if (formFotoRef.current) formFotoRef.current.value = "";
   }
 
-  // Detay panelinden mevcut tutanağa fotoğraf ekle
+  // Detay panelinden mevcut (kaydedilmiş) tutanağa fotoğraf ekle — hemen yüklenir.
   async function detayFotoEkle(files: FileList | null) {
-    if (!files || !secili) return;
+    if (!files || !secili || !pid) return;
     setFotYukleniyor(true);
-    const yeniler: Fotograf[] = [];
-    for (const file of Array.from(files)) {
-      if (file.size > 10 * 1024 * 1024) { alert(`${file.name} 10MB sınırını aşıyor.`); continue; }
-      const base64 = await fileToBase64(file);
-      yeniler.push({ id: uid(), ad: file.name, base64, tarih: new Date().toISOString() });
+    try {
+      for (const file of Array.from(files)) {
+        if (file.size > 10 * 1024 * 1024) { alert(`${file.name} 10MB sınırını aşıyor.`); continue; }
+        const doc = await api<{ id: string }>(`/projects/${pid}/documents`, {
+          method: "POST", projectId: pid,
+          body: { title: file.name, doc_category: "SahaTutanagi", entity_type: "saha_tutanagi", entity_id: secili.id },
+        });
+        const fd = new FormData();
+        fd.append("file", file);
+        await apiUpload(`/projects/${pid}/documents/${doc.id}/versions`, fd);
+      }
+      await loadFotograflar(secili);
+    } catch {
+      setErr("Fotoğraf yüklenemedi.");
+    } finally {
+      setFotYukleniyor(false);
+      if (detayFotoRef.current) detayFotoRef.current.value = "";
     }
-    const guncellendi = { ...secili, fotograflar: [...(secili.fotograflar || []), ...yeniler] };
-    kaydet(tutanaklar.map(t => t.id === secili.id ? guncellendi : t));
-    setSecili(guncellendi);
-    setFotYukleniyor(false);
-    if (detayFotoRef.current) detayFotoRef.current.value = "";
   }
 
-  function formFotoSil(id: string) {
-    setFormFotograflar(prev => prev.filter(f => f.id !== id));
+  function formFotoSil(key: string) {
+    setFormFotograflar((prev) => prev.filter((f) => f.key !== key));
   }
 
-  function detayFotoSil(fotoId: string) {
-    if (!secili) return;
-    const guncellendi = { ...secili, fotograflar: secili.fotograflar.filter(f => f.id !== fotoId) };
-    kaydet(tutanaklar.map(t => t.id === secili.id ? guncellendi : t));
-    setSecili(guncellendi);
+  async function tutanakOlustur() {
+    if (!form.baslik.trim() || !form.aciklama.trim() || !pid) return;
+    setOlusturuluyor(true);
+    setErr(null);
+    try {
+      const res = await api<{ id: string }>(`/projects/${pid}/tutanaklar`, {
+        method: "POST", projectId: pid,
+        body: {
+          tip: form.tip,
+          baslik: form.baslik.trim(),
+          tarih: form.tarih,
+          taseron_id: form.taseron_id || null,
+          kisim: form.kisim || null,
+          aciklama: form.aciklama.trim(),
+          tutar: form.tutar ? Number(form.tutar) : null,
+          birim: form.birim || null,
+          miktar: form.miktar ? Number(form.miktar) : null,
+          kisim_sefi_var: form.kisim_sefi_var,
+        },
+      });
+      // Staged fotoğrafları şimdi yükle (tutanak id'si artık var).
+      for (const f of formFotograflar) {
+        if (!f.file) continue;
+        const doc = await api<{ id: string }>(`/projects/${pid}/documents`, {
+          method: "POST", projectId: pid,
+          body: { title: f.ad, doc_category: "SahaTutanagi", entity_type: "saha_tutanagi", entity_id: res.id },
+        });
+        const fd = new FormData();
+        fd.append("file", f.file);
+        await apiUpload(`/projects/${pid}/documents/${doc.id}/versions`, fd);
+      }
+      formFotograflar.forEach((f) => URL.revokeObjectURL(f.url));
+      setForm({ ...BOŞ_FORM });
+      setFormFotograflar([]);
+      setFormAcik(false);
+      await load();
+    } catch {
+      setErr("Tutanak oluşturulamadı.");
+    } finally {
+      setOlusturuluyor(false);
+    }
   }
 
-  function tutanakOlustur() {
-    if (!form.baslik.trim() || !form.aciklama.trim()) return;
-    const zincir = onayZinciriOlustur(form.kisim_sefi_var);
-    const yeni: Tutanak = {
-      id: uid(),
-      tip: form.tip,
-      baslik: form.baslik.trim(),
-      tarih: form.tarih,
-      taseron_id: form.taseron_id || undefined,
-      taseron_adi: form.taseron_id ? `Taşeron ${form.taseron_id.slice(0, 4)}` : undefined,
-      kisim: form.kisim || undefined,
-      aciklama: form.aciklama.trim(),
-      tutar: form.tutar ? Number(form.tutar) : undefined,
-      birim: form.birim || undefined,
-      miktar: form.miktar ? Number(form.miktar) : undefined,
-      durum: "taslak",
-      onay_zinciri: zincir,
-      fotograflar: formFotograflar,
-      hakedise_eklendi: false,
-      olusturan: "Sistem Yöneticisi",
-      olusturma_tarihi: new Date().toISOString(),
-    };
-    kaydet([yeni, ...tutanaklar]);
-    setForm({ ...BOŞ_FORM });
-    setFormFotograflar([]);
-    setFormAcik(false);
+  async function onayaSuncu(t: Tutanak) {
+    if (!pid) return;
+    try {
+      await api(`/projects/${pid}/tutanaklar/${t.id}/submit`, { method: "POST", projectId: pid });
+      await load();
+      setSecili({ ...t, durum: "onay_sureci" });
+    } catch {
+      setErr("Onaya sunulamadı.");
+    }
   }
 
-  function onayaSuncu(t: Tutanak) {
-    const guncellendi = tutanaklar.map(x =>
-      x.id === t.id ? { ...x, durum: "onay_sureci" as const } : x
-    );
-    kaydet(guncellendi);
-    setSecili({ ...t, durum: "onay_sureci" });
+  async function onayVer(t: Tutanak, karar: "onaylandi" | "reddedildi") {
+    if (!pid) return;
+    try {
+      await api(`/projects/${pid}/tutanaklar/${t.id}/decide`, {
+        method: "POST", projectId: pid, body: { karar, not: onayNot || null },
+      });
+      await load();
+      setOnayModal(false);
+      setOnayNot("");
+      const guncel = await api<{ tutanaklar: Tutanak[] }>(`/projects/${pid}/tutanaklar`, { projectId: pid });
+      setSecili(guncel.tutanaklar.find((x) => x.id === t.id) ?? null);
+    } catch {
+      setErr("Karar kaydedilemedi.");
+    }
   }
 
-  function onayVer(t: Tutanak, karar: "onaylandi" | "reddedildi") {
-    const bekleyenIdx = t.onay_zinciri.findIndex(a => a.durum === "bekliyor");
-    if (bekleyenIdx === -1) return;
-    const yeniZincir = t.onay_zinciri.map((a, i) =>
-      i === bekleyenIdx ? { ...a, durum: karar, tarih: new Date().toISOString(), not: onayNot } : a
-    );
-    const hepsiOnaylandi = yeniZincir.every(a => a.durum === "onaylandi");
-    const biriReddetti = yeniZincir.some(a => a.durum === "reddedildi");
-    const yeniDurum = biriReddetti ? "reddedildi" : hepsiOnaylandi ? "onaylandi" : "onay_sureci";
-    const guncellendi: Tutanak = {
-      ...t, onay_zinciri: yeniZincir, durum: yeniDurum,
-      hakedise_eklendi: hepsiOnaylandi && TIP_HAKEDIS[t.tip],
-    };
-    kaydet(tutanaklar.map(x => x.id === t.id ? guncellendi : x));
-    setSecili(guncellendi);
-    setOnayModal(false);
-    setOnayNot("");
+  async function sil(id: string) {
+    if (!pid || !confirm("Bu tutanağı silmek istediğinize emin misiniz?")) return;
+    try {
+      await api(`/projects/${pid}/tutanaklar/${id}`, { method: "DELETE", projectId: pid });
+      await load();
+      if (secili?.id === id) setSecili(null);
+    } catch {
+      setErr("Silinemedi.");
+    }
   }
 
-  function sil(id: string) {
-    if (!confirm("Bu tutanağı silmek istediğinize emin misiniz?")) return;
-    kaydet(tutanaklar.filter(t => t.id !== id));
-    if (secili?.id === id) setSecili(null);
-  }
-
-  const filtreliler = filtre === "hepsi" ? tutanaklar : tutanaklar.filter(t => t.tip === filtre);
-  const bekleyenOnay = secili ? secili.onay_zinciri.findIndex(a => a.durum === "bekliyor") : -1;
+  const filtreliler = filtre === "hepsi" ? tutanaklar : tutanaklar.filter((t) => t.tip === filtre);
+  const bekleyenOnay = secili ? secili.onay_zinciri.findIndex((a) => a.durum === "bekliyor") : -1;
 
   if (!current) return <p className="text-beton-400 text-sm">Önce üst bardan bir proje seçin.</p>;
 
@@ -265,6 +301,7 @@ export default function SahaTutanaklariPage() {
           + Yeni Tutanak
         </button>
       </div>
+      {err && <p className="text-sm text-red-400">{err}</p>}
 
       {/* Filtre */}
       <div className="flex gap-2 flex-wrap">
@@ -285,7 +322,7 @@ export default function SahaTutanaklariPage() {
         <div className="space-y-2">
           {filtreliler.length === 0 && <p className="text-beton-400 text-sm">Henüz tutanak yok.</p>}
           {filtreliler.map((t) => (
-            <div key={t.id} onClick={() => setSecili(t)}
+            <div key={t.id} onClick={() => sec(t)}
               className={`rounded-lg border p-4 cursor-pointer transition ${
                 secili?.id === t.id ? "border-emniyet-500 bg-beton-800" : "border-beton-800 bg-beton-900 hover:border-beton-600"
               }`}
@@ -294,9 +331,6 @@ export default function SahaTutanaklariPage() {
                 <div className="flex items-center gap-2">
                   <span>{TIP_ICON[t.tip]}</span>
                   <span className="font-medium text-white text-sm">{t.baslik}</span>
-                  {t.fotograflar?.length > 0 && (
-                    <span className="text-xs text-beton-400">📷 {t.fotograflar.length}</span>
-                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {t.hakedise_eklendi && (
@@ -311,6 +345,7 @@ export default function SahaTutanaklariPage() {
                 <span>{TIP_LABEL[t.tip]}</span>
                 <span>{t.tarih}</span>
                 {t.kisim && <span>{t.kisim}</span>}
+                {t.taseron_adi && <span>{t.taseron_adi}</span>}
                 {t.tutar && <span>{t.tutar.toLocaleString("tr-TR")} TL</span>}
               </div>
               <div className="mt-2 flex gap-1">
@@ -341,7 +376,9 @@ export default function SahaTutanaklariPage() {
             </div>
 
             {secili.kisim && <p className="text-sm text-beton-300">Kısım: <span className="text-white">{secili.kisim}</span></p>}
-            {secili.taseron_adi && <p className="text-sm text-beton-300">Taşeron: <span className="text-white">{secili.taseron_adi}</span></p>}
+            {(secili.taseron_adi || subName(secili.taseron_id)) && (
+              <p className="text-sm text-beton-300">Taşeron: <span className="text-white">{secili.taseron_adi ?? subName(secili.taseron_id)}</span></p>
+            )}
             <p className="text-sm text-beton-200">{secili.aciklama}</p>
 
             {(secili.tutar || secili.miktar) && (
@@ -359,11 +396,11 @@ export default function SahaTutanaklariPage() {
             {/* Fotoğraflar */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-beton-400 uppercase tracking-wide">Fotoğraflar ({secili.fotograflar?.length || 0})</p>
+                <p className="text-xs text-beton-400 uppercase tracking-wide">Fotoğraflar ({seciliFotograflar.length})</p>
                 <div className="flex gap-2">
                   <input ref={detayFotoRef} type="file" accept="image/*" multiple capture="environment"
                     className="hidden"
-                    onChange={e => detayFotoEkle(e.target.files)}
+                    onChange={(e) => detayFotoEkle(e.target.files)}
                   />
                   <button onClick={() => detayFotoRef.current?.click()}
                     disabled={fotYukleniyor}
@@ -373,21 +410,13 @@ export default function SahaTutanaklariPage() {
                   </button>
                 </div>
               </div>
-              {secili.fotograflar?.length > 0 ? (
+              {seciliFotograflar.length > 0 ? (
                 <div className="grid grid-cols-3 gap-2">
-                  {secili.fotograflar.map((f) => (
-                    <div key={f.id} className="relative group">
-                      <img
-                        src={f.base64}
-                        alt={f.ad}
-                        className="w-full h-20 object-cover rounded-md cursor-pointer border border-beton-700 hover:border-emniyet-500"
-                        onClick={() => setFotografBuyuk(f)}
-                      />
-                      <button
-                        onClick={() => detayFotoSil(f.id)}
-                        className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
-                      >✕</button>
-                    </div>
+                  {seciliFotograflar.map((f) => (
+                    <img key={f.key} src={f.url} alt={f.ad}
+                      className="w-full h-20 object-cover rounded-md cursor-pointer border border-beton-700 hover:border-emniyet-500"
+                      onClick={() => setFotografBuyuk(f)}
+                    />
                   ))}
                 </div>
               ) : (
@@ -448,7 +477,7 @@ export default function SahaTutanaklariPage() {
       {formAcik && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setFormAcik(false)}>
           <div className="bg-beton-900 border border-beton-700 rounded-xl w-full max-w-lg mx-4 p-6 space-y-4 max-h-[90vh] overflow-y-auto"
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <h2 className="font-display font-bold text-white text-lg">Yeni Tutanak</h2>
 
@@ -473,7 +502,7 @@ export default function SahaTutanaklariPage() {
             {/* Başlık */}
             <div>
               <label className="block text-xs text-beton-400 mb-1">Başlık *</label>
-              <input value={form.baslik} onChange={e => setForm({ ...form, baslik: e.target.value })}
+              <input value={form.baslik} onChange={(e) => setForm({ ...form, baslik: e.target.value })}
                 className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                 placeholder="Tutanak başlığı"
               />
@@ -482,26 +511,37 @@ export default function SahaTutanaklariPage() {
             {/* Tarih */}
             <div>
               <label className="block text-xs text-beton-400 mb-1">Tarih *</label>
-              <input type="date" value={form.tarih} onChange={e => setForm({ ...form, tarih: e.target.value })}
+              <input type="date" value={form.tarih} onChange={(e) => setForm({ ...form, tarih: e.target.value })}
                 className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
               />
+            </div>
+
+            {/* Taşeron */}
+            <div>
+              <label className="block text-xs text-beton-400 mb-1">Taşeron</label>
+              <select value={form.taseron_id} onChange={(e) => setForm({ ...form, taseron_id: e.target.value })}
+                className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+              >
+                <option value="">Seçin (opsiyonel)</option>
+                {subs.map((s) => <option key={s.id} value={s.id}>{s.company_name}</option>)}
+              </select>
             </div>
 
             {/* Kısım */}
             <div>
               <label className="block text-xs text-beton-400 mb-1">Kısım</label>
-              <select value={form.kisim} onChange={e => setForm({ ...form, kisim: e.target.value })}
+              <select value={form.kisim} onChange={(e) => setForm({ ...form, kisim: e.target.value })}
                 className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
               >
                 <option value="">Seçin (opsiyonel)</option>
-                {KISIMLAR.map(k => <option key={k} value={k}>{k}</option>)}
+                {KISIMLAR.map((k) => <option key={k} value={k}>{k}</option>)}
               </select>
             </div>
 
             {/* Kısım Şefi */}
             <div className="flex items-center gap-2">
               <input type="checkbox" id="kisim_sefi" checked={form.kisim_sefi_var}
-                onChange={e => setForm({ ...form, kisim_sefi_var: e.target.checked })}
+                onChange={(e) => setForm({ ...form, kisim_sefi_var: e.target.checked })}
                 className="rounded"
               />
               <label htmlFor="kisim_sefi" className="text-sm text-beton-300">Kısım Şefi onayı gerekli</label>
@@ -512,21 +552,21 @@ export default function SahaTutanaklariPage() {
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block text-xs text-beton-400 mb-1">Miktar</label>
-                  <input type="number" value={form.miktar} onChange={e => setForm({ ...form, miktar: e.target.value })}
+                  <input type="number" value={form.miktar} onChange={(e) => setForm({ ...form, miktar: e.target.value })}
                     className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                     placeholder="0"
                   />
                 </div>
                 <div>
                   <label className="block text-xs text-beton-400 mb-1">Birim</label>
-                  <input value={form.birim} onChange={e => setForm({ ...form, birim: e.target.value })}
+                  <input value={form.birim} onChange={(e) => setForm({ ...form, birim: e.target.value })}
                     className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                     placeholder="adet"
                   />
                 </div>
                 <div>
                   <label className="block text-xs text-beton-400 mb-1">Tutar (TL)</label>
-                  <input type="number" value={form.tutar} onChange={e => setForm({ ...form, tutar: e.target.value })}
+                  <input type="number" value={form.tutar} onChange={(e) => setForm({ ...form, tutar: e.target.value })}
                     className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                     placeholder="0"
                   />
@@ -537,7 +577,7 @@ export default function SahaTutanaklariPage() {
             {/* Açıklama */}
             <div>
               <label className="block text-xs text-beton-400 mb-1">Açıklama *</label>
-              <textarea value={form.aciklama} onChange={e => setForm({ ...form, aciklama: e.target.value })}
+              <textarea value={form.aciklama} onChange={(e) => setForm({ ...form, aciklama: e.target.value })}
                 rows={3}
                 className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500 resize-none"
                 placeholder="Tutanak detayları..."
@@ -549,22 +589,21 @@ export default function SahaTutanaklariPage() {
               <label className="block text-xs text-beton-400 mb-2">Fotoğraflar</label>
               <input ref={formFotoRef} type="file" accept="image/*" multiple capture="environment"
                 className="hidden"
-                onChange={e => formFotoEkle(e.target.files)}
+                onChange={(e) => formFotoEkle(e.target.files)}
               />
               <button onClick={() => formFotoRef.current?.click()}
-                disabled={fotYukleniyor}
-                className="w-full rounded-md border border-dashed border-beton-700 px-3 py-3 text-sm text-beton-400 hover:border-emniyet-500 hover:text-emniyet-500 transition disabled:opacity-50"
+                className="w-full rounded-md border border-dashed border-beton-700 px-3 py-3 text-sm text-beton-400 hover:border-emniyet-500 hover:text-emniyet-500 transition"
               >
-                {fotYukleniyor ? "Yükleniyor..." : "📷 Fotoğraf Seç veya Çek (birden fazla seçilebilir)"}
+                📷 Fotoğraf Seç veya Çek (birden fazla seçilebilir)
               </button>
               {formFotograflar.length > 0 && (
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   {formFotograflar.map((f) => (
-                    <div key={f.id} className="relative group">
-                      <img src={f.base64} alt={f.ad}
+                    <div key={f.key} className="relative group">
+                      <img src={f.url} alt={f.ad}
                         className="w-full h-20 object-cover rounded-md border border-beton-700"
                       />
-                      <button onClick={() => formFotoSil(f.id)}
+                      <button onClick={() => formFotoSil(f.key)}
                         className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
                       >✕</button>
                     </div>
@@ -589,9 +628,9 @@ export default function SahaTutanaklariPage() {
                 className="rounded-md border border-beton-700 px-4 py-2 text-sm text-beton-300 hover:border-beton-500"
               >İptal</button>
               <button onClick={tutanakOlustur}
-                disabled={!form.baslik.trim() || !form.aciklama.trim()}
+                disabled={!form.baslik.trim() || !form.aciklama.trim() || olusturuluyor}
                 className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50"
-              >Oluştur</button>
+              >{olusturuluyor ? "Oluşturuluyor…" : "Oluştur"}</button>
             </div>
           </div>
         </div>
@@ -605,7 +644,7 @@ export default function SahaTutanaklariPage() {
             <p className="text-sm text-beton-300">Tutanak: <span className="text-white">{secili.baslik}</span></p>
             <div>
               <label className="block text-xs text-beton-400 mb-1">Not (opsiyonel)</label>
-              <textarea value={onayNot} onChange={e => setOnayNot(e.target.value)} rows={2}
+              <textarea value={onayNot} onChange={(e) => setOnayNot(e.target.value)} rows={2}
                 className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500 resize-none"
                 placeholder="Onay notu..."
               />
@@ -630,8 +669,8 @@ export default function SahaTutanaklariPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
           onClick={() => setFotografBuyuk(null)}
         >
-          <div className="relative max-w-3xl w-full mx-4" onClick={e => e.stopPropagation()}>
-            <img src={fotografBuyuk.base64} alt={fotografBuyuk.ad}
+          <div className="relative max-w-3xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <img src={fotografBuyuk.url} alt={fotografBuyuk.ad}
               className="w-full max-h-[80vh] object-contain rounded-lg"
             />
             <p className="text-center text-xs text-beton-400 mt-2">{fotografBuyuk.ad}</p>

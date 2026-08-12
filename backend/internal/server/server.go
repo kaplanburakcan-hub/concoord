@@ -16,26 +16,27 @@ import (
 	"github.com/ipks/ipks/backend/internal/config"
 	"github.com/ipks/ipks/backend/internal/contracts"
 	"github.com/ipks/ipks/backend/internal/correspondence"
-	"github.com/ipks/ipks/backend/internal/design"
-	"github.com/ipks/ipks/backend/internal/machines"
-	"github.com/ipks/ipks/backend/internal/meetings"
-	"github.com/ipks/ipks/backend/internal/personnel"
-	"github.com/ipks/ipks/backend/internal/statements"
-	"github.com/ipks/ipks/backend/internal/survey"
-	"github.com/ipks/ipks/backend/internal/warehouse"
 	"github.com/ipks/ipks/backend/internal/dashboard"
+	"github.com/ipks/ipks/backend/internal/design"
 	"github.com/ipks/ipks/backend/internal/documents"
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/machines"
 	"github.com/ipks/ipks/backend/internal/materials"
+	"github.com/ipks/ipks/backend/internal/meetings"
 	"github.com/ipks/ipks/backend/internal/notify"
 	"github.com/ipks/ipks/backend/internal/ohs"
 	"github.com/ipks/ipks/backend/internal/payments"
+	"github.com/ipks/ipks/backend/internal/personnel"
 	"github.com/ipks/ipks/backend/internal/procurement"
 	"github.com/ipks/ipks/backend/internal/projects"
 	"github.com/ipks/ipks/backend/internal/rbac"
 	"github.com/ipks/ipks/backend/internal/reports"
+	"github.com/ipks/ipks/backend/internal/statements"
 	"github.com/ipks/ipks/backend/internal/storage"
+	"github.com/ipks/ipks/backend/internal/survey"
 	"github.com/ipks/ipks/backend/internal/tasks"
+	"github.com/ipks/ipks/backend/internal/tutanaklar"
+	"github.com/ipks/ipks/backend/internal/warehouse"
 )
 
 func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler {
@@ -116,6 +117,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	designH := design.NewHandler(pool)
 	warehouseH := warehouse.NewHandler(pool)
 	meetingsH := meetings.NewHandler(pool)
+	tutanaklarH := tutanaklar.NewHandler(pool)
 
 	// --- Faz 21: Personel & Puantaj ---
 	personnelH := personnel.NewHandler(pool)
@@ -362,7 +364,6 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("procurement.upload_delivery")).Post("/projects/{projectID}/purchase-orders/{id}/deliveries", procH.AddDelivery)
 		})
 
-
 		// ---- Faz 8: İSG (checklist şablonları, denetimler, bulgular, cezalar) ----
 		// Ceza otomasyonu: kesme isteği içinde PDF üretilir + bildirim yayılır;
 		// para cezası taşeronun sonraki taslak hakedişinde kesinti önerisi olur.
@@ -515,6 +516,18 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/meetings", meetingsH.Create)
 			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/meetings/{id}", meetingsH.Update)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/meetings/{id}", meetingsH.Delete)
+		})
+
+		// Saha Tutanakları (kaza/yangın/hırsızlık, ek imalat, mesai, yevmiyeli
+		// çalışma) — önceden localStorage'da tutulan özelliğin backend'e taşınmış
+		// hali; hakediş metraj satırlarına bağlanabilmesi için gerçek bir varlık.
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/tutanaklar", tutanaklarH.List)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/tutanaklar", tutanaklarH.Create)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/tutanaklar/{id}/submit", tutanaklarH.Submit)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/tutanaklar/{id}/decide", tutanaklarH.Decide)
+			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/tutanaklar/{id}", tutanaklarH.Delete)
 		})
 
 		// Faz 26 — Makine & Ekipman
