@@ -18,10 +18,6 @@ type Tedarikci = {
   phone?: string; email?: string;
 };
 
-function loadTedarikciler(pid: string): Tedarikci[] {
-  try { return JSON.parse(localStorage.getItem(`ipks_tedarikciler_${pid}`) || "[]"); } catch { return []; }
-}
-
 function fmtDate(s?: string | null) {
   if (!s) return "—";
   return new Date(s).toLocaleDateString("tr-TR", { day: "2-digit", month: "short", year: "numeric" });
@@ -98,11 +94,13 @@ export default function TaseronDashboardPage() {
         .catch(() => ({ contracts: [] as ContractDTO[] })),
       api<{ payments: Payment[] }>(`/projects/${pid}/payments`, { projectId: pid })
         .catch(() => ({ payments: [] as Payment[] })),
-    ]).then(([sr, cr, pr]) => {
+      api<{ tedarikciler: Tedarikci[] }>(`/projects/${pid}/tedarikciler`, { projectId: pid })
+        .catch(() => ({ tedarikciler: [] as Tedarikci[] })),
+    ]).then(([sr, cr, pr, tr]) => {
       setSubs(sr.subcontractors ?? []);
       setContracts(cr.contracts ?? []);
       setPayments(pr.payments ?? []);
-      setTedarikciler(loadTedarikciler(pid));
+      setTedarikciler(tr.tedarikciler ?? []);
     }).finally(() => setLoading(false));
   }, [pid]);
 

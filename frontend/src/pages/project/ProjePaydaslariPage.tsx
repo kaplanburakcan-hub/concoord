@@ -52,6 +52,45 @@ type Paydas = {
   notlar?: string;
 };
 
+// API'den dönen satır (snake_case) — backend'de project_stakeholders tablosu.
+type ApiStakeholder = {
+  id: string;
+  kategori_id: string;
+  alt_kirilim_id?: string;
+  tip: "kisi" | "firma";
+  ad: string;
+  soyad?: string;
+  unvan?: string;
+  firma_adi?: string;
+  telefon?: string;
+  email?: string;
+  notlar?: string;
+  row_version: number;
+};
+
+function apiToPaydas(s: ApiStakeholder): Paydas {
+  return {
+    id: s.id, kategoriId: s.kategori_id, altKirilimId: s.alt_kirilim_id, tip: s.tip,
+    ad: s.ad, soyad: s.soyad, unvan: s.unvan, firmaAdi: s.firma_adi,
+    telefon: s.telefon, email: s.email, notlar: s.notlar,
+  };
+}
+
+function paydasToApiBody(p: Omit<Paydas, "id">) {
+  return {
+    kategori_id: p.kategoriId,
+    alt_kirilim_id: p.altKirilimId?.trim() || null,
+    tip: p.tip,
+    ad: p.ad?.trim() || "",
+    soyad: p.soyad?.trim() || null,
+    unvan: p.unvan?.trim() || null,
+    firma_adi: p.firmaAdi?.trim() || null,
+    telefon: p.telefon?.trim() || null,
+    email: p.email?.trim() || null,
+    notlar: p.notlar?.trim() || null,
+  };
+}
+
 const BOŞ_FORM: Omit<Paydas, "id"> = {
   kategoriId: "",
   altKirilimId: "",
@@ -99,27 +138,6 @@ function demoPaydaslar(): Omit<Paydas, "id">[] {
 }
 
 // ── Yardımcı ─────────────────────────────────────────────────────────────
-function uid() {
-  return Math.random().toString(36).slice(2, 10);
-}
-
-function storageKey(pid: string) {
-  return `ipks_paydaslar_${pid}`;
-}
-
-function loadFromStorage(pid: string): Paydas[] {
-  try {
-    const raw = localStorage.getItem(storageKey(pid));
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveToStorage(pid: string, data: Paydas[]) {
-  localStorage.setItem(storageKey(pid), JSON.stringify(data));
-}
-
 function kategoriLabel(id: string) {
   return KATEGORILER.find((k) => k.id === id)?.label ?? id;
 }
@@ -131,13 +149,24 @@ function altKirilimLabel(katId: string, akId?: string) {
 }
 
 // ── Excel Export ──────────────────────────────────────────────────────────
-function exportExcel(paydaslar: Paydas[], projeAdi: string) {
+// taseronlar: gerçek subcontractors kayıtları — "Taşeron ve Personelleri"
+// sayfasında firma satırları paydaslar[] içinde değil, ayrı /subcontractors
+// API'sinden gelir; dışa aktarımda sessizce atlanmasınlar diye burada
+// birleştiriliyor.
+function exportExcel(paydaslar: Paydas[], taseronlar: Sub[], projeAdi: string) {
   const wb = XLSX.utils.book_new();
 
   KATEGORILER.forEach((kat) => {
     const rows = paydaslar.filter((p) => p.kategoriId === kat.id);
+    const firmaRows = kat.id === "alt_yuklenici"
+      ? taseronlar.map((s) => [
+          "Firma", "", "", s.trade ?? "", s.company_name, "",
+          s.phone ?? "", s.email ?? "", s.contact_person ? `İletişim: ${s.contact_person}` : "",
+        ])
+      : [];
     const data = [
       ["Tip", "Ad", "Soyad", "Ünvan", "Firma Adı", "Alt Kırılım", "Telefon", "E-posta", "Notlar"],
+      ...firmaRows,
       ...rows.map((p) => [
         p.tip === "kisi" ? "Kişi" : "Firma",
         p.ad,
@@ -184,12 +213,12 @@ function downloadTemplate() {
 }
 
 // ── Excel Import ──────────────────────────────────────────────────────────
-function importExcel(file: File, callback: (data: Paydas[]) => void) {
+function importExcel(file: File, callback: (data: Omit<Paydas, "id">[]) => void) {
   const reader = new FileReader();
   reader.onload = (e) => {
     const data = new Uint8Array(e.target?.result as ArrayBuffer);
     const wb = XLSX.read(data, { type: "array" });
-    const result: Paydas[] = [];
+    const result: Omit<Paydas, "id">[] = [];
 
     wb.SheetNames.forEach((sheetName) => {
       const kat = KATEGORILER.find(
@@ -205,7 +234,6 @@ function importExcel(file: File, callback: (data: Paydas[]) => void) {
         const altKirilimLabel = row[5] ?? "";
         const altKirilim = kat.altKirilimlar?.find((ak) => ak.label === altKirilimLabel);
         result.push({
-          id: uid(),
           kategoriId: kat.id,
           altKirilimId: altKirilim?.id,
           tip: (row[0] ?? "").toLowerCase().includes("firma") ? "firma" : "kisi",
@@ -248,20 +276,23 @@ export default function ProjePaydaslariPage() {
     } catch { /* sessiz hata */ }
   }
 
+  async function loadPaydaslar(p: string) {
+    if (!p || p === "demo") { setPaydaslar([]); return; }
+    try {
+      const r = await api<{ stakeholders: ApiStakeholder[] }>(`/projects/${p}/stakeholders`, { projectId: p });
+      setPaydaslar(r.stakeholders.map(apiToPaydas));
+    } catch { setPaydaslar([]); }
+  }
+
   useEffect(() => {
-    setPaydaslar(loadFromStorage(pid));
+    loadPaydaslar(pid);
     loadTaseronlar(pid);
   }, [pid]);
-
-  function kaydet(data: Paydas[]) {
-    setPaydaslar(data);
-    saveToStorage(pid, data);
-  }
 
   async function formGonder() {
     if (!form.ad && !form.firmaAdi) return;
 
-    // Taşeron firma → API
+    // Taşeron firma → API (mevcut özel yol, dokunulmadı)
     if (form.kategoriId === "alt_yuklenici" && form.tip === "firma") {
       setSubsBusy(true);
       try {
@@ -282,15 +313,24 @@ export default function ProjePaydaslariPage() {
       return;
     }
 
-    // Diğer kategoriler → localStorage
-    if (duzenleId) {
-      kaydet(paydaslar.map((p) => (p.id === duzenleId ? { ...form, id: duzenleId } : p)));
-      setDuzenleId(null);
-    } else {
-      kaydet([...paydaslar, { ...form, id: uid() }]);
-    }
-    setForm({ ...BOŞ_FORM, kategoriId: form.kategoriId });
-    setFormAcik(false);
+    // Diğer kategoriler → /stakeholders
+    setSubsBusy(true);
+    try {
+      if (duzenleId) {
+        await api(`/projects/${pid}/stakeholders/${duzenleId}`, {
+          method: "PATCH", projectId: pid, body: paydasToApiBody(form),
+        });
+        setDuzenleId(null);
+      } else {
+        await api(`/projects/${pid}/stakeholders`, {
+          method: "POST", projectId: pid, body: paydasToApiBody(form),
+        });
+      }
+      await loadPaydaslar(pid);
+      setForm({ ...BOŞ_FORM, kategoriId: form.kategoriId });
+      setFormAcik(false);
+    } catch { /* sessiz — mevcut davranışla tutarlı */ }
+    finally { setSubsBusy(false); }
   }
 
   async function silSub(subId: string) {
@@ -298,8 +338,12 @@ export default function ProjePaydaslariPage() {
     try {
       await api(`/projects/${pid}/subcontractors/${subId}`, { method: "DELETE", projectId: pid });
       await loadTaseronlar(pid);
-      // Bağlı localStorage personellerini de temizle
-      kaydet(paydaslar.filter(p => !(p.kategoriId === "alt_yuklenici" && p.altKirilimId === subId)));
+      // Bağlı personel kayıtlarını da temizle (alt_kirilim_id FK değil, elle temizlenir)
+      const bagliPersonel = paydaslar.filter(p => p.kategoriId === "alt_yuklenici" && p.altKirilimId === subId);
+      await Promise.all(bagliPersonel.map(p =>
+        api(`/projects/${pid}/stakeholders/${p.id}`, { method: "DELETE", projectId: pid }).catch(() => {})
+      ));
+      await loadPaydaslar(pid);
     } catch { /* sessiz */ }
   }
 
@@ -310,9 +354,12 @@ export default function ProjePaydaslariPage() {
     setFormAcik(true);
   }
 
-  function sil(id: string) {
+  async function sil(id: string) {
     if (!confirm("Bu paydaşı silmek istediğinize emin misiniz?")) return;
-    kaydet(paydaslar.filter((p) => p.id !== id));
+    try {
+      await api(`/projects/${pid}/stakeholders/${id}`, { method: "DELETE", projectId: pid });
+      await loadPaydaslar(pid);
+    } catch { /* sessiz */ }
   }
 
   function duzenle(p: Paydas) {
@@ -320,6 +367,41 @@ export default function ProjePaydaslariPage() {
     setDuzenleId(p.id);
     setAktifKat(p.kategoriId);
     setFormAcik(true);
+  }
+
+  // Excel içe aktarım / demo veri — taşeron-firma satırları manuel formla aynı
+  // özel yoldan /subcontractors'a, diğer tüm satırlar toplu /stakeholders'a gider.
+  async function commitRows(rows: Omit<Paydas, "id">[], replaceExisting: boolean) {
+    setSubsBusy(true);
+    try {
+      if (replaceExisting) {
+        await Promise.all(paydaslar.map(p =>
+          api(`/projects/${pid}/stakeholders/${p.id}`, { method: "DELETE", projectId: pid }).catch(() => {})
+        ));
+      }
+      const firmaRows = rows.filter(r => r.kategoriId === "alt_yuklenici" && r.tip === "firma");
+      const digerRows = rows.filter(r => !(r.kategoriId === "alt_yuklenici" && r.tip === "firma"));
+      await Promise.all(firmaRows.map(r => api(`/projects/${pid}/subcontractors`, {
+        method: "POST", projectId: pid,
+        body: {
+          company_name: r.firmaAdi?.trim() || r.ad.trim(),
+          trade: r.unvan?.trim() || null,
+          phone: r.telefon?.trim() || null,
+          email: r.email?.trim() || null,
+        },
+      }).catch(() => {})));
+      if (digerRows.length) {
+        await api(`/projects/${pid}/stakeholders/bulk`, {
+          method: "POST", projectId: pid, body: { items: digerRows.map(paydasToApiBody) },
+        }).catch(() => {});
+      }
+      await Promise.all([loadPaydaslar(pid), loadTaseronlar(pid)]);
+    } finally { setSubsBusy(false); }
+  }
+
+  async function demoYukle() {
+    if (!confirm("Bu proje için 27 demo paydaş yüklenecek. Devam edilsin mi?")) return;
+    await commitRows(demoPaydaslar(), false);
   }
 
   function yeniEkle(katId: string) {
@@ -368,19 +450,16 @@ export default function ProjePaydaslariPage() {
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (!file) return;
-              importExcel(file, (data) => {
-                if (confirm(`${data.length} paydaş bulundu. Mevcut verilerle birleştirilsin mi?`)) {
-                  kaydet([...paydaslar, ...data]);
-                } else {
-                  kaydet(data);
-                }
+              importExcel(file, (rows) => {
+                const replaceExisting = !confirm(`${rows.length} paydaş bulundu. Mevcut verilerle birleştirilsin mi?`);
+                commitRows(rows, replaceExisting);
               });
               e.target.value = "";
             }}
           />
-          {paydaslar.length > 0 && (
+          {(paydaslar.length > 0 || taseronlar.length > 0) && (
             <button
-              onClick={() => exportExcel(paydaslar, current?.name ?? "Proje")}
+              onClick={() => exportExcel(paydaslar, taseronlar, current?.name ?? "Proje")}
               className="rounded-md border border-beton-700 px-3 py-2 text-sm text-beton-200 hover:border-emniyet-500"
             >
               📊 Excel Dışa Aktar
@@ -394,14 +473,11 @@ export default function ProjePaydaslariPage() {
         <div className="rounded-lg border border-beton-700 bg-beton-900/50 px-4 py-3 flex items-center justify-between gap-3">
           <p className="text-sm text-beton-400">Henüz paydaş eklenmemiş. Demo veriyle başlamak ister misiniz?</p>
           <button
-            onClick={() => {
-              if (!confirm("Bu proje için 27 demo paydaş yüklenecek. Devam edilsin mi?")) return;
-              const data = demoPaydaslar().map((p) => ({ ...p, id: uid() }));
-              kaydet(data);
-            }}
-            className="shrink-0 rounded-md bg-beton-700 px-3 py-1.5 text-xs font-medium text-beton-100 hover:bg-beton-600"
+            onClick={demoYukle}
+            disabled={subsBusy}
+            className="shrink-0 rounded-md bg-beton-700 px-3 py-1.5 text-xs font-medium text-beton-100 hover:bg-beton-600 disabled:opacity-50"
           >
-            Demo Veri Yükle
+            {subsBusy ? "Yükleniyor…" : "Demo Veri Yükle"}
           </button>
         </div>
       )}

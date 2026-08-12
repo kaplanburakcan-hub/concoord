@@ -13,21 +13,10 @@ type WorkItem = {
   contract_qty: number; unit_price?: number; contract_amount?: number; row_version: number;
 };
 
-// Tedarikçi tipi (localStorage'da saklanır)
 type Tedarikci = {
   id: string; company_name: string; trade?: string; contact_person?: string;
-  phone?: string; email?: string; tax_no?: string;
+  phone?: string; email?: string; tax_no?: string; row_version: number;
 };
-
-function tedarikcilerKey(pid: string) { return `ipks_tedarikciler_${pid}`; }
-
-function loadTedarikciler(pid: string): Tedarikci[] {
-  try { return JSON.parse(localStorage.getItem(tedarikcilerKey(pid)) || "[]"); } catch { return []; }
-}
-
-function saveTedarikciler(pid: string, data: Tedarikci[]) {
-  localStorage.setItem(tedarikcilerKey(pid), JSON.stringify(data));
-}
 
 type ActiveType = "taseron" | "tedarikci";
 
@@ -51,7 +40,10 @@ export default function SubcontractorsPage() {
     } catch {
       setErr("Taşeronlar yüklenemedi ya da erişim yetkiniz yok.");
     }
-    setTedarikciler(loadTedarikciler(pid));
+    try {
+      const r = await api<{ tedarikciler: Tedarikci[] }>(`/projects/${pid}/tedarikciler`, { projectId: pid });
+      setTedarikciler(r.tedarikciler);
+    } catch { /* sessiz — izin yoksa panel boş kalır */ }
   }, [pid, sel, activeType]);
 
   useEffect(() => { load(); }, [load]);
@@ -64,12 +56,6 @@ export default function SubcontractorsPage() {
   function handleSelectTedarikci(id: string) {
     setActiveType("tedarikci");
     setSel(id);
-  }
-
-  function onTedarikciChanged(data: Tedarikci[]) {
-    if (!pid) return;
-    saveTedarikciler(pid, data);
-    setTedarikciler(data);
   }
 
   if (!current) return <p className="text-beton-400">Önce üst bardan bir proje seçin.</p>;
@@ -94,11 +80,12 @@ export default function SubcontractorsPage() {
           />
           {/* Tedarikçiler */}
           <TedarikciPanel
+            projectId={pid!}
             tedarikciler={tedarikciler}
             selected={activeType === "tedarikci" ? sel : null}
             onSelect={handleSelectTedarikci}
             canManage={can("contracts.upload")}
-            onChanged={onTedarikciChanged}
+            onChanged={load}
           />
         </div>
 
@@ -200,28 +187,31 @@ function SubPanel({ projectId, subs, selected, onSelect, canManage, onChanged }:
 }
 
 // ── Tedarikçi Paneli ──────────────────────────────────────────────────
-function TedarikciPanel({ tedarikciler, selected, onSelect, canManage, onChanged }: {
-  tedarikciler: Tedarikci[]; selected: string | null;
+function TedarikciPanel({ projectId, tedarikciler, selected, onSelect, canManage, onChanged }: {
+  projectId: string; tedarikciler: Tedarikci[]; selected: string | null;
   onSelect: (id: string) => void; canManage: boolean;
-  onChanged: (data: Tedarikci[]) => void;
+  onChanged: () => void;
 }) {
   const [name, setName] = useState("");
   const [trade, setTrade] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function add() {
+  async function add() {
     if (!name.trim()) return;
-    const newT: Tedarikci = {
-      id: Math.random().toString(36).slice(2, 10),
-      company_name: name.trim(),
-      trade: trade.trim() || undefined,
-    };
-    onChanged([...tedarikciler, newT]);
-    setName(""); setTrade("");
+    setBusy(true);
+    try {
+      await api(`/projects/${projectId}/tedarikciler`, {
+        method: "POST", projectId,
+        body: { company_name: name.trim(), trade: trade.trim() || null },
+      });
+      setName(""); setTrade(""); onChanged();
+    } finally { setBusy(false); }
   }
 
-  function sil(id: string) {
+  async function sil(id: string) {
     if (!confirm("Bu tedarikçiyi silmek istediğinize emin misiniz?")) return;
-    onChanged(tedarikciler.filter(t => t.id !== id));
+    await api(`/projects/${projectId}/tedarikciler/${id}`, { method: "DELETE", projectId });
+    onChanged();
   }
 
   return (
@@ -258,8 +248,8 @@ function TedarikciPanel({ tedarikciler, selected, onSelect, canManage, onChanged
             className="w-full rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-white"
           />
           <button
-            onClick={add}
-            className="w-full rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-sm py-1.5"
+            onClick={add} disabled={busy}
+            className="w-full rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-sm py-1.5 disabled:opacity-50"
           >
             Tedarikçi Ekle
           </button>

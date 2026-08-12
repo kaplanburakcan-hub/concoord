@@ -31,6 +31,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/projects"
 	"github.com/ipks/ipks/backend/internal/rbac"
 	"github.com/ipks/ipks/backend/internal/reports"
+	"github.com/ipks/ipks/backend/internal/stakeholders"
 	"github.com/ipks/ipks/backend/internal/statements"
 	"github.com/ipks/ipks/backend/internal/storage"
 	"github.com/ipks/ipks/backend/internal/survey"
@@ -118,6 +119,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	warehouseH := warehouse.NewHandler(pool)
 	meetingsH := meetings.NewHandler(pool)
 	tutanaklarH := tutanaklar.NewHandler(pool)
+	stakeholdersH := stakeholders.NewHandler(pool)
 
 	// --- Faz 21: Personel & Puantaj ---
 	personnelH := personnel.NewHandler(pool)
@@ -255,6 +257,15 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("contracts.view")).Get("/projects/{projectID}/subcontractors/{id}", payH.GetSubcontractor)
 			pr.With(mw.RequirePermission("contracts.upload")).Patch("/projects/{projectID}/subcontractors/{id}", payH.UpdateSubcontractor)
 			pr.With(mw.RequirePermission("contracts.delete")).Delete("/projects/{projectID}/subcontractors/{id}", payH.DeleteSubcontractor)
+
+			// Tedarikçiler — subcontractors ile aynı şekil/izin ailesi, ayrı tablo
+			// (bkz. migration 000037; Taşeron-Tedarikçi Sözleşmeleri sayfasında
+			// gösterilir, sahte localStorage-only "Tedarikçi" verisinin yerini alır).
+			pr.With(mw.RequirePermission("contracts.view")).Get("/projects/{projectID}/tedarikciler", payH.ListTedarikciler)
+			pr.With(mw.RequirePermission("contracts.upload")).Post("/projects/{projectID}/tedarikciler", payH.CreateTedarikci)
+			pr.With(mw.RequirePermission("contracts.view")).Get("/projects/{projectID}/tedarikciler/{id}", payH.GetTedarikci)
+			pr.With(mw.RequirePermission("contracts.upload")).Patch("/projects/{projectID}/tedarikciler/{id}", payH.UpdateTedarikci)
+			pr.With(mw.RequirePermission("contracts.delete")).Delete("/projects/{projectID}/tedarikciler/{id}", payH.DeleteTedarikci)
 
 			// Birim fiyat cetveli (work_items) + Excel/CSV içe aktarma
 			pr.With(mw.RequirePermission("contracts.view")).Get("/projects/{projectID}/subcontractors/{subID}/work-items", payH.ListWorkItems)
@@ -528,6 +539,20 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/tutanaklar/{id}/submit", tutanaklarH.Submit)
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/tutanaklar/{id}/decide", tutanaklarH.Decide)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/tutanaklar/{id}", tutanaklarH.Delete)
+		})
+
+		// Proje Paydaşları (İşveren, Müşavir, Yüklenici, Taşeron personeli, Yapı
+		// Denetim, Proje Müellifi, Danışmanlar, İSG-OSGB, Tedarikçiler) — önceden
+		// localStorage'da tutulan özelliğin backend'e taşınmış hali. Taşeron-firma
+		// satırları bu endpoint'e değil, mevcut /subcontractors'a gider (frontend'de
+		// zaten öyle uygulanıyor).
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/stakeholders", stakeholdersH.List)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/stakeholders", stakeholdersH.Create)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/stakeholders/bulk", stakeholdersH.BulkCreate)
+			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/stakeholders/{id}", stakeholdersH.Update)
+			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/stakeholders/{id}", stakeholdersH.Delete)
 		})
 
 		// Faz 26 — Makine & Ekipman
