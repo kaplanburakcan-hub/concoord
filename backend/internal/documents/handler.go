@@ -34,10 +34,11 @@ const maxUploadBytes = 100 << 20 // 100 MB
 var docCategories = map[string]bool{
 	"Contract": true, "Addendum": true, "Submittal": true, "Drawing": true,
 	"Delivery": true, "OHS": true, "Other": true,
-	"SahaTutanagi":     true, // DB CHECK'te vardı (migration 000035), map'te eksikti — bug fix
-	"SahaFotografi":    true,
-	"ImalatFotografi":  true,
-	"DenetimFotografi": true,
+	"SahaTutanagi":       true, // DB CHECK'te vardı (migration 000035), map'te eksikti — bug fix
+	"SahaFotografi":      true,
+	"ImalatFotografi":    true,
+	"DenetimFotografi":   true,
+	"IdariHakedisFatura": true,
 }
 
 type Handler struct {
@@ -400,16 +401,16 @@ func (h *Handler) CreateDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 type versionDTO struct {
-	ID         uuid.UUID `json:"id"`
-	VersionNo  int       `json:"version_no"`
-	FileID     uuid.UUID `json:"file_id"`
-	OriginalName string  `json:"original_name"`
-	Mime       string    `json:"mime"`
-	SizeBytes  int64     `json:"size_bytes"`
-	SHA256     string    `json:"sha256"`
-	Note       *string   `json:"note,omitempty"`
-	UploadedBy *uuid.UUID `json:"uploaded_by,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID           uuid.UUID  `json:"id"`
+	VersionNo    int        `json:"version_no"`
+	FileID       uuid.UUID  `json:"file_id"`
+	OriginalName string     `json:"original_name"`
+	Mime         string     `json:"mime"`
+	SizeBytes    int64      `json:"size_bytes"`
+	SHA256       string     `json:"sha256"`
+	Note         *string    `json:"note,omitempty"`
+	UploadedBy   *uuid.UUID `json:"uploaded_by,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 func (h *Handler) GetDocument(w http.ResponseWriter, r *http.Request) {

@@ -21,6 +21,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/design"
 	"github.com/ipks/ipks/backend/internal/documents"
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/idarihakedis"
 	"github.com/ipks/ipks/backend/internal/machines"
 	"github.com/ipks/ipks/backend/internal/materials"
 	"github.com/ipks/ipks/backend/internal/meetings"
@@ -138,6 +139,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 	// --- Faz 27: Yazışmalar (Gelen/Giden Evrak) ---
 	correspondenceH := correspondence.NewHandler(pool)
+
+	// --- Nakit Akış Faz D: İdari Hakedişler ---
+	idariHakedisH := idarihakedis.NewHandler(pool)
 
 	// Liveness — süreç ayakta mı?
 	r.Get("/healthz", func(w http.ResponseWriter, req *http.Request) {
@@ -318,6 +322,15 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("payments.approve_plan_change")).Get("/projects/{projectID}/payment-plan-changes", paymentPlansH.ListPending)
 			pr.With(mw.RequirePermission("payments.approve_plan_change")).Post("/projects/{projectID}/payment-plan-changes/{id}/approve", paymentPlansH.Approve)
 			pr.With(mw.RequirePermission("payments.approve_plan_change")).Post("/projects/{projectID}/payment-plan-changes/{id}/reject", paymentPlansH.Reject)
+		})
+
+		// Faz D (Nakit Akış) — İdari Hakedişler (nakit giriş kaynağı).
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("progress_payments.view")).Get("/projects/{projectID}/idari-hakedisler", idariHakedisH.List)
+			pr.With(mw.RequirePermission("progress_payments.finalize")).Post("/projects/{projectID}/idari-hakedisler", idariHakedisH.Create)
+			pr.With(mw.RequirePermission("progress_payments.finalize")).Patch("/projects/{projectID}/idari-hakedisler/{id}", idariHakedisH.Update)
+			pr.With(mw.RequirePermission("progress_payments.finalize")).Delete("/projects/{projectID}/idari-hakedisler/{id}", idariHakedisH.Delete)
 		})
 
 		// ---- Faz 5: Malzeme Onay Süreci (Submittals / MAR) ----
