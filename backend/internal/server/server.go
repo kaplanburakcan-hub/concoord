@@ -13,6 +13,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/admin"
 	"github.com/ipks/ipks/backend/internal/audit"
 	"github.com/ipks/ipks/backend/internal/auth"
+	"github.com/ipks/ipks/backend/internal/cashflow"
 	"github.com/ipks/ipks/backend/internal/config"
 	"github.com/ipks/ipks/backend/internal/contracts"
 	"github.com/ipks/ipks/backend/internal/correspondence"
@@ -146,6 +147,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 	// --- Nakit Akış Faz E: Sabit Giderler ---
 	fixedExpensesH := fixedexpenses.NewHandler(pool)
+
+	// --- Nakit Akış Faz F: Nakit Akış Raporu + Ödeme Planları (toplu) ---
+	cashflowH := cashflow.NewHandler(pool)
 
 	// Liveness — süreç ayakta mı?
 	r.Get("/healthz", func(w http.ResponseWriter, req *http.Request) {
@@ -344,6 +348,13 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("progress_payments.finalize")).Post("/projects/{projectID}/fixed-expenses", fixedExpensesH.Create)
 			pr.With(mw.RequirePermission("progress_payments.finalize")).Patch("/projects/{projectID}/fixed-expenses/{id}", fixedExpensesH.Update)
 			pr.With(mw.RequirePermission("progress_payments.finalize")).Delete("/projects/{projectID}/fixed-expenses/{id}", fixedExpensesH.Delete)
+		})
+
+		// Faz F (Nakit Akış) — nakit akış raporu + toplu ödeme planları ("Ödemeler" sekmesi).
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("reports.view_financial_reports")).Get("/projects/{projectID}/cash-flow", cashflowH.Report)
+			pr.With(mw.RequirePermission("reports.view_financial_reports")).Get("/projects/{projectID}/payment-plans", cashflowH.PaymentPlans)
 		})
 
 		// ---- Faz 5: Malzeme Onay Süreci (Submittals / MAR) ----

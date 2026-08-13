@@ -56,6 +56,8 @@ import PersonelPuantajPage from "./pages/project/PersonelPuantajPage";
 import TedarikciEkstrerlerPage from "./pages/payments/TedarikciEkstrerlerPage";
 import PaymentPlanApprovalsPage from "./pages/payments/PaymentPlanApprovalsPage";
 import SabitGiderlerPage from "./pages/payments/SabitGiderlerPage";
+import NakitAkisPage from "./pages/payments/NakitAkisPage";
+import OdemePlanlariPage from "./pages/payments/OdemePlanlariPage";
 import GelenEvrakPage from "./pages/project/GelenEvrakPage";
 import GidenEvrakPage from "./pages/project/GidenEvrakPage";
 
@@ -346,6 +348,8 @@ export default function App() {
                       <Route path="/tedarikci-ekstreler" element={<RequirePerm perm="contracts.view"><TedarikciEkstrerlerPage /></RequirePerm>} />
                       <Route path="/odeme-plani-onaylari" element={<RequirePerm perm="payments.approve_plan_change"><PaymentPlanApprovalsPage /></RequirePerm>} />
                       <Route path="/sabit-giderler" element={<RequirePerm perm="progress_payments.view"><SabitGiderlerPage /></RequirePerm>} />
+                      <Route path="/nakit-akis" element={<RequirePerm perm="reports.view_financial_reports"><NakitAkisPage /></RequirePerm>} />
+                      <Route path="/odeme-planlari" element={<RequirePerm perm="reports.view_financial_reports"><OdemePlanlariPage /></RequirePerm>} />
                       <Route path="/proje/personel-puantaj" element={<RequirePerm perm="reports.view"><PersonelPuantajPage /></RequirePerm>} />
                       <Route path="/saha/tutanaklar" element={<RequirePerm perm="reports.view"><SahaTutanaklariPage /></RequirePerm>} />
                       {/* ── YAZIŞMALAR ── */}

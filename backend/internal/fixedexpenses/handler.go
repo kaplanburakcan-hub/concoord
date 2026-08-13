@@ -10,6 +10,7 @@
 package fixedexpenses
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -71,6 +72,29 @@ func requireUser(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 }
 
 // ── List ─────────────────────────────────────────────────────────────────
+
+// ListActive — projedeki aktif sabit giderleri döner (HTTP dışı, Faz F'nin
+// nakit akışı raporu Expand() ile birleştirmeden önce bunu çağırır).
+func ListActive(ctx context.Context, pool *pgxpool.Pool, projectID uuid.UUID) ([]FixedExpense, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT `+listCols+`
+		FROM fixed_expenses f
+		JOIN users u ON u.id = f.created_by
+		WHERE f.project_id=$1 AND f.deleted_at IS NULL AND f.active`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []FixedExpense{}
+	for rows.Next() {
+		var f FixedExpense
+		if err := scanRow(rows, &f); err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	pid, ok := parseID(w, r, "projectID")

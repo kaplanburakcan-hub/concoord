@@ -91,6 +91,13 @@ const GROUPS: NavGroup[] = [
       { to: "/documents", label: "Dokümanlar", perm: "documents.view", icon: I.dok },
       { to: "/hakedis", label: "Taşeron Hakedişleri", perm: "progress_payments.view", icon: I.hakedis, end: true },
       { to: "/tedarikci-ekstreler", label: "Tedarikçi Ekstreler", perm: "contracts.view", icon: I.ekstrem },
+    ],
+  },
+  {
+    title: "Ödemeler",
+    items: [
+      { to: "/nakit-akis", label: "Nakit Akış", perm: "reports.view_financial_reports", icon: I.ozet },
+      { to: "/odeme-planlari", label: "Ödeme Planları", perm: "reports.view_financial_reports", icon: I.hakedis },
       { to: "/odeme-plani-onaylari", label: "Ödeme Planı Onayları", perm: "payments.approve_plan_change", icon: I.izin },
       { to: "/sabit-giderler", label: "Sabit Giderler", perm: "progress_payments.view", icon: I.aylik },
     ],

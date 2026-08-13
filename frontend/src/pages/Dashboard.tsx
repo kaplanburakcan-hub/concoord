@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { Can } from "../auth/guards";
@@ -250,6 +251,11 @@ export default function Dashboard() {
             </Card>
           </div>
 
+          {/* Nakit Akış özeti — Faz F, yalnızca finansal rapor izniyle */}
+          <Can perm="reports.view_financial_reports">
+            <NakitAkisCard projectId={current.id} currency={cur} />
+          </Can>
+
           {/* Milestone timeline */}
           <Card title="Milestone zaman çizelgesi">
             {dash.milestones.length === 0 ? (
@@ -387,6 +393,58 @@ function PVEditor({ projectId, onSaved }: { projectId: string; onSaved: () => vo
       </div>
       {msg && <p className="mt-1 text-xs text-beton-300">{msg}</p>}
     </div>
+  );
+}
+
+// Nakit Akış özet kartı (Faz F) — son 30 gün + gelecek 30 gün toplu
+// giriş/çıkış/net. Detaylı görünüm için /nakit-akis'e yönlendirir.
+type CashFlowSummary = { total_in: number; total_out: number; net: number };
+
+function NakitAkisCard({ projectId, currency }: { projectId: string; currency: string }) {
+  const [summary, setSummary] = useState<CashFlowSummary | null>(null);
+  const [err, setErr] = useState(false);
+
+  useEffect(() => {
+    const from = new Date(); from.setDate(from.getDate() - 30);
+    const to = new Date(); to.setDate(to.getDate() + 30);
+    const q = `from=${from.toISOString().slice(0, 10)}&to=${to.toISOString().slice(0, 10)}&group=monthly`;
+    api<{ summary: CashFlowSummary }>(`/projects/${projectId}/cash-flow?${q}`)
+      .then((r) => setSummary(r.summary))
+      .catch(() => setErr(true));
+  }, [projectId]);
+
+  const money = (v: number) => v.toLocaleString("tr-TR", { maximumFractionDigits: 0 }) + " " + currency;
+
+  return (
+    <Card
+      title="Nakit Akış (son 30 gün + gelecek 30 gün)"
+      action={<Link to="/nakit-akis" className="text-xs text-emniyet-500 hover:underline">Detaylı gör →</Link>}
+    >
+      {err && <p className="text-sm text-beton-400">Nakit akış verisi yüklenemedi.</p>}
+      {!err && !summary && <p className="text-sm text-beton-400">Yükleniyor…</p>}
+      {summary && (
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-beton-500">Giriş</p>
+            <p className="mt-1 font-display text-lg font-medium text-emniyet-500" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {money(summary.total_in)}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-beton-500">Çıkış</p>
+            <p className="mt-1 font-display text-lg font-medium text-red-400" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {money(summary.total_out)}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-beton-500">Net</p>
+            <p className={"mt-1 font-display text-lg font-medium " + (summary.net >= 0 ? "text-beton-100" : "text-red-400")} style={{ fontVariantNumeric: "tabular-nums" }}>
+              {money(summary.net)}
+            </p>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 
