@@ -20,6 +20,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/dashboard"
 	"github.com/ipks/ipks/backend/internal/design"
 	"github.com/ipks/ipks/backend/internal/documents"
+	"github.com/ipks/ipks/backend/internal/fixedexpenses"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/idarihakedis"
 	"github.com/ipks/ipks/backend/internal/machines"
@@ -142,6 +143,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 	// --- Nakit Akış Faz D: İdari Hakedişler ---
 	idariHakedisH := idarihakedis.NewHandler(pool)
+
+	// --- Nakit Akış Faz E: Sabit Giderler ---
+	fixedExpensesH := fixedexpenses.NewHandler(pool)
 
 	// Liveness — süreç ayakta mı?
 	r.Get("/healthz", func(w http.ResponseWriter, req *http.Request) {
@@ -331,6 +335,15 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("progress_payments.finalize")).Post("/projects/{projectID}/idari-hakedisler", idariHakedisH.Create)
 			pr.With(mw.RequirePermission("progress_payments.finalize")).Patch("/projects/{projectID}/idari-hakedisler/{id}", idariHakedisH.Update)
 			pr.With(mw.RequirePermission("progress_payments.finalize")).Delete("/projects/{projectID}/idari-hakedisler/{id}", idariHakedisH.Delete)
+		})
+
+		// Faz E (Nakit Akış) — Sabit Giderler (araç, endirekt personel, mobilizasyon vb.).
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("progress_payments.view")).Get("/projects/{projectID}/fixed-expenses", fixedExpensesH.List)
+			pr.With(mw.RequirePermission("progress_payments.finalize")).Post("/projects/{projectID}/fixed-expenses", fixedExpensesH.Create)
+			pr.With(mw.RequirePermission("progress_payments.finalize")).Patch("/projects/{projectID}/fixed-expenses/{id}", fixedExpensesH.Update)
+			pr.With(mw.RequirePermission("progress_payments.finalize")).Delete("/projects/{projectID}/fixed-expenses/{id}", fixedExpensesH.Delete)
 		})
 
 		// ---- Faz 5: Malzeme Onay Süreci (Submittals / MAR) ----
