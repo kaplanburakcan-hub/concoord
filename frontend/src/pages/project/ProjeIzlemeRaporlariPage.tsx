@@ -4,10 +4,10 @@ import { api } from "../../api/client";
 import { useProjects } from "../../projects/ProjectContext";
 
 // Proje İzleme Raporları — finansal ve operasyonel izleme raporları.
-// Maliyet Takip ve Malzeme/Stok kartları gerçek sayfalara bağlanır (Aylık
-// Rapor / Depo); Nakit Akış Raporu için henüz karşılık gelen bir sayfa yok,
-// dürüstçe "Yakında" olarak işaretlenir. Özel raporlar artık backend'de
-// kalıcı (önceden yalnızca bu oturumda React state'inde tutuluyordu).
+// Maliyet Takip, Malzeme/Stok ve Nakit Akış kartları gerçek sayfalara
+// bağlanır (Aylık Rapor / Depo / Nakit Akış). Özel raporlar artık
+// backend'de kalıcı (önceden yalnızca bu oturumda React state'inde
+// tutuluyordu).
 
 type ReportCard = {
   id: string;
@@ -15,7 +15,7 @@ type ReportCard = {
   desc: string;
   color: string;
   default: boolean;
-  path?: string;
+  path: string;
 };
 
 const DEFAULT_REPORTS: ReportCard[] = [
@@ -25,6 +25,7 @@ const DEFAULT_REPORTS: ReportCard[] = [
     desc: "Tahsilat, ödeme ve nakit pozisyonunun dönemsel görünümü. Hakediş ve avans ödemeleriyle ilişkilendirilir.",
     color: "border-emniyet-500/40 bg-emniyet-500/5",
     default: true,
+    path: "/nakit-akis",
   },
   {
     id: "cost",
@@ -116,26 +117,14 @@ export default function ProjeIzlemeRaporlariPage() {
 
       {/* Varsayılan + özel raporlar */}
       <div className="grid gap-3 sm:grid-cols-3">
-        {DEFAULT_REPORTS.map((r) =>
-          r.path ? (
-            <Link key={r.id} to={r.path}
-              className={"relative rounded-xl border p-4 cursor-pointer hover:brightness-110 transition " + r.color}>
-              <p className="font-medium text-beton-100 text-sm pr-4">{r.label}</p>
-              <p className="mt-1 text-xs text-beton-400 leading-relaxed">{r.desc}</p>
-              <span className="mt-3 inline-flex items-center gap-1 text-[10px] text-beton-500">● Varsayılan</span>
-            </Link>
-          ) : (
-            <div key={r.id}
-              className={"relative rounded-xl border p-4 opacity-50 cursor-not-allowed select-none " + r.color}
-              title="Yakında kullanılabilir olacak">
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-medium text-beton-100 text-sm">{r.label}</p>
-                <span className="rounded-full border border-beton-700 px-2 py-0.5 text-[10px] text-beton-500 bg-beton-900 shrink-0">Yakında</span>
-              </div>
-              <p className="mt-1 text-xs text-beton-400 leading-relaxed">{r.desc}</p>
-            </div>
-          )
-        )}
+        {DEFAULT_REPORTS.map((r) => (
+          <Link key={r.id} to={r.path}
+            className={"relative rounded-xl border p-4 cursor-pointer hover:brightness-110 transition " + r.color}>
+            <p className="font-medium text-beton-100 text-sm pr-4">{r.label}</p>
+            <p className="mt-1 text-xs text-beton-400 leading-relaxed">{r.desc}</p>
+            <span className="mt-3 inline-flex items-center gap-1 text-[10px] text-beton-500">● Varsayılan</span>
+          </Link>
+        ))}
 
         {custom.map((r) => (
           <div key={r.id} className={"relative rounded-xl border p-4 cursor-default " + COLORS[custom.indexOf(r) % COLORS.length]}>
