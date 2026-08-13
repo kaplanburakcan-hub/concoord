@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api/client";
+import { api, apiFetchBlob, apiUpload } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { Can } from "../auth/guards";
 import { useProjects } from "../projects/ProjectContext";
 import SCurve from "./dashboard/SCurve";
 import type { SCurvePoint } from "./dashboard/SCurve";
-import ProgressDonut from "./dashboard/ProgressDonut";
+import MultiDonut from "./dashboard/MultiDonut";
 
 // Faz 9 — rol duyarlı proje dashboard'u. Finansal blok (EVM) backend'de izinle
 // süzülür: reports.view_financial_reports yoksa `evm` alanı hiç gelmez; taşeron
@@ -61,12 +61,16 @@ type Dash = {
   };
   pending: { payments: number; mars: number; prs: number; overdue_pos: number; open_tasks: number };
   activity?: Activity[];
+  cost_breakdown?: { tasaron: number; malzeme: number; diger: number };
+  document_status?: { onayli: number; revizyon: number; taslak: number };
+  cover_image?: { document_id: string; version: number };
+  accident_free_days: { days: number; reference_date: string | null; since_accident: boolean; has_reference: boolean };
   subcontractor_scoped: boolean;
 };
 type PVEntry = { month: string; planned_pct: number };
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const { current, loading: projLoading } = useProjects();
   const [dash, setDash] = useState<Dash | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -135,94 +139,98 @@ export default function Dashboard() {
 
       {dash && (
         <div className="mt-6 grid gap-4">
-          <div className={dash.evm ? "grid gap-4 md:grid-cols-2" : "grid gap-4"}>
-            {/* İlerleme çubuğu — herkese açık (tutar içermez) */}
-            <Card title="Fiziki ilerleme">
-              <div className="h-3 rounded-full bg-beton-800 border border-beton-700 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-emniyet-500 transition-all"
-                  style={{ width: `${Math.min(100, dash.progress_pct)}%` }}
-                />
-              </div>
-              <p className="mt-2 text-xs text-beton-400" style={{ fontVariantNumeric: "tabular-nums" }}>
-                %{dash.progress_pct.toFixed(1)}
-              </p>
-            </Card>
-
-            {/* Parasal ilerleme — finansal veri, EVM ile aynı izin kapısı
-                (dash.evm yalnızca reports.view_financial_reports ile gelir).
-                Taşeron hakedişleri + teslim alınmış satınalmalar (AC) /
-                proje sözleşme bedeli. */}
+          {/* Kompakt KPI şeridi — tek satırda at-a-glance göstergeler
+              (Panel v2 konsept önizlemesinde onaylanan yoğun yerleşim). */}
+          <div className={"grid gap-3 " + (dash.evm ? "grid-cols-3 md:grid-cols-6" : "grid-cols-2 md:grid-cols-3")}>
+            <Kpi label="Fiziksel İlerleme" value={`%${dash.progress_pct.toFixed(1)}`} />
             {dash.evm && (
-              <Card title="Parasal İlerleme">
+              <>
                 {dash.evm.contract_amount ? (
-                  <>
-                    <ProgressDonut pct={dash.evm.financial_progress_pct} />
-                    <p className="mt-2 text-xs text-beton-400 text-center" style={{ fontVariantNumeric: "tabular-nums" }}>
-                      {money(dash.evm.ac)} / {money(dash.evm.contract_amount)}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-beton-500 text-center">
-                      Gerçekleşen harcama (hakediş + satınalma) / sözleşme bedeli
-                    </p>
-                  </>
+                  <Kpi label="Parasal İlerleme" value={`%${dash.evm.financial_progress_pct.toFixed(1)}`} />
                 ) : (
-                  <p className="text-sm text-beton-400">
-                    Sözleşme bedeli girilmemiş — proje künyesinden ekleyin.
-                  </p>
+                  <Kpi label="Parasal İlerleme" value="—" />
                 )}
-              </Card>
-            )}
-          </div>
-
-          {/* EVM — yalnızca finansal rapor izniyle gelir */}
-          {dash.evm && (
-            <Card
-              title={`EVM (kümülatif · ${dash.evm.as_of_month})`}
-              action={
-                <Can perm="projects.edit">
-                  <button
-                    onClick={() => setShowPV((s) => !s)}
-                    className="text-xs text-emniyet-500 hover:underline"
-                  >
-                    {showPV ? "PV planını gizle" : "PV planını düzenle"}
-                  </button>
-                </Can>
-              }
-            >
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Kpi label="SPI" value={idx(dash.evm.spi)} bad={dash.evm.spi > 0 && dash.evm.spi < 0.9} />
                 <Kpi label="CPI" value={idx(dash.evm.cpi)} bad={dash.evm.cpi > 0 && dash.evm.cpi < 0.9} />
-                <Kpi label="EAC" value={money(dash.evm.eac)} />
-                <Kpi label="ETC" value={money(dash.evm.etc)} />
-              </div>
-              <div
-                className="mt-3 grid grid-cols-3 gap-3 text-xs text-beton-400"
-                style={{ fontVariantNumeric: "tabular-nums" }}
-              >
-                <span>PV <span className="text-beton-200">{money(dash.evm.pv)}</span></span>
-                <span>EV <span className="text-beton-200">{money(dash.evm.ev)}</span></span>
-                <span>AC <span className="text-beton-200">{money(dash.evm.ac)}</span></span>
-              </div>
-              <div className="mt-4">
-                {dash.evm.s_curve.length >= 2 ? (
-                  <SCurve points={dash.evm.s_curve} currency={cur} asOf={dash.evm.as_of_month} />
-                ) : (
-                  <div className="rounded-lg border border-dashed border-beton-700 bg-beton-950 px-4 py-8 text-center">
-                    <p className="text-sm text-beton-400">S-eğrisi için henüz yeterli veri yok.</p>
-                    <p className="mt-1 text-xs text-beton-500">
-                      Grafik, en az iki dönem hakediş/ilerleme kaydı girildiğinde görünür.
-                    </p>
-                  </div>
-                )}
-              </div>
-              <p className="mt-1 text-[11px] text-beton-500">
-                PV kaynağı: {planSourceTR(dash.evm.plan_source)} · BAC {money(dash.evm.bac)}
-              </p>
-              {showPV && <PVEditor projectId={current.id} onSaved={load} />}
-            </Card>
+              </>
+            )}
+            <Kpi label="Kazasız Gün" value={dash.accident_free_days.has_reference ? String(dash.accident_free_days.days) : "—"} />
+            <Kpi label="Açık İSG" value={String(dash.open_findings.total)} bad={dash.open_findings.critical > 0} />
+          </div>
+          {dash.evm && !dash.evm.contract_amount && (
+            <p className="-mt-2 text-xs text-beton-500">Sözleşme bedeli girilmemiş — parasal ilerleme için proje künyesinden ekleyin.</p>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
+          {/* Ana blok: EVM trendi (geniş) + proje görseli/kazasız gün/maliyet (dar sütun) */}
+          <div className={dash.evm ? "grid gap-4 lg:grid-cols-3" : "grid gap-4"}>
+            {dash.evm && (
+              <div className="lg:col-span-2">
+                <Card
+                  title={`EVM (kümülatif · ${dash.evm.as_of_month})`}
+                  action={
+                    <Can perm="projects.edit">
+                      <button
+                        onClick={() => setShowPV((s) => !s)}
+                        className="text-xs text-emniyet-500 hover:underline"
+                      >
+                        {showPV ? "PV planını gizle" : "PV planını düzenle"}
+                      </button>
+                    </Can>
+                  }
+                >
+                  <div className="grid grid-cols-2 gap-3">
+                    <Kpi label="EAC" value={money(dash.evm.eac)} />
+                    <Kpi label="ETC" value={money(dash.evm.etc)} />
+                  </div>
+                  <div
+                    className="mt-3 grid grid-cols-3 gap-3 text-xs text-beton-400"
+                    style={{ fontVariantNumeric: "tabular-nums" }}
+                  >
+                    <span>PV <span className="text-beton-200">{money(dash.evm.pv)}</span></span>
+                    <span>EV <span className="text-beton-200">{money(dash.evm.ev)}</span></span>
+                    <span>AC <span className="text-beton-200">{money(dash.evm.ac)}</span></span>
+                  </div>
+                  <div className="mt-4">
+                    {dash.evm.s_curve.length >= 2 ? (
+                      <SCurve points={dash.evm.s_curve} currency={cur} asOf={dash.evm.as_of_month} />
+                    ) : (
+                      <div className="rounded-lg border border-dashed border-beton-700 bg-beton-950 px-4 py-8 text-center">
+                        <p className="text-sm text-beton-400">S-eğrisi için henüz yeterli veri yok.</p>
+                        <p className="mt-1 text-xs text-beton-500">
+                          Grafik, en az iki dönem hakediş/ilerleme kaydı girildiğinde görünür.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <p className="mt-1 text-[11px] text-beton-500">
+                    PV kaynağı: {planSourceTR(dash.evm.plan_source)} · BAC {money(dash.evm.bac)}
+                  </p>
+                  {showPV && <PVEditor projectId={current.id} onSaved={load} />}
+                </Card>
+              </div>
+            )}
+
+            <div className="grid gap-4">
+              <CoverImageCard projectId={current.id} coverImage={dash.cover_image} canUpload={can("documents.upload")} onChanged={load} />
+              <AccidentFreeDaysCard projectId={current.id} summary={dash.accident_free_days} canLog={can("ohs.perform_inspection")} onChanged={load} />
+              {dash.cost_breakdown && (
+                <Card title="Maliyet Durumu">
+                  <MultiDonut
+                    layout="row"
+                    size={54}
+                    formatValue={(v) => v.toLocaleString("tr-TR")}
+                    segments={[
+                      { label: "Taşeron", value: dash.cost_breakdown.tasaron, color: "rgb(var(--emniyet-500))" },
+                      { label: "Malzeme", value: dash.cost_breakdown.malzeme, color: "#f59e0b" },
+                      { label: "Diğer", value: dash.cost_breakdown.diger, color: "rgb(var(--beton-500))" },
+                    ]}
+                  />
+                </Card>
+              )}
+            </div>
+          </div>
+
+          <div className={dash.document_status ? "grid gap-4 md:grid-cols-3" : "grid gap-4 md:grid-cols-2"}>
             {/* Açık İSG bulguları */}
             <Card title="Açık İSG bulguları">
               <div className="flex flex-wrap gap-2">
@@ -234,6 +242,18 @@ export default function Dashboard() {
                 <Badge label={`Termini geçen ${dash.open_findings.overdue}`} tone={dash.open_findings.overdue ? "red" : "muted"} />
               </div>
             </Card>
+
+            {/* Doküman durumu (Dashboard v2) — rozet listesi, donut değil
+                (Panel v2 önizlemesinde İSG bulguları ile aynı dile getirildi). */}
+            {dash.document_status && (
+              <Card title="Doküman Durumu">
+                <div className="flex flex-wrap gap-2">
+                  <Badge label={`Onaylı ${dash.document_status.onayli}`} tone="blue" />
+                  <Badge label={`Revizyon ${dash.document_status.revizyon}`} tone={dash.document_status.revizyon ? "amber" : "muted"} />
+                  <Badge label={`Taslak ${dash.document_status.taslak}`} tone="muted" />
+                </div>
+              </Card>
+            )}
 
             {/* Bekleyen onaylar */}
             <Card title="Bekleyen işler">
@@ -251,41 +271,41 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Nakit Akış özeti — Faz F, yalnızca finansal rapor izniyle */}
-          <Can perm="reports.view_financial_reports">
-            <NakitAkisCard projectId={current.id} currency={cur} />
-          </Can>
-
-          {/* Milestone timeline */}
-          <Card title="Milestone zaman çizelgesi">
-            {dash.milestones.length === 0 ? (
-              <p className="text-sm text-beton-400">Tanımlı milestone yok.</p>
-            ) : (
-              <ul className="space-y-2">
-                {dash.milestones.map((m) => (
-                  <li key={m.id} className="flex items-center gap-3 text-sm">
-                    <span
-                      className={
-                        "inline-block w-2.5 h-2.5 rounded-full " +
-                        (m.status === "Completed"
-                          ? "bg-emniyet-500"
-                          : m.late
-                            ? "bg-red-500"
-                            : "bg-beton-600")
-                      }
-                    />
-                    <span className="text-beton-100 flex-1">{m.name}</span>
-                    <span className="font-mono text-xs text-beton-400">
-                      plan {m.planned_date ?? "—"} · gerçek {m.actual_date ?? "—"}
-                    </span>
-                    <span className={"font-mono text-xs " + (m.late ? "text-red-400" : "text-beton-300")}>
-                      {m.late ? "GECİKMİŞ" : m.status}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
+          {/* Nakit akış + milestone — yan yana (Panel v2 yerleşimi) */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Can perm="reports.view_financial_reports">
+              <NakitAkisCard projectId={current.id} currency={cur} />
+            </Can>
+            <Card title="Milestone zaman çizelgesi">
+              {dash.milestones.length === 0 ? (
+                <p className="text-sm text-beton-400">Tanımlı milestone yok.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {dash.milestones.map((m) => (
+                    <li key={m.id} className="flex items-center gap-3 text-sm">
+                      <span
+                        className={
+                          "inline-block w-2.5 h-2.5 rounded-full " +
+                          (m.status === "Completed"
+                            ? "bg-emniyet-500"
+                            : m.late
+                              ? "bg-red-500"
+                              : "bg-beton-600")
+                        }
+                      />
+                      <span className="text-beton-100 flex-1">{m.name}</span>
+                      <span className="font-mono text-xs text-beton-400">
+                        plan {m.planned_date ?? "—"} · gerçek {m.actual_date ?? "—"}
+                      </span>
+                      <span className={"font-mono text-xs " + (m.late ? "text-red-400" : "text-beton-300")}>
+                        {m.late ? "GECİKMİŞ" : m.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
 
           {/* Aktivite akışı — taşerona dönmez */}
           {dash.activity && (
@@ -448,6 +468,138 @@ function NakitAkisCard({ projectId, currency }: { projectId: string; currency: s
   );
 }
 
+// Proje görseli (Dashboard v2) — mevcut polimorfik documents motoru
+// (doc_category="ProjeGorseli") üzerinden; FotograflarPage.tsx'teki
+// iki adımlı yükleme deseniyle aynı (create → multipart version upload).
+function CoverImageCard({ projectId, coverImage, canUpload, onChanged }: {
+  projectId: string;
+  coverImage?: { document_id: string; version: number };
+  canUpload: boolean;
+  onChanged: () => void;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!coverImage) { setUrl(null); return; }
+    apiFetchBlob(`/projects/${projectId}/documents/${coverImage.document_id}/versions/${coverImage.version}/download`)
+      .then(setUrl)
+      .catch(() => setUrl(null));
+  }, [projectId, coverImage]);
+
+  async function upload(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    setBusy(true);
+    try {
+      const doc = await api<{ document: { id: string } }>(`/projects/${projectId}/documents`, {
+        method: "POST", projectId,
+        body: { title: "Proje Görseli", doc_category: "ProjeGorseli", entity_type: "project", entity_id: projectId },
+      });
+      const fd = new FormData();
+      fd.append("file", file);
+      await apiUpload(`/projects/${projectId}/documents/${doc.document.id}/versions`, fd);
+      onChanged();
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  return (
+    <Card
+      title="Proje Görseli"
+      action={canUpload && (
+        <button onClick={() => fileRef.current?.click()} disabled={busy}
+          className="text-xs text-emniyet-500 hover:underline disabled:opacity-50">
+          {busy ? "Yükleniyor…" : url ? "Değiştir" : "Yükle"}
+        </button>
+      )}
+    >
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => upload(e.target.files)} />
+      {url ? (
+        <img src={url} alt="Proje görseli" className="w-full h-48 object-cover rounded-lg" />
+      ) : (
+        <div className="h-48 rounded-lg border border-dashed border-beton-700 bg-beton-950 flex items-center justify-center">
+          <p className="text-sm text-beton-500">Henüz proje görseli eklenmedi.</p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// Kazasız gün sayacı (Dashboard v2) — bugün ile son iş kazası tarihi
+// arasındaki gün sayısı; hiç kaza kaydı yoksa proje başlangıç tarihine
+// kadar sayar (ondan ÖNCEYE asla inmez — bkz. ohsaccidents.LoadFreeDays).
+function AccidentFreeDaysCard({ projectId, summary, canLog, onChanged }: {
+  projectId: string;
+  summary: { days: number; reference_date: string | null; since_accident: boolean; has_reference: boolean };
+  canLog: boolean;
+  onChanged: () => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [desc, setDesc] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    if (!desc.trim()) return;
+    setBusy(true);
+    try {
+      await api(`/projects/${projectId}/ohs-accidents`, {
+        method: "POST", projectId, body: { accident_date: date, description: desc.trim() },
+      });
+      setAdding(false);
+      setDesc("");
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card
+      title="İş Güvenliği — Kazasız Gün"
+      action={canLog && (
+        <button onClick={() => setAdding((v) => !v)} className="text-xs text-emniyet-500 hover:underline">
+          {adding ? "Vazgeç" : "+ Kaza kaydı ekle"}
+        </button>
+      )}
+    >
+      {summary.has_reference ? (
+        <>
+          <p className="font-display text-4xl font-medium text-beton-100" style={{ fontVariantNumeric: "tabular-nums" }}>
+            {summary.days}
+          </p>
+          <p className="mt-1 text-xs text-beton-400">
+            {summary.since_accident
+              ? `Son iş kazasından beri (${summary.reference_date})`
+              : `Proje başlangıcından beri (${summary.reference_date}) — kayıtlı kaza yok`}
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-beton-400">Proje başlangıç tarihi girilmemiş — sayaç hesaplanamıyor.</p>
+      )}
+      {adding && (
+        <div className="mt-3 border-t border-beton-800 pt-3 space-y-2">
+          <div className="flex gap-2">
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+              max={new Date().toISOString().slice(0, 10)}
+              className="rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100" />
+            <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Kısa açıklama"
+              className="flex-1 rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100" />
+          </div>
+          <button onClick={save} disabled={busy || !desc.trim()}
+            className="rounded-md bg-red-500/90 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5">
+            {busy ? "Kaydediliyor…" : "Kaza kaydını gir"}
+          </button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function idx(v: number) {
   return v === 0 ? "—" : v.toFixed(3);
 }
@@ -508,12 +660,14 @@ function Kpi({ label, value, bad }: { label: string; value: string; bad?: boolea
     </div>
   );
 }
-function Badge({ label, tone }: { label: string; tone: "red" | "amber" | "muted" }) {
+function Badge({ label, tone }: { label: string; tone: "red" | "amber" | "blue" | "muted" }) {
   const cls =
     tone === "red"
       ? "bg-red-500/15 text-red-400"
       : tone === "amber"
         ? "bg-emniyet-500/15 text-emniyet-500"
-        : "bg-beton-800 text-beton-300";
+        : tone === "blue"
+          ? "bg-blue-500/15 text-blue-400"
+          : "bg-beton-800 text-beton-300";
   return <span className={"font-mono text-xs px-2 py-1 rounded " + cls}>{label}</span>;
 }

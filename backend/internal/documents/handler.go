@@ -39,6 +39,7 @@ var docCategories = map[string]bool{
 	"ImalatFotografi":    true,
 	"DenetimFotografi":   true,
 	"IdariHakedisFatura": true,
+	"ProjeGorseli":       true,
 }
 
 type Handler struct {
@@ -259,18 +260,19 @@ func (h *Handler) DeleteFolder(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 type documentDTO struct {
-	ID            uuid.UUID  `json:"id"`
-	ProjectID     uuid.UUID  `json:"project_id"`
-	FolderID      *uuid.UUID `json:"folder_id,omitempty"`
-	EntityType    *string    `json:"entity_type,omitempty"`
-	EntityID      *uuid.UUID `json:"entity_id,omitempty"`
-	Title         string     `json:"title"`
-	DocCategory   string     `json:"doc_category"`
-	RowVersion    int        `json:"row_version"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	VersionCount  int        `json:"version_count"`
-	LatestVersion *int       `json:"latest_version,omitempty"`
+	ID             uuid.UUID  `json:"id"`
+	ProjectID      uuid.UUID  `json:"project_id"`
+	FolderID       *uuid.UUID `json:"folder_id,omitempty"`
+	EntityType     *string    `json:"entity_type,omitempty"`
+	EntityID       *uuid.UUID `json:"entity_id,omitempty"`
+	Title          string     `json:"title"`
+	DocCategory    string     `json:"doc_category"`
+	ApprovalStatus string     `json:"approval_status"`
+	RowVersion     int        `json:"row_version"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+	VersionCount   int        `json:"version_count"`
+	LatestVersion  *int       `json:"latest_version,omitempty"`
 }
 
 func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
@@ -286,7 +288,7 @@ func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.pool.Query(r.Context(), `
 		SELECT d.id, d.project_id, d.folder_id, d.entity_type, d.entity_id, d.title,
-		       d.doc_category, d.row_version, d.created_at, d.updated_at,
+		       d.doc_category, d.approval_status, d.row_version, d.created_at, d.updated_at,
 		       COALESCE(v.cnt,0), v.latest
 		FROM documents d
 		LEFT JOIN (
@@ -310,7 +312,7 @@ func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var d documentDTO
 		if err := rows.Scan(&d.ID, &d.ProjectID, &d.FolderID, &d.EntityType, &d.EntityID, &d.Title,
-			&d.DocCategory, &d.RowVersion, &d.CreatedAt, &d.UpdatedAt, &d.VersionCount, &d.LatestVersion); err != nil {
+			&d.DocCategory, &d.ApprovalStatus, &d.RowVersion, &d.CreatedAt, &d.UpdatedAt, &d.VersionCount, &d.LatestVersion); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
@@ -425,10 +427,10 @@ func (h *Handler) GetDocument(w http.ResponseWriter, r *http.Request) {
 	var d documentDTO
 	err := h.pool.QueryRow(r.Context(), `
 		SELECT id, project_id, folder_id, entity_type, entity_id, title, doc_category,
-		       row_version, created_at, updated_at
+		       approval_status, row_version, created_at, updated_at
 		FROM documents WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, did, pid).
 		Scan(&d.ID, &d.ProjectID, &d.FolderID, &d.EntityType, &d.EntityID, &d.Title, &d.DocCategory,
-			&d.RowVersion, &d.CreatedAt, &d.UpdatedAt)
+			&d.ApprovalStatus, &d.RowVersion, &d.CreatedAt, &d.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Doküman bulunamadı.", nil)
 		return
@@ -461,11 +463,14 @@ func (h *Handler) GetDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateDocumentReq struct {
-	Title       *string `json:"title"`
-	FolderID    *string `json:"folder_id"`
-	DocCategory *string `json:"doc_category"`
-	RowVersion  int     `json:"row_version"`
+	Title          *string `json:"title"`
+	FolderID       *string `json:"folder_id"`
+	DocCategory    *string `json:"doc_category"`
+	ApprovalStatus *string `json:"approval_status"`
+	RowVersion     int     `json:"row_version"`
 }
+
+var approvalStatuses = map[string]bool{"Taslak": true, "Revizyon": true, "Onaylı": true}
 
 func (h *Handler) UpdateDocument(w http.ResponseWriter, r *http.Request) {
 	pid, ok := parseID(w, r, "projectID")
@@ -482,6 +487,10 @@ func (h *Handler) UpdateDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.DocCategory != nil && *req.DocCategory != "" && !docCategories[*req.DocCategory] {
 		httpx.ValidationFailed(w, r, map[string]string{"doc_category": "geçersiz kategori"})
+		return
+	}
+	if req.ApprovalStatus != nil && *req.ApprovalStatus != "" && !approvalStatuses[*req.ApprovalStatus] {
+		httpx.ValidationFailed(w, r, map[string]string{"approval_status": "geçersiz durum"})
 		return
 	}
 	var folder *uuid.UUID
@@ -507,10 +516,10 @@ func (h *Handler) UpdateDocument(w http.ResponseWriter, r *http.Request) {
 	var cur documentDTO
 	err = tx.QueryRow(r.Context(), `
 		SELECT id, project_id, folder_id, entity_type, entity_id, title, doc_category,
-		       row_version, created_at, updated_at
+		       approval_status, row_version, created_at, updated_at
 		FROM documents WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL FOR UPDATE`, did, pid).
 		Scan(&cur.ID, &cur.ProjectID, &cur.FolderID, &cur.EntityType, &cur.EntityID, &cur.Title, &cur.DocCategory,
-			&cur.RowVersion, &cur.CreatedAt, &cur.UpdatedAt)
+			&cur.ApprovalStatus, &cur.RowVersion, &cur.CreatedAt, &cur.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Doküman bulunamadı.", nil)
 		return
@@ -532,6 +541,10 @@ func (h *Handler) UpdateDocument(w http.ResponseWriter, r *http.Request) {
 	if req.DocCategory != nil && *req.DocCategory != "" {
 		category = *req.DocCategory
 	}
+	approval := cur.ApprovalStatus
+	if req.ApprovalStatus != nil && *req.ApprovalStatus != "" {
+		approval = *req.ApprovalStatus
+	}
 	newFolder := cur.FolderID
 	if setFolder {
 		newFolder = folder
@@ -539,13 +552,13 @@ func (h *Handler) UpdateDocument(w http.ResponseWriter, r *http.Request) {
 
 	var d documentDTO
 	err = tx.QueryRow(r.Context(), `
-		UPDATE documents SET title=$3, doc_category=$4, folder_id=$5, row_version=row_version+1
+		UPDATE documents SET title=$3, doc_category=$4, approval_status=$5, folder_id=$6, row_version=row_version+1
 		WHERE id=$1 AND project_id=$2
 		RETURNING id, project_id, folder_id, entity_type, entity_id, title, doc_category,
-		          row_version, created_at, updated_at`,
-		did, pid, title, category, newFolder).
+		          approval_status, row_version, created_at, updated_at`,
+		did, pid, title, category, approval, newFolder).
 		Scan(&d.ID, &d.ProjectID, &d.FolderID, &d.EntityType, &d.EntityID, &d.Title, &d.DocCategory,
-			&d.RowVersion, &d.CreatedAt, &d.UpdatedAt)
+			&d.ApprovalStatus, &d.RowVersion, &d.CreatedAt, &d.UpdatedAt)
 	if err != nil {
 		if isFKViolation(err) {
 			httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "Klasör bulunamadı.", nil)

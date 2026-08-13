@@ -25,8 +25,10 @@ import (
 
 	"github.com/ipks/ipks/backend/internal/audit"
 	"github.com/ipks/ipks/backend/internal/auth"
+	"github.com/ipks/ipks/backend/internal/fixedexpenses"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/notify"
+	"github.com/ipks/ipks/backend/internal/ohsaccidents"
 	"github.com/ipks/ipks/backend/internal/rbac"
 	"github.com/ipks/ipks/backend/internal/storage"
 )
@@ -134,7 +136,31 @@ type dashboardDTO struct {
 
 	Activity []activityDTO `json:"activity,omitempty"` // taşerona dönmez
 
+	// Dashboard v2 — kullanıcının paylaştığı örnek panelden ilham alınan,
+	// birebir değil KONSEPT olarak uyarlanan yeni widget'lar.
+	CostBreakdown    *costBreakdownDTO           `json:"cost_breakdown,omitempty"` // finansal izinle (evm ile aynı kapı)
+	DocumentStatus   *documentStatusDTO          `json:"document_status,omitempty"`
+	CoverImage       *coverImageDTO              `json:"cover_image,omitempty"`
+	AccidentFreeDays ohsaccidents.FreeDaysSummary `json:"accident_free_days"`
+
 	SubcontractorScoped bool `json:"subcontractor_scoped"`
+}
+
+type costBreakdownDTO struct {
+	Tasaron float64 `json:"tasaron"`
+	Malzeme float64 `json:"malzeme"`
+	Diger   float64 `json:"diger"`
+}
+
+type documentStatusDTO struct {
+	Onayli   int `json:"onayli"`
+	Revizyon int `json:"revizyon"`
+	Taslak   int `json:"taslak"`
+}
+
+type coverImageDTO struct {
+	DocumentID uuid.UUID `json:"document_id"`
+	Version    int       `json:"version"`
 }
 
 func (h *Handler) ProjectDashboard(w http.ResponseWriter, r *http.Request) {
@@ -185,6 +211,66 @@ func (h *Handler) ProjectDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	if canFin && sub == nil {
 		out.EVM = evm
+
+		// Maliyet dağılımı (Dashboard v2) — cash_events'teki gerçek harcamalar
+		// (Taşeron: hakediş ödeme planı, Malzeme: tedarikçi ekstresi + PO
+		// ödemesi, Diğer: kasa fişi) + Faz E'nin sanal sabit gider satırları
+		// (proje başlangıcından bugüne, Diğer'e eklenir). İşçilik kalemi
+		// YOK — puantaj yalnızca saat tutar, ücret/maliyet alanı hiçbir
+		// yerde yok (bilinçli olarak dışarıda bırakıldı).
+		cb := costBreakdownDTO{}
+		if err := h.pool.QueryRow(ctx, `
+			SELECT
+			  COALESCE(sum(amount) FILTER (WHERE source_entity='progress_payment_disbursement'),0)::float8,
+			  COALESCE(sum(amount) FILTER (WHERE source_entity IN ('supplier_payment','po_payment')),0)::float8,
+			  COALESCE(sum(amount) FILTER (WHERE source_entity='kasa_fisi'),0)::float8
+			FROM cash_events
+			WHERE project_id=$1 AND direction='out' AND deleted_at IS NULL`, pid).
+			Scan(&cb.Tasaron, &cb.Malzeme, &cb.Diger); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		var projectStart *time.Time
+		if err := h.pool.QueryRow(ctx, `SELECT start_date FROM projects WHERE id=$1`, pid).
+			Scan(&projectStart); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		if projectStart != nil {
+			expenses, err := fixedexpenses.ListActive(ctx, h.pool, pid)
+			if err != nil {
+				httpx.Internal(w, r)
+				return
+			}
+			for _, v := range fixedexpenses.Expand(expenses, *projectStart, time.Now().UTC()) {
+				cb.Diger += v.Amount
+			}
+		}
+		out.CostBreakdown = &cb
+	}
+
+	// Kazasız gün sayacı (Dashboard v2) — herkese açık (finansal veri değil).
+	freeDays, err := ohsaccidents.LoadFreeDays(ctx, h.pool, pid)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	out.AccidentFreeDays = freeDays
+
+	// Proje görseli (Dashboard v2) — herkese açık.
+	var cover coverImageDTO
+	if err := h.pool.QueryRow(ctx, `
+		SELECT d.id, v.latest
+		FROM documents d
+		JOIN (SELECT document_id, max(version_no) latest FROM document_versions GROUP BY document_id) v
+		  ON v.document_id = d.id
+		WHERE d.project_id=$1 AND d.doc_category='ProjeGorseli' AND d.deleted_at IS NULL
+		ORDER BY d.created_at DESC LIMIT 1`, pid).
+		Scan(&cover.DocumentID, &cover.Version); err == nil {
+		out.CoverImage = &cover
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		httpx.Internal(w, r)
+		return
 	}
 
 	// Milestone timeline.
@@ -245,6 +331,21 @@ func (h *Handler) ProjectDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if sub == nil {
+		// Doküman durumu (Dashboard v2) — kategoriden bağımsız, projedeki
+		// tüm dokümanların approval_status kırılımı.
+		ds := documentStatusDTO{}
+		if err := h.pool.QueryRow(ctx, `
+			SELECT
+			  count(*) FILTER (WHERE approval_status='Onaylı'),
+			  count(*) FILTER (WHERE approval_status='Revizyon'),
+			  count(*) FILTER (WHERE approval_status='Taslak')
+			FROM documents WHERE project_id=$1 AND deleted_at IS NULL`, pid).
+			Scan(&ds.Onayli, &ds.Revizyon, &ds.Taslak); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		out.DocumentStatus = &ds
+
 		if err := h.pool.QueryRow(ctx, `
 			SELECT
 			  (SELECT count(*) FROM material_approvals

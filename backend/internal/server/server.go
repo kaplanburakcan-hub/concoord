@@ -29,6 +29,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/meetings"
 	"github.com/ipks/ipks/backend/internal/notify"
 	"github.com/ipks/ipks/backend/internal/ohs"
+	"github.com/ipks/ipks/backend/internal/ohsaccidents"
 	"github.com/ipks/ipks/backend/internal/paymentplans"
 	"github.com/ipks/ipks/backend/internal/payments"
 	"github.com/ipks/ipks/backend/internal/personnel"
@@ -150,6 +151,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 	// --- Nakit Akış Faz F: Nakit Akış Raporu + Ödeme Planları (toplu) ---
 	cashflowH := cashflow.NewHandler(pool)
+
+	// --- Dashboard v2: İş kazası kaydı ("kazasız gün" sayacı) ---
+	ohsAccidentsH := ohsaccidents.NewHandler(pool)
 
 	// Liveness — süreç ayakta mı?
 	r.Get("/healthz", func(w http.ResponseWriter, req *http.Request) {
@@ -355,6 +359,14 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.Use(mw.Authenticate)
 			pr.With(mw.RequirePermission("reports.view_financial_reports")).Get("/projects/{projectID}/cash-flow", cashflowH.Report)
 			pr.With(mw.RequirePermission("reports.view_financial_reports")).Get("/projects/{projectID}/payment-plans", cashflowH.PaymentPlans)
+		})
+
+		// Dashboard v2 — İş kazası kaydı ("kazasız gün" sayacı).
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("ohs.view")).Get("/projects/{projectID}/ohs-accidents", ohsAccidentsH.List)
+			pr.With(mw.RequirePermission("ohs.perform_inspection")).Post("/projects/{projectID}/ohs-accidents", ohsAccidentsH.Create)
+			pr.With(mw.RequirePermission("ohs.perform_inspection")).Delete("/projects/{projectID}/ohs-accidents/{id}", ohsAccidentsH.Delete)
 		})
 
 		// ---- Faz 5: Malzeme Onay Süreci (Submittals / MAR) ----

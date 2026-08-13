@@ -11,6 +11,7 @@ type DocVersion = {
 };
 type Doc = {
   id: string; folder_id?: string; title: string; doc_category: string;
+  approval_status: string; row_version: number;
   version_count: number; latest_version?: number; updated_at: string;
 };
 
@@ -18,6 +19,15 @@ const CATS = ["Contract", "Addendum", "Submittal", "Drawing", "Delivery", "OHS",
 const CAT_LABEL: Record<string, string> = {
   Contract: "Sözleşme", Addendum: "Zeyilname", Submittal: "Malzeme", Drawing: "Çizim",
   Delivery: "İrsaliye", OHS: "İSG", Other: "Diğer",
+};
+
+// Dashboard v2 "Doküman Durumu" widget'ının veri kaynağı — resmi bir onay
+// akışı değil, serbest bir durum etiketi (bkz. backend migration 000046).
+const APPROVAL_STATUSES = ["Taslak", "Revizyon", "Onaylı"] as const;
+const APPROVAL_TONE: Record<string, string> = {
+  Taslak: "bg-beton-800 text-beton-300",
+  Revizyon: "bg-amber-500/15 text-amber-400",
+  "Onaylı": "bg-emniyet-500/15 text-emniyet-500",
 };
 
 export default function DocumentsPage() {
@@ -275,6 +285,13 @@ function DocRow({ projectId, doc, open, onToggle, canUpload, canDelete, canDownl
 
   useEffect(() => { if (open) loadVersions(); }, [open, loadVersions]);
 
+  async function setApprovalStatus(status: string) {
+    await api(`/projects/${projectId}/documents/${doc.id}`, {
+      method: "PATCH", projectId, body: { approval_status: status, row_version: doc.row_version },
+    });
+    onChanged();
+  }
+
   async function upload() {
     const file = fileRef.current?.files?.[0];
     if (!file) return;
@@ -308,6 +325,20 @@ function DocRow({ projectId, doc, open, onToggle, canUpload, canDelete, canDownl
           {doc.title}
         </button>
         <span className="font-mono text-xs px-2 py-0.5 rounded bg-beton-800 text-beton-300">{CAT_LABEL[doc.doc_category] ?? doc.doc_category}</span>
+        {canUpload ? (
+          <select
+            value={doc.approval_status}
+            onChange={(e) => setApprovalStatus(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className={"text-xs font-medium px-1.5 py-0.5 rounded border-0 outline-none " + (APPROVAL_TONE[doc.approval_status] ?? "bg-beton-800 text-beton-300")}
+          >
+            {APPROVAL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        ) : (
+          <span className={"text-xs font-medium px-1.5 py-0.5 rounded " + (APPROVAL_TONE[doc.approval_status] ?? "bg-beton-800 text-beton-300")}>
+            {doc.approval_status}
+          </span>
+        )}
         <span className="font-mono text-xs text-beton-400">{doc.latest_version ? `v${doc.latest_version}` : "boş"}</span>
         {canDelete && <button onClick={onDelete} className="text-beton-400 hover:text-red-400 text-xs">sil</button>}
       </div>
