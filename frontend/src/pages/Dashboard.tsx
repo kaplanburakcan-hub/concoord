@@ -59,7 +59,7 @@ type Dash = {
     observation: number;
     overdue: number;
   };
-  pending: { payments: number; mars: number; prs: number; overdue_pos: number; open_tasks: number };
+  pending: { payments: number; mars: number; prs: number; open_pos: number; overdue_pos: number; open_tasks: number };
   activity?: Activity[];
   cost_breakdown?: { tasaron: number; malzeme: number; diger: number };
   document_status?: { onayli: number; revizyon: number; taslak: number };
@@ -164,7 +164,7 @@ export default function Dashboard() {
           {/* Ana blok: EVM trendi (geniş) + proje görseli/kazasız gün/maliyet (dar sütun) */}
           <div className={dash.evm ? "grid gap-4 lg:grid-cols-3" : "grid gap-4"}>
             {dash.evm && (
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-2 grid gap-4">
                 <Card
                   title={`EVM (kümülatif · ${dash.evm.as_of_month})`}
                   action={
@@ -207,6 +207,22 @@ export default function Dashboard() {
                   </p>
                   {showPV && <PVEditor projectId={current.id} onSaved={load} />}
                 </Card>
+
+                {/* Satınalma özeti (Dashboard v2) — taşerona dönmez (pending
+                    verilerinin geri kalanıyla aynı kapsam). EVM kartının
+                    altındaki boşluğu gerçek içerikle doldurur. */}
+                {!dash.subcontractor_scoped && (
+                  <Card
+                    title="Satınalma Özeti"
+                    action={<Link to="/satinalma" className="text-xs text-emniyet-500 hover:underline">Detaylı gör →</Link>}
+                  >
+                    <div className="grid grid-cols-3 gap-3">
+                      <Kpi label="Açık Talep (PR)" value={String(dash.pending.prs)} />
+                      <Kpi label="Açık Sipariş (PO)" value={String(dash.pending.open_pos)} />
+                      <Kpi label="Geciken Sipariş" value={String(dash.pending.overdue_pos)} bad={dash.pending.overdue_pos > 0} />
+                    </div>
+                  </Card>
+                )}
               </div>
             )}
 
@@ -262,8 +278,6 @@ export default function Dashboard() {
                 {!dash.subcontractor_scoped && (
                   <>
                     <li>Bekleyen MAR: <b>{dash.pending.mars}</b></li>
-                    <li>Onay bekleyen PR: <b>{dash.pending.prs}</b></li>
-                    <li>Geciken sipariş (PO): <b className={dash.pending.overdue_pos ? "text-red-400" : ""}>{dash.pending.overdue_pos}</b></li>
                     <li>Açık görev: <b>{dash.pending.open_tasks}</b></li>
                   </>
                 )}
