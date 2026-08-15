@@ -137,14 +137,6 @@
   },
   {
     "tip": "is_makinesi",
-    "slug": "vidanjor",
-    "name": "Vidanjör",
-    "source_url": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Honey_wagon_01.JPG",
-    "license": "CC BY-SA 3.0",
-    "author": "CambridgeBayWeather"
-  },
-  {
-    "tip": "is_makinesi",
     "slug": "beton-pompasi-mobil",
     "name": "Beton Pompası (mobil)",
     "source_url": null,

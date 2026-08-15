@@ -26,7 +26,6 @@ export const AD_KATALOG: Record<Tip, string[]> = {
     "Çekici (Tır Başı)",
     "Su Tankeri - Arazöz",
     "Yakıt Tankeri",
-    "Vidanjör",
     "Beton Pompası (mobil)",
     "Beton Pompası (sabit / yer pompası)",
     "Transmikser (Beton Mikseri)",

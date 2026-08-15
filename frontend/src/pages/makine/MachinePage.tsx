@@ -73,7 +73,7 @@ function GroupPhoto({ src, label }: { src?: string; label: string }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <div className="w-11 h-11 rounded-lg bg-beton-800 border border-beton-700 flex items-center justify-center shrink-0 text-beton-500 text-xs font-medium">
+      <div className="w-20 h-16 rounded-lg bg-beton-800 border border-beton-700 flex items-center justify-center shrink-0 text-beton-500 text-xs font-medium">
         {label.slice(0, 2).toUpperCase()}
       </div>
     );
@@ -83,7 +83,7 @@ function GroupPhoto({ src, label }: { src?: string; label: string }) {
       src={src}
       alt={label}
       onError={() => setFailed(true)}
-      className="w-11 h-11 rounded-lg object-cover shrink-0 border border-beton-700"
+      className="w-20 h-16 rounded-lg object-contain bg-beton-950 shrink-0 border border-beton-700 p-1"
     />
   );
 }
@@ -365,11 +365,11 @@ export default function MachinePage({
             : `Henüz ${trLower(tipLabel)} tanımlanmamış. "Ekle" butonuyla başlayın.`}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="columns-1 lg:columns-2 gap-3">
           {groups.map(g => (
-            <div key={g.key} className="rounded-xl border border-beton-800 bg-beton-900/60 p-3">
-              {/* Group header: fotoğraf + tip adı + kayıt sayısı + hızlı ekle */}
-              <div className="flex items-center gap-3 mb-2">
+            <div key={g.key} className="break-inside-avoid mb-3 rounded-xl border border-beton-800 bg-beton-900/60 p-2.5">
+              {/* Grup başlığı: fotoğraf + tip adı + kayıt sayısı + hızlı ekle — kompakt tek satır */}
+              <div className="flex items-center gap-3">
                 <GroupPhoto src={g.photo} label={g.label} />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-beton-100 truncate">{g.label}</div>
@@ -378,17 +378,15 @@ export default function MachinePage({
                 {g.key !== AD_DIGER && (
                   <button
                     onClick={() => openAdd(g.label)}
-                    className="px-2.5 py-1 rounded-md border border-beton-700 text-xs text-beton-300 hover:border-emniyet-500 hover:text-emniyet-500 shrink-0"
+                    className="px-2.5 py-1 rounded-md border border-beton-700 text-xs text-beton-300 hover:border-emniyet-500 hover:text-emniyet-500 shrink-0 self-start"
                   >
                     + Ekle
                   </button>
                 )}
               </div>
 
-              {g.machines.length === 0 ? (
-                <p className="text-xs text-beton-500 italic pl-14">Henüz kayıtlı {trLower(g.label)} yok.</p>
-              ) : (
-              <div className="space-y-2">
+              {g.machines.length > 0 && (
+              <div className="space-y-2 mt-2.5">
               {g.machines.map(m => {
             const durum = DURUM_MAP[m.durum] ?? DURUM_MAP["aktif"];
             const isExpanded = expandedId === m.id;
