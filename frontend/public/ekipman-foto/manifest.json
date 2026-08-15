@@ -1,48 +1,354 @@
 [
-  { "tip": "arac", "slug": "binek-otomobil", "name": "Binek Otomobil", "source_url": "https://upload.wikimedia.org/wikipedia/commons/7/79/Peugeot_206_sedan.jpg", "license": "CC BY-SA 3.0", "author": "Razvan85 / ZZZico" },
-  { "tip": "arac", "slug": "panelvan", "name": "Panelvan", "source_url": "https://upload.wikimedia.org/wikipedia/commons/7/7c/2014_Ford_Transit_Custom_panel_van_%28fl%29.jpg", "license": "CC BY-SA 4.0", "author": "BarnCas" },
-  { "tip": "arac", "slug": "kamyonet-pickup", "name": "Kamyonet (Pickup)", "source_url": "https://upload.wikimedia.org/wikipedia/commons/0/08/Toyota_Hilux_Pickup_4x4_2-door_1987.jpg", "license": "CC BY-SA 4.0", "author": "Ethan Llamas" },
-  { "tip": "arac", "slug": "minibus-servis-araci", "name": "Minibüs / Servis Aracı", "source_url": "https://images.pexels.com/photos/31374505/pexels-photo-31374505.jpeg", "license": "Pexels license (free)", "author": "Chris Wade Ntezicimpa" },
-
-  { "tip": "is_makinesi", "slug": "kule-vinc", "name": "Kule Vinç", "source_url": "https://images.pexels.com/photos/2323080/pexels-photo-2323080.jpeg", "license": "Pexels license (free)", "author": "Athena Sandrini" },
-  { "tip": "is_makinesi", "slug": "mobil-vinc", "name": "Mobil Vinç", "source_url": "https://images.pexels.com/photos/29502190/pexels-photo-29502190.jpeg", "license": "Pexels license (free)", "author": "Action Construction Equipment Ltd" },
-  { "tip": "is_makinesi", "slug": "paletli-ekskavator", "name": "Paletli Ekskavatör", "source_url": "https://images.pexels.com/photos/6245621/pexels-photo-6245621.jpeg", "license": "Pexels license (free)", "author": "Charlie Bird" },
-  { "tip": "is_makinesi", "slug": "lastikli-ekskavator", "name": "Lastikli Ekskavatör", "source_url": "https://images.pexels.com/photos/36957845/pexels-photo-36957845.jpeg", "license": "Pexels license (free)", "author": "Elias" },
-  { "tip": "is_makinesi", "slug": "yukleyici-loder", "name": "Yükleyici (Loder)", "source_url": "https://cdn.pixabay.com/photo/2017/01/21/19/30/wheel-loader-1998102_1280.jpg", "license": "Pixabay Content License (free)", "author": "Pixabay uploader" },
-  { "tip": "is_makinesi", "slug": "kazici-yukleyici-beko-loder", "name": "Kazıcı Yükleyici (Beko Loder)", "source_url": "https://images.pexels.com/photos/29543012/pexels-photo-29543012.jpeg", "license": "Pexels license (free)", "author": "Action Construction Equipment Ltd" },
-  { "tip": "is_makinesi", "slug": "dozer", "name": "Dozer", "source_url": "https://images.pexels.com/photos/13923406/pexels-photo-13923406.jpeg", "license": "Pexels license (free)", "author": "Serg Alesenko" },
-  { "tip": "is_makinesi", "slug": "greyder", "name": "Greyder", "source_url": "https://images.pexels.com/photos/18812422/pexels-photo-18812422.jpeg", "license": "Pexels license (free)", "author": "mehmetakifarts" },
-  { "tip": "is_makinesi", "slug": "silindir-sikistirma", "name": "Silindir (Sıkıştırma)", "source_url": "https://images.pexels.com/photos/15456924/pexels-photo-15456924.jpeg", "license": "Pexels license (free)", "author": "Andre" },
-  { "tip": "is_makinesi", "slug": "damperli-kamyon", "name": "Damperli Kamyon", "source_url": "https://images.pexels.com/photos/37016213/pexels-photo-37016213.jpeg", "license": "Pexels license (free)", "author": "Ghi Rosales" },
-  { "tip": "is_makinesi", "slug": "cekici-tir-basi", "name": "Çekici (Tır Başı)", "source_url": "https://upload.wikimedia.org/wikipedia/commons/4/42/Daf_T1600_DA.jpg", "license": "CC BY-SA 4.0", "author": "PCvandeVelde" },
-  { "tip": "is_makinesi", "slug": "su-tankeri-arazoz", "name": "Su Tankeri - Arazöz", "source_url": "https://images.pexels.com/photos/17168925/pexels-photo-17168925.jpeg", "license": "Pexels license (free)", "author": "Rory C" },
-  { "tip": "is_makinesi", "slug": "yakit-tankeri", "name": "Yakıt Tankeri", "source_url": "https://images.pexels.com/photos/9739039/pexels-photo-9739039.jpeg", "license": "Pexels license (free)", "author": "Alexander" },
-  { "tip": "is_makinesi", "slug": "vidanjor", "name": "Vidanjör", "source_url": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Honey_wagon_01.JPG", "license": "CC BY-SA 3.0", "author": "CambridgeBayWeather" },
-  { "tip": "is_makinesi", "slug": "beton-pompasi-mobil", "name": "Beton Pompası (mobil)", "source_url": "https://upload.wikimedia.org/wikipedia/commons/0/0c/LC09_-_Schwing_concrete_pump.jpg", "license": "CC BY-SA 4.0", "author": "Cjp24" },
-  { "tip": "is_makinesi", "slug": "beton-pompasi-sabit-yer-pompasi", "name": "Beton Pompası (sabit / yer pompası)", "source_url": "https://upload.wikimedia.org/wikipedia/commons/0/00/Bomba_de_hormig%C3%B3n_portatil.JPG", "license": "CC BY-SA (multi-license)", "author": "Davidhv22" },
-  { "tip": "is_makinesi", "slug": "transmikser-beton-mikseri", "name": "Transmikser (Beton Mikseri)", "source_url": "https://images.pexels.com/photos/10068081/pexels-photo-10068081.jpeg", "license": "Pexels license (free)", "author": "Parinduan" },
-  { "tip": "is_makinesi", "slug": "forklift", "name": "Forklift", "source_url": "https://images.pexels.com/photos/29480644/pexels-photo-29480644.jpeg", "license": "Pexels license (free)", "author": "ACE Cranes India" },
-  { "tip": "is_makinesi", "slug": "teleskopik-forklift", "name": "Teleskopik Forklift", "source_url": "https://upload.wikimedia.org/wikipedia/commons/8/8b/Weidemann_Teleskoplader_T4512_CC40.jpg", "license": "CC BY-SA 3.0", "author": "Wacker Neuson SE" },
-  { "tip": "is_makinesi", "slug": "vincli-kamyon", "name": "Vinçli Kamyon", "source_url": "https://images.pexels.com/photos/12131140/pexels-photo-12131140.jpeg", "license": "Pexels license (free)", "author": "Mak_jp" },
-  { "tip": "is_makinesi", "slug": "asfalt-finiseri", "name": "Asfalt Finişeri", "source_url": "https://upload.wikimedia.org/wikipedia/commons/e/ea/Asphalt_finisher_SUPER_1600-3.jpg", "license": "CC0 1.0", "author": "Georg Pik" },
-  { "tip": "is_makinesi", "slug": "sondaj-delici-makinesi", "name": "Sondaj / Delici Makinesi", "source_url": "https://upload.wikimedia.org/wikipedia/commons/5/5a/Mobile_drill_rig_in_Wyoming%2C_2006.jpg", "license": "CC BY-SA 2.0", "author": "Greg Goebel" },
-  { "tip": "is_makinesi", "slug": "hidrolik-kirici", "name": "Hidrolik Kırıcı", "source_url": "https://images.pexels.com/photos/30519990/pexels-photo-30519990.jpeg", "license": "Pexels license (free)", "author": "Aleksandr Sochnev" },
-  { "tip": "is_makinesi", "slug": "mobil-platform-sepetli-makasli", "name": "Mobil Platform (Sepetli/Makaslı)", "source_url": "https://images.pexels.com/photos/15734987/pexels-photo-15734987.jpeg", "license": "Pexels license (free)", "author": "Robert So" },
-  { "tip": "is_makinesi", "slug": "mini-ekskavator", "name": "Mini Ekskavatör", "source_url": "https://images.pexels.com/photos/20609454/pexels-photo-20609454.jpeg", "license": "Pexels license (free)", "author": "Timothy Huliselan" },
-
-  { "tip": "ekipman", "slug": "jenerator", "name": "Jeneratör", "source_url": "https://cdn.pixabay.com/photo/2016/06/17/01/22/diesel-generators-1462432_1280.jpg", "license": "Pixabay Content License (free)", "author": "izmitgucsistemleri" },
-  { "tip": "ekipman", "slug": "kompresor", "name": "Kompresör", "source_url": "https://upload.wikimedia.org/wikipedia/commons/b/b3/Fahrbarer_Drucklufterzeuger_mit_Speicher.JPG", "license": "CC BY-SA 3.0", "author": "Holmium" },
-  { "tip": "ekipman", "slug": "transpalet", "name": "Transpalet", "source_url": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Pallet_Jack.jpg", "license": "CC BY-SA 3.0", "author": "Poo" },
-  { "tip": "ekipman", "slug": "basincli-yikama-makinesi", "name": "Basınçlı Yıkama Makinesi", "source_url": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Kaercher_hochdruckreiniger.jpg", "license": "Public domain", "author": "Alfred Kärcher GmbH & Co. KG" },
-  { "tip": "ekipman", "slug": "su-pompasi-dalgic-motor-dahil", "name": "Su Pompası (Dalgıç Motor dahil)", "source_url": "https://upload.wikimedia.org/wikipedia/commons/7/75/A_photo_on_Submersible_Pump.JPG", "license": "CC BY-SA 3.0", "author": "Thamizhpparithi Maari" },
-  { "tip": "ekipman", "slug": "kaynak-makinesi", "name": "Kaynak Makinesi", "source_url": "https://upload.wikimedia.org/wikipedia/commons/4/4f/SPAWARKA_AI-7.jpg", "license": "CC BY-SA 4.0", "author": "Wojtas0202" },
-  { "tip": "ekipman", "slug": "beton-vibratoru", "name": "Beton Vibratörü", "source_url": "https://upload.wikimedia.org/wikipedia/commons/4/42/Wacker_Neuson_Innenr%C3%BCttler_IREN.jpg", "license": "CC BY-SA 3.0 / GFDL 1.2+", "author": "Wacker Neuson SE" },
-  { "tip": "ekipman", "slug": "beton-kesme-makinesi", "name": "Beton Kesme Makinesi", "source_url": "https://upload.wikimedia.org/wikipedia/commons/1/1e/Concrete_saw.jpg", "license": "Public domain (U.S. Navy work)", "author": "Mark H. Overstreet (US Navy)" },
-  { "tip": "ekipman", "slug": "demir-kesme-bukme-makinesi", "name": "Demir Kesme/Bükme Makinesi", "source_url": "https://upload.wikimedia.org/wikipedia/commons/f/fd/Baustahlmaschine.JPG", "license": "CC BY-SA 4.0", "author": "Mailtosap" },
-  { "tip": "ekipman", "slug": "iskele-sistemi", "name": "İskele Sistemi", "source_url": "https://upload.wikimedia.org/wikipedia/commons/0/0e/Aluminium_scaffolding.jpg", "license": "CC BY-SA 3.0", "author": "Harald Groven" },
-  { "tip": "ekipman", "slug": "kalip-sistemi", "name": "Kalıp Sistemi", "source_url": "https://upload.wikimedia.org/wikipedia/commons/0/00/Concrete_formwork_(27).jpg", "license": "CC BY-SA 3.0 / GFDL 1.2+", "author": "WTF Formwork" },
-  { "tip": "ekipman", "slug": "aydinlatma-kulesi", "name": "Aydınlatma Kulesi", "source_url": "https://upload.wikimedia.org/wikipedia/commons/c/c7/Lichtmast_Zeppelin_Rental.JPG", "license": "CC BY-SA 4.0", "author": "Mailtosap" },
-  { "tip": "ekipman", "slug": "el-aletleri-seti", "name": "El Aletleri Seti", "source_url": "https://images.pexels.com/photos/1029243/pexels-photo-1029243.jpeg", "license": "Pexels license (free)", "author": "Suntorn Somtong" },
-  { "tip": "ekipman", "slug": "drone", "name": "Drone", "source_url": "https://upload.wikimedia.org/wikipedia/commons/9/96/Quadcopter_Drone_in_flight.jpg", "license": "CC BY-SA 4.0", "author": "Project Kei (Keita.Honda)" },
-  { "tip": "ekipman", "slug": "isitici-isimak-vb", "name": "Isıtıcı (ISIMAK vb.)", "source_url": "https://upload.wikimedia.org/wikipedia/commons/2/27/Elettroriscaldatore_Stanley_2.jpg", "license": "CC BY-SA 4.0", "author": "Air fans" }
+  {
+    "tip": "arac",
+    "slug": "binek-otomobil",
+    "name": "Binek Otomobil",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "arac",
+    "slug": "panelvan",
+    "name": "Panelvan",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "arac",
+    "slug": "kamyonet-pickup",
+    "name": "Kamyonet (Pickup)",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "arac",
+    "slug": "minibus-servis-araci",
+    "name": "Minibüs / Servis Aracı",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "kule-vinc",
+    "name": "Kule Vinç",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "mobil-vinc",
+    "name": "Mobil Vinç",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "paletli-ekskavator",
+    "name": "Paletli Ekskavatör",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "lastikli-ekskavator",
+    "name": "Lastikli Ekskavatör",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "yukleyici-loder",
+    "name": "Yükleyici (Loder)",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "kazici-yukleyici-beko-loder",
+    "name": "Kazıcı Yükleyici (Beko Loder)",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "dozer",
+    "name": "Dozer",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "greyder",
+    "name": "Greyder",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "silindir-sikistirma",
+    "name": "Silindir (Sıkıştırma)",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "damperli-kamyon",
+    "name": "Damperli Kamyon",
+    "source_url": "https://images.pexels.com/photos/37016213/pexels-photo-37016213.jpeg",
+    "license": "Pexels license (free)",
+    "author": "Ghi Rosales"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "cekici-tir-basi",
+    "name": "Çekici (Tır Başı)",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/4/42/Daf_T1600_DA.jpg",
+    "license": "CC BY-SA 4.0",
+    "author": "PCvandeVelde"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "su-tankeri-arazoz",
+    "name": "Su Tankeri - Arazöz",
+    "source_url": "https://images.pexels.com/photos/17168925/pexels-photo-17168925.jpeg",
+    "license": "Pexels license (free)",
+    "author": "Rory C"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "yakit-tankeri",
+    "name": "Yakıt Tankeri",
+    "source_url": "https://images.pexels.com/photos/9739039/pexels-photo-9739039.jpeg",
+    "license": "Pexels license (free)",
+    "author": "Alexander"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "vidanjor",
+    "name": "Vidanjör",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Honey_wagon_01.JPG",
+    "license": "CC BY-SA 3.0",
+    "author": "CambridgeBayWeather"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "beton-pompasi-mobil",
+    "name": "Beton Pompası (mobil)",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "beton-pompasi-sabit-yer-pompasi",
+    "name": "Beton Pompası (sabit / yer pompası)",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/0/00/Bomba_de_hormig%C3%B3n_portatil.JPG",
+    "license": "CC BY-SA (multi-license)",
+    "author": "Davidhv22"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "transmikser-beton-mikseri",
+    "name": "Transmikser (Beton Mikseri)",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "forklift",
+    "name": "Forklift",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "teleskopik-forklift",
+    "name": "Teleskopik Forklift",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "vincli-kamyon",
+    "name": "Vinçli Kamyon",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "asfalt-finiseri",
+    "name": "Asfalt Finişeri",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "sondaj-delici-makinesi",
+    "name": "Sondaj / Delici Makinesi",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "hidrolik-kirici",
+    "name": "Hidrolik Kırıcı",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "mobil-platform-sepetli-makasli",
+    "name": "Mobil Platform (Sepetli/Makaslı)",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "is_makinesi",
+    "slug": "mini-ekskavator",
+    "name": "Mini Ekskavatör",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "jenerator",
+    "name": "Jeneratör",
+    "source_url": "https://cdn.pixabay.com/photo/2016/06/17/01/22/diesel-generators-1462432_1280.jpg",
+    "license": "Pixabay Content License (free)",
+    "author": "izmitgucsistemleri"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "kompresor",
+    "name": "Kompresör",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/b/b3/Fahrbarer_Drucklufterzeuger_mit_Speicher.JPG",
+    "license": "CC BY-SA 3.0",
+    "author": "Holmium"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "transpalet",
+    "name": "Transpalet",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Pallet_Jack.jpg",
+    "license": "CC BY-SA 3.0",
+    "author": "Poo"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "basincli-yikama-makinesi",
+    "name": "Basınçlı Yıkama Makinesi",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Kaercher_hochdruckreiniger.jpg",
+    "license": "Public domain",
+    "author": "Alfred Kärcher GmbH & Co. KG"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "su-pompasi-dalgic-motor-dahil",
+    "name": "Su Pompası (Dalgıç Motor dahil)",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/7/75/A_photo_on_Submersible_Pump.JPG",
+    "license": "CC BY-SA 3.0",
+    "author": "Thamizhpparithi Maari"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "kaynak-makinesi",
+    "name": "Kaynak Makinesi",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "beton-vibratoru",
+    "name": "Beton Vibratörü",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/4/42/Wacker_Neuson_Innenr%C3%BCttler_IREN.jpg",
+    "license": "CC BY-SA 3.0 / GFDL 1.2+",
+    "author": "Wacker Neuson SE"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "beton-kesme-makinesi",
+    "name": "Beton Kesme Makinesi",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/1/1e/Concrete_saw.jpg",
+    "license": "Public domain (U.S. Navy work)",
+    "author": "Mark H. Overstreet (US Navy)"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "demir-kesme-bukme-makinesi",
+    "name": "Demir Kesme/Bükme Makinesi",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/f/fd/Baustahlmaschine.JPG",
+    "license": "CC BY-SA 4.0",
+    "author": "Mailtosap"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "iskele-sistemi",
+    "name": "İskele Sistemi",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "kalip-sistemi",
+    "name": "Kalıp Sistemi",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "aydinlatma-kulesi",
+    "name": "Aydınlatma Kulesi",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "el-aletleri-seti",
+    "name": "El Aletleri Seti",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "drone",
+    "name": "Drone",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "isitici-isimak-vb",
+    "name": "Isıtıcı (ISIMAK vb.)",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  }
 ]
