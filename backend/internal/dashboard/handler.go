@@ -127,12 +127,13 @@ type dashboardDTO struct {
 	} `json:"open_findings"`
 
 	Pending struct {
-		Payments  int `json:"payments"` // Draft|Submitted|SiteApproved
-		MARs      int `json:"mars"`     // Submitted|UnderReview
-		PRs       int `json:"prs"`      // Submitted
-		OpenPOs   int `json:"open_pos"` // Ordered|PartiallyDelivered (gecikmemiş)
-		OverduePO int `json:"overdue_pos"`
-		OpenTasks int `json:"open_tasks"`
+		Payments     int `json:"payments"` // Draft|Submitted|SiteApproved
+		MARs         int `json:"mars"`     // Submitted|UnderReview
+		PRs          int `json:"prs"`      // Submitted
+		OpenPOs      int `json:"open_pos"` // Ordered|PartiallyDelivered (gecikmemiş)
+		DeliveredPOs int `json:"delivered_pos"`
+		OverduePO    int `json:"overdue_pos"`
+		OpenTasks    int `json:"open_tasks"`
 	} `json:"pending"`
 
 	Activity []activityDTO `json:"activity,omitempty"` // taşerona dönmez
@@ -357,13 +358,15 @@ func (h *Handler) ProjectDashboard(w http.ResponseWriter, r *http.Request) {
 			   WHERE project_id=$1 AND deleted_at IS NULL
 			     AND status IN ('Ordered','PartiallyDelivered')),
 			  (SELECT count(*) FROM purchase_orders
+			   WHERE project_id=$1 AND deleted_at IS NULL AND status='Delivered'),
+			  (SELECT count(*) FROM purchase_orders
 			   WHERE project_id=$1 AND deleted_at IS NULL
 			     AND status IN ('Ordered','PartiallyDelivered')
 			     AND expected_date IS NOT NULL AND expected_date < CURRENT_DATE),
 			  (SELECT count(*) FROM tasks
 			   WHERE project_id=$1 AND deleted_at IS NULL AND status <> 'Done')`, pid).
-			Scan(&out.Pending.MARs, &out.Pending.PRs, &out.Pending.OpenPOs, &out.Pending.OverduePO,
-				&out.Pending.OpenTasks); err != nil {
+			Scan(&out.Pending.MARs, &out.Pending.PRs, &out.Pending.OpenPOs, &out.Pending.DeliveredPOs,
+				&out.Pending.OverduePO, &out.Pending.OpenTasks); err != nil {
 			httpx.Internal(w, r)
 			return
 		}

@@ -59,7 +59,7 @@ type Dash = {
     observation: number;
     overdue: number;
   };
-  pending: { payments: number; mars: number; prs: number; open_pos: number; overdue_pos: number; open_tasks: number };
+  pending: { payments: number; mars: number; prs: number; open_pos: number; delivered_pos: number; overdue_pos: number; open_tasks: number };
   activity?: Activity[];
   cost_breakdown?: { tasaron: number; malzeme: number; diger: number };
   document_status?: { onayli: number; revizyon: number; taslak: number };
@@ -75,6 +75,10 @@ export default function Dashboard() {
   const [dash, setDash] = useState<Dash | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [showPV, setShowPV] = useState(false);
+  const [addingAccident, setAddingAccident] = useState(false);
+  const [accidentDate, setAccidentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [accidentDesc, setAccidentDesc] = useState("");
+  const [accidentBusy, setAccidentBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!current) return;
@@ -91,6 +95,22 @@ export default function Dashboard() {
     setDash(null);
     load();
   }, [load]);
+
+  async function saveAccident() {
+    if (!current || !accidentDesc.trim()) return;
+    setAccidentBusy(true);
+    try {
+      await api(`/projects/${current.id}/ohs-accidents`, {
+        method: "POST", projectId: current.id,
+        body: { accident_date: accidentDate, description: accidentDesc.trim() },
+      });
+      setAddingAccident(false);
+      setAccidentDesc("");
+      await load();
+    } finally {
+      setAccidentBusy(false);
+    }
+  }
 
   if (projLoading) return <p className="text-beton-400 text-sm">Yükleniyor…</p>;
   if (!current)
@@ -154,17 +174,40 @@ export default function Dashboard() {
                 <Kpi label="CPI" value={idx(dash.evm.cpi)} bad={dash.evm.cpi > 0 && dash.evm.cpi < 0.9} />
               </>
             )}
-            <Kpi label="Kazasız Gün" value={dash.accident_free_days.has_reference ? String(dash.accident_free_days.days) : "—"} />
+            <Kpi
+              label="Kazasız Gün"
+              value={dash.accident_free_days.has_reference ? String(dash.accident_free_days.days) : "—"}
+              action={can("ohs.perform_inspection") && (
+                <button onClick={() => setAddingAccident((v) => !v)} className="mt-1 text-[10px] text-emniyet-500 hover:underline">
+                  {addingAccident ? "vazgeç" : "+ kaza kaydı ekle"}
+                </button>
+              )}
+            />
             <Kpi label="Açık İSG" value={String(dash.open_findings.total)} bad={dash.open_findings.critical > 0} />
           </div>
           {dash.evm && !dash.evm.contract_amount && (
             <p className="-mt-2 text-xs text-beton-500">Sözleşme bedeli girilmemiş — parasal ilerleme için proje künyesinden ekleyin.</p>
           )}
+          {addingAccident && (
+            <div className="-mt-2 rounded-xl border border-beton-800 bg-beton-900 p-4" style={{ boxShadow: "var(--shadow)" }}>
+              <div className="flex flex-wrap items-end gap-2">
+                <input type="date" value={accidentDate} onChange={(e) => setAccidentDate(e.target.value)}
+                  max={new Date().toISOString().slice(0, 10)}
+                  className="rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100" />
+                <input value={accidentDesc} onChange={(e) => setAccidentDesc(e.target.value)} placeholder="Kısa açıklama"
+                  className="flex-1 min-w-[160px] rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100" />
+                <button onClick={saveAccident} disabled={accidentBusy || !accidentDesc.trim()}
+                  className="rounded-md bg-red-500/90 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5">
+                  {accidentBusy ? "Kaydediliyor…" : "Kaza kaydını gir"}
+                </button>
+              </div>
+            </div>
+          )}
 
-          {/* Ana blok: EVM trendi (geniş) + proje görseli/kazasız gün/maliyet (dar sütun) */}
+          {/* Row A: EVM trendi (geniş) + proje görseli (dar sütun, büyütülmüş) */}
           <div className={dash.evm ? "grid gap-4 lg:grid-cols-3" : "grid gap-4"}>
             {dash.evm && (
-              <div className="lg:col-span-2 grid gap-4">
+              <div className="lg:col-span-2">
                 <Card
                   title={`EVM (kümülatif · ${dash.evm.as_of_month})`}
                   action={
@@ -207,28 +250,51 @@ export default function Dashboard() {
                   </p>
                   {showPV && <PVEditor projectId={current.id} onSaved={load} />}
                 </Card>
-
-                {/* Satınalma özeti (Dashboard v2) — taşerona dönmez (pending
-                    verilerinin geri kalanıyla aynı kapsam). EVM kartının
-                    altındaki boşluğu gerçek içerikle doldurur. */}
-                {!dash.subcontractor_scoped && (
-                  <Card
-                    title="Satınalma Özeti"
-                    action={<Link to="/satinalma" className="text-xs text-emniyet-500 hover:underline">Detaylı gör →</Link>}
-                  >
-                    <div className="grid grid-cols-3 gap-3">
-                      <Kpi label="Açık Talep (PR)" value={String(dash.pending.prs)} />
-                      <Kpi label="Açık Sipariş (PO)" value={String(dash.pending.open_pos)} />
-                      <Kpi label="Geciken Sipariş" value={String(dash.pending.overdue_pos)} bad={dash.pending.overdue_pos > 0} />
-                    </div>
-                  </Card>
-                )}
               </div>
             )}
+            <CoverImageCard projectId={current.id} coverImage={dash.cover_image} canUpload={can("documents.upload")} onChanged={load} />
+          </div>
 
-            <div className="grid gap-4">
-              <CoverImageCard projectId={current.id} coverImage={dash.cover_image} canUpload={can("documents.upload")} onChanged={load} />
-              <AccidentFreeDaysCard projectId={current.id} summary={dash.accident_free_days} canLog={can("ohs.perform_inspection")} onChanged={load} />
+          {/* Row B: Satınalma özeti (solda liste, sağda tamamlanan/devam eden donut'u)
+              + Maliyet Durumu — Row A ile aynı 2:1 grid ritmi (bütünleşik yerleşim). */}
+          {!dash.subcontractor_scoped && (
+            <div className={dash.cost_breakdown ? "grid gap-4 lg:grid-cols-3" : "grid gap-4"}>
+              <div className={dash.cost_breakdown ? "lg:col-span-2" : ""}>
+                <Card
+                  title="Satınalma Özeti"
+                  action={<Link to="/satinalma" className="text-xs text-emniyet-500 hover:underline">Detaylı gör →</Link>}
+                >
+                  <div className="grid grid-cols-2 gap-4 items-center">
+                    <div className="space-y-2.5 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "rgb(var(--emniyet-500))" }} />
+                        <span className="text-beton-300 flex-1">Açık Talep (PR)</span>
+                        <span className="font-mono font-semibold text-beton-100">{dash.pending.prs}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "#f59e0b" }} />
+                        <span className="text-beton-300 flex-1">Açık Sipariş (PO)</span>
+                        <span className="font-mono font-semibold text-beton-100">{dash.pending.open_pos}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full shrink-0 bg-red-500" />
+                        <span className="text-beton-300 flex-1">Geciken Sipariş</span>
+                        <span className={"font-mono font-semibold " + (dash.pending.overdue_pos ? "text-red-400" : "text-beton-100")}>
+                          {dash.pending.overdue_pos}
+                        </span>
+                      </div>
+                    </div>
+                    <MultiDonut
+                      layout="row"
+                      size={64}
+                      segments={[
+                        { label: "Tamamlanan", value: dash.pending.delivered_pos, color: "#22c55e" },
+                        { label: "Devam Eden", value: dash.pending.open_pos, color: "rgb(var(--emniyet-500))" },
+                      ]}
+                    />
+                  </div>
+                </Card>
+              </div>
               {dash.cost_breakdown && (
                 <Card title="Maliyet Durumu">
                   <MultiDonut
@@ -244,7 +310,7 @@ export default function Dashboard() {
                 </Card>
               )}
             </div>
-          </div>
+          )}
 
           <div className={dash.document_status ? "grid gap-4 md:grid-cols-3" : "grid gap-4 md:grid-cols-2"}>
             {/* Açık İSG bulguları */}
@@ -285,10 +351,12 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Nakit akış + milestone — yan yana (Panel v2 yerleşimi) */}
-          <div className="grid gap-4 lg:grid-cols-2">
+          {/* Nakit akış + milestone — Row A/B ile aynı 2:1 grid ritmi (bütünleşik yerleşim) */}
+          <div className="grid gap-4 lg:grid-cols-3">
             <Can perm="reports.view_financial_reports">
-              <NakitAkisCard projectId={current.id} currency={cur} />
+              <div className="lg:col-span-2">
+                <NakitAkisCard projectId={current.id} currency={cur} />
+              </div>
             </Can>
             <Card title="Milestone zaman çizelgesi">
               {dash.milestones.length === 0 ? (
@@ -533,81 +601,10 @@ function CoverImageCard({ projectId, coverImage, canUpload, onChanged }: {
     >
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => upload(e.target.files)} />
       {url ? (
-        <img src={url} alt="Proje görseli" className="w-full h-48 object-cover rounded-lg" />
+        <img src={url} alt="Proje görseli" className="w-full h-full min-h-[280px] object-cover rounded-lg" />
       ) : (
-        <div className="h-48 rounded-lg border border-dashed border-beton-700 bg-beton-950 flex items-center justify-center">
+        <div className="h-full min-h-[280px] rounded-lg border border-dashed border-beton-700 bg-beton-950 flex items-center justify-center">
           <p className="text-sm text-beton-500">Henüz proje görseli eklenmedi.</p>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-// Kazasız gün sayacı (Dashboard v2) — bugün ile son iş kazası tarihi
-// arasındaki gün sayısı; hiç kaza kaydı yoksa proje başlangıç tarihine
-// kadar sayar (ondan ÖNCEYE asla inmez — bkz. ohsaccidents.LoadFreeDays).
-function AccidentFreeDaysCard({ projectId, summary, canLog, onChanged }: {
-  projectId: string;
-  summary: { days: number; reference_date: string | null; since_accident: boolean; has_reference: boolean };
-  canLog: boolean;
-  onChanged: () => void;
-}) {
-  const [adding, setAdding] = useState(false);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [desc, setDesc] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function save() {
-    if (!desc.trim()) return;
-    setBusy(true);
-    try {
-      await api(`/projects/${projectId}/ohs-accidents`, {
-        method: "POST", projectId, body: { accident_date: date, description: desc.trim() },
-      });
-      setAdding(false);
-      setDesc("");
-      onChanged();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Card
-      title="İş Güvenliği — Kazasız Gün"
-      action={canLog && (
-        <button onClick={() => setAdding((v) => !v)} className="text-xs text-emniyet-500 hover:underline">
-          {adding ? "Vazgeç" : "+ Kaza kaydı ekle"}
-        </button>
-      )}
-    >
-      {summary.has_reference ? (
-        <>
-          <p className="font-display text-4xl font-medium text-beton-100" style={{ fontVariantNumeric: "tabular-nums" }}>
-            {summary.days}
-          </p>
-          <p className="mt-1 text-xs text-beton-400">
-            {summary.since_accident
-              ? `Son iş kazasından beri (${summary.reference_date})`
-              : `Proje başlangıcından beri (${summary.reference_date}) — kayıtlı kaza yok`}
-          </p>
-        </>
-      ) : (
-        <p className="text-sm text-beton-400">Proje başlangıç tarihi girilmemiş — sayaç hesaplanamıyor.</p>
-      )}
-      {adding && (
-        <div className="mt-3 border-t border-beton-800 pt-3 space-y-2">
-          <div className="flex gap-2">
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-              max={new Date().toISOString().slice(0, 10)}
-              className="rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100" />
-            <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Kısa açıklama"
-              className="flex-1 rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100" />
-          </div>
-          <button onClick={save} disabled={busy || !desc.trim()}
-            className="rounded-md bg-red-500/90 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5">
-            {busy ? "Kaydediliyor…" : "Kaza kaydını gir"}
-          </button>
         </div>
       )}
     </Card>
@@ -636,16 +633,16 @@ function entityTR(e: string) {
 
 function Card({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-beton-800 bg-beton-900 p-5" style={{ boxShadow: "var(--shadow)" }}>
+    <div className="h-full flex flex-col rounded-xl border border-beton-800 bg-beton-900 p-5" style={{ boxShadow: "var(--shadow)" }}>
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-beton-100">{title}</h2>
         {action}
       </div>
-      <div className="mt-3">{children}</div>
+      <div className="mt-3 flex-1 min-h-0">{children}</div>
     </div>
   );
 }
-function Kpi({ label, value, bad }: { label: string; value: string; bad?: boolean }) {
+function Kpi({ label, value, bad, action }: { label: string; value: string; bad?: boolean; action?: ReactNode }) {
   // "—" değeri (henüz hesaplanamayan endeks) soluk ve küçük gösterilir ki
   // gerçek rakamlarla görsel olarak karışmasın.
   const empty = value === "—" || value.trim() === "";
@@ -671,6 +668,7 @@ function Kpi({ label, value, bad }: { label: string; value: string; bad?: boolea
           {value}
         </p>
       )}
+      {action}
     </div>
   );
 }
