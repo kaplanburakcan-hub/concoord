@@ -1,6 +1,11 @@
 -- Seed: Proje Keşfi Veri Seti
 -- 5 aktif proje için 7 kategori × gerçekçi imalat kalemleri
 -- Çalıştırma: psql <dsn> -f seed_proje_kesfi.sql
+-- NOT: Windows'ta psql'in istemci kodlama ayarı konsol code page'ine göre
+-- WIN1252/CP850 olabilir; bu satır olmadan Türkçe karakterler (ş,ç,ğ,ı,ö,ü)
+-- çift kodlanıp DB'ye bozuk (mojibake) yazılır. Bkz. project_survey_items
+-- düzeltmesi (2026-08-16).
+SET client_encoding = 'UTF8';
 
 -- ─── DEMO-04 | Nilüfer Şehir Hastanesi Kompleksi ───────────────────────────
 -- Proje: 06802be9-d6e4-4bc8-abb4-6aaa6bfc840f  (~320M TRY götürü sözleşme)
