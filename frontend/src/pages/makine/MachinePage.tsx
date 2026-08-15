@@ -1,6 +1,7 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
+import { AD_KATALOG, AD_DIGER, photoUrl, trLower, type Tip } from "./ekipmanKatalog";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -33,64 +34,6 @@ type MachineLog = {
   aciklama?: string;
 };
 
-type Tip = "arac" | "is_makinesi" | "ekipman";
-
-// Standart ad/tip kataloğu — "Ad / İsim" alanı bu listeden seçilir (spesifik
-// makine kimliği plaka/marka/model/seri no ile ayrışır, "Ad" ortak tipi verir).
-const AD_KATALOG: Record<Tip, string[]> = {
-  arac: [
-    "Binek Otomobil",
-    "Panelvan",
-    "Kamyonet (Pickup)",
-    "Minibüs / Servis Aracı",
-  ],
-  is_makinesi: [
-    "Kule Vinç",
-    "Mobil Vinç",
-    "Paletli Ekskavatör",
-    "Lastikli Ekskavatör",
-    "Yükleyici (Loder)",
-    "Kazıcı Yükleyici (Beko Loder)",
-    "Dozer",
-    "Greyder",
-    "Silindir (Sıkıştırma)",
-    "Damperli Kamyon",
-    "Çekici (Tır Başı)",
-    "Su Tankeri - Arazöz",
-    "Yakıt Tankeri",
-    "Vidanjör",
-    "Beton Pompası (mobil)",
-    "Beton Pompası (sabit / yer pompası)",
-    "Transmikser (Beton Mikseri)",
-    "Forklift",
-    "Teleskopik Forklift",
-    "Vinçli Kamyon",
-    "Asfalt Finişeri",
-    "Sondaj / Delici Makinesi",
-    "Hidrolik Kırıcı",
-    "Mobil Platform (Sepetli/Makaslı)",
-    "Mini Ekskavatör",
-  ],
-  ekipman: [
-    "Jeneratör",
-    "Kompresör",
-    "Transpalet",
-    "Basınçlı Yıkama Makinesi",
-    "Su Pompası (Dalgıç Motor dahil)",
-    "Kaynak Makinesi",
-    "Beton Vibratörü",
-    "Beton Kesme Makinesi",
-    "Demir Kesme/Bükme Makinesi",
-    "İskele Sistemi",
-    "Kalıp Sistemi",
-    "Aydınlatma Kulesi",
-    "El Aletleri Seti",
-    "Drone",
-    "Isıtıcı (ISIMAK vb.)",
-  ],
-};
-const AD_DIGER = "__diger__";
-
 interface Props {
   tip: Tip;
   tipLabel: string;
@@ -121,6 +64,28 @@ function fmtDate(s?: string) {
 function fmtCur(n?: number) {
   if (n == null) return "—";
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
+}
+
+// Grup başlığı fotoğrafı — statik olarak public/ekipman-foto/ altında
+// paketlenir (S3/R2 bağımlılığı yok). Kaynak bulunamazsa (404) ya da
+// "Diğer" grubu için jenerik bir yer tutucuya düşer.
+function GroupPhoto({ src, label }: { src?: string; label: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return (
+      <div className="w-11 h-11 rounded-lg bg-beton-800 border border-beton-700 flex items-center justify-center shrink-0 text-beton-500 text-xs font-medium">
+        {label.slice(0, 2).toUpperCase()}
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={label}
+      onError={() => setFailed(true)}
+      className="w-11 h-11 rounded-lg object-cover shrink-0 border border-beton-700"
+    />
+  );
 }
 
 // ── Empty form state ──────────────────────────────────────────────────────────
@@ -196,9 +161,9 @@ export default function MachinePage({
       .finally(() => setBusy(false));
   }
 
-  function openAdd() {
+  function openAdd(presetAd?: string) {
     setEditId(null);
-    setForm(emptyMachine(tip));
+    setForm(presetAd ? { ...emptyMachine(tip), ad: presetAd } : emptyMachine(tip));
     setAdCustom(false);
     setFormOpen(true);
   }
@@ -311,6 +276,32 @@ export default function MachinePage({
   const kpiDevre   = machines.filter(m => m.durum === "devre_disi").length;
   const kpiKiralik = machines.filter(m => m.sahiplik === "kiralik").length;
 
+  // Katalog tipine göre gruplama — inşaatta en sık kullanılan tipler
+  // (AD_KATALOG) her biri temsili bir fotoğrafla ayrı bir bölüm olarak
+  // gösterilir, altında o tipten KAYITLI makineler listelenir. Arama/filtre
+  // aktifken boş gruplar gizlenir (arama "bul" amaçlıdır); aksi halde tüm
+  // katalog görünür kalır (platform-thinking: boş durumları gizleme).
+  const hasActiveFilter = search.trim() !== "" || filterDurum !== "all";
+  const groups = useMemo(() => {
+    const byAd = new Map<string, Machine[]>();
+    for (const m of filtered) {
+      const arr = byAd.get(m.ad) ?? [];
+      arr.push(m);
+      byAd.set(m.ad, arr);
+    }
+    const catalogGroups = AD_KATALOG[tip]
+      .map(ad => ({ key: ad, label: ad, photo: photoUrl(tip, ad), machines: byAd.get(ad) ?? [] }))
+      .filter(g => !hasActiveFilter || g.machines.length > 0);
+    for (const ad of AD_KATALOG[tip]) byAd.delete(ad);
+    const digerMachines = Array.from(byAd.values()).flat();
+    const out = [...catalogGroups];
+    if (digerMachines.length > 0) {
+      out.push({ key: AD_DIGER, label: "Diğer", photo: undefined, machines: digerMachines });
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, tip, hasActiveFilter]);
+
   if (!pid) return <div className="p-8 text-beton-400">Proje seçilmedi.</div>;
   if (busy)  return <div className="p-8 text-beton-400">Yükleniyor…</div>;
   if (err)   return <div className="p-8 text-red-500">{err}</div>;
@@ -322,7 +313,7 @@ export default function MachinePage({
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <h1 className="text-xl font-bold text-beton-100">{tipLabel}</h1>
         <button
-          onClick={openAdd}
+          onClick={() => openAdd()}
           className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium"
         >
           + {tipLabel === "Ekipmanlar" ? "Ekipman" : tipLabel === "İş Makineleri" ? "Makine" : "Araç"} Ekle
@@ -366,14 +357,39 @@ export default function MachinePage({
         <span className="text-xs text-beton-400 ml-1">{filtered.length} kayıt</span>
       </div>
 
-      {/* Machine List */}
-      {filtered.length === 0 ? (
+      {/* Machine List — katalog tipine göre gruplanmış (fotoğraf + mevcut kayıtlar) */}
+      {groups.length === 0 ? (
         <div className="rounded-xl border border-dashed border-beton-800 p-12 text-center text-beton-400 text-sm">
-          Henüz {tipLabel.toLowerCase()} tanımlanmamış. "Ekle" butonuyla başlayın.
+          {hasActiveFilter
+            ? "Aramanızla eşleşen kayıt bulunamadı."
+            : `Henüz ${trLower(tipLabel)} tanımlanmamış. "Ekle" butonuyla başlayın.`}
         </div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map(m => {
+        <div className="space-y-4">
+          {groups.map(g => (
+            <div key={g.key} className="rounded-xl border border-beton-800 bg-beton-900/60 p-3">
+              {/* Group header: fotoğraf + tip adı + kayıt sayısı + hızlı ekle */}
+              <div className="flex items-center gap-3 mb-2">
+                <GroupPhoto src={g.photo} label={g.label} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-beton-100 truncate">{g.label}</div>
+                  <div className="text-xs text-beton-500">{g.machines.length} kayıt</div>
+                </div>
+                {g.key !== AD_DIGER && (
+                  <button
+                    onClick={() => openAdd(g.label)}
+                    className="px-2.5 py-1 rounded-md border border-beton-700 text-xs text-beton-300 hover:border-emniyet-500 hover:text-emniyet-500 shrink-0"
+                  >
+                    + Ekle
+                  </button>
+                )}
+              </div>
+
+              {g.machines.length === 0 ? (
+                <p className="text-xs text-beton-500 italic pl-14">Henüz kayıtlı {trLower(g.label)} yok.</p>
+              ) : (
+              <div className="space-y-2">
+              {g.machines.map(m => {
             const durum = DURUM_MAP[m.durum] ?? DURUM_MAP["aktif"];
             const isExpanded = expandedId === m.id;
             return (
@@ -592,7 +608,11 @@ export default function MachinePage({
                 )}
               </div>
             );
-          })}
+              })}
+              </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
