@@ -350,5 +350,29 @@
     "source_url": null,
     "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
     "author": "Kullanıcı"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "beton-perdah-makinesi",
+    "name": "Beton Perdah Makinesi",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "kirici-delici-hammer-breakers",
+    "name": "Kırıcı Delici (Hammer & Breakers)",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
+  },
+  {
+    "tip": "ekipman",
+    "slug": "el-kompaktoru-plate-compactor",
+    "name": "El Kompaktörü (Plate Compactor)",
+    "source_url": null,
+    "license": "Kullanıcı tarafından sağlandı (kullanım hakkı beyan edildi)",
+    "author": "Kullanıcı"
   }
 ]
