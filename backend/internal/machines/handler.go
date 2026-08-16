@@ -2,6 +2,7 @@ package machines
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/equipmenttransfers"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/notify"
+	"github.com/ipks/ipks/backend/internal/validate"
 )
 
 type Handler struct {
@@ -50,6 +52,10 @@ type Machine struct {
 	Aciklama           *string   `json:"aciklama,omitempty"`
 	AtanmaTarihi       string    `json:"atanma_tarihi"`
 	IsBasiTarihi       *string   `json:"is_basi_tarihi,omitempty"`
+	// IsBasiDetaylari — tipe göre değişen serbest alanlar (Faz D): km/saat,
+	// ariza_var, hasar_var/hasar_aciklama, operator, planlanan_sure_gun.
+	// Şema uygulama katmanında (frontend) tutulur, burada opak JSON'dur.
+	IsBasiDetaylari json.RawMessage `json:"is_basi_detaylari,omitempty"`
 	// FromTransferID doluysa bu atama onaylı bir proje-arası transferden
 	// geldi; TeslimAlindiTarihi boşken frontend "Teslim Alındı" butonunu
 	// gösterir (bkz. MarkDelivered).
@@ -68,7 +74,7 @@ const machineSelectCols = `
 	TO_CHAR(ce.son_bakim_tarihi,'YYYY-MM-DD'),
 	TO_CHAR(ce.sonraki_bakim_tarihi,'YYYY-MM-DD'),
 	ce.aciklama, TO_CHAR(pm.atanma_tarihi,'YYYY-MM-DD'),
-	TO_CHAR(pm.is_basi_tarihi,'YYYY-MM-DD'),
+	TO_CHAR(pm.is_basi_tarihi,'YYYY-MM-DD'), pm.is_basi_detaylari,
 	pm.from_transfer_id, TO_CHAR(pm.teslim_alindi_tarihi,'YYYY-MM-DD'),
 	pm.created_at, pm.updated_at`
 
@@ -76,8 +82,8 @@ func scanMachine(row interface{ Scan(...any) error }, m *Machine) error {
 	return row.Scan(&m.ID, &m.ProjectID, &m.CompanyEquipmentID, &m.Tip, &m.Ad, &m.Plaka,
 		&m.Marka, &m.Model, &m.SeriNo, &m.DemirbasNo, &m.UretimYili, &m.Sahiplik,
 		&m.Tedarikci, &m.GunlukUcret, &m.Durum, &m.SonBakimTarihi, &m.SonrakiBakimTarihi,
-		&m.Aciklama, &m.AtanmaTarihi, &m.IsBasiTarihi, &m.FromTransferID, &m.TeslimAlindiTarihi,
-		&m.CreatedAt, &m.UpdatedAt)
+		&m.Aciklama, &m.AtanmaTarihi, &m.IsBasiTarihi, &m.IsBasiDetaylari,
+		&m.FromTransferID, &m.TeslimAlindiTarihi, &m.CreatedAt, &m.UpdatedAt)
 }
 
 type MachineLog struct {
@@ -375,6 +381,73 @@ func (h *Handler) UpdateMachine(w http.ResponseWriter, r *http.Request) {
 		id, pid, b.Ad, b.Plaka, b.Marka, b.Model, b.SeriNo, b.DemirbasNo, b.UretimYili,
 		b.Sahiplik, b.Tedarikci, b.GunlukUcret, b.Durum,
 		b.SonBakimTarihi, b.SonrakiBakimTarihi, b.Aciklama), &m)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"machine": m})
+}
+
+type isBasiBody struct {
+	IsBasiTarihi    *string         `json:"is_basi_tarihi"`
+	IsBasiDetaylari json.RawMessage `json:"is_basi_detaylari"`
+}
+
+// UpdateIsBasi — atamanın iş başı tarihi + tipe göre değişen detaylarını
+// (km/saat, arıza, hasar, operatör, planlanan süre) günceller (Faz D).
+// is_basi_tarihi hem projenin ana sözleşme tarihinden ÖNCE hem bugünden
+// SONRA olamaz — validate.WithinProjectBounds bunu sunucu tarafında
+// kesin olarak uygular (istemci sadece <input min/max> ile ön filtre yapar).
+func (h *Handler) UpdateIsBasi(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	id, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+	var b isBasiBody
+	if !httpx.DecodeJSON(w, r, &b) {
+		return
+	}
+	ctx := r.Context()
+
+	var tarih *time.Time
+	if b.IsBasiTarihi != nil && *b.IsBasiTarihi != "" {
+		t, err := time.Parse("2006-01-02", *b.IsBasiTarihi)
+		if err != nil {
+			httpx.ValidationFailed(w, r, map[string]string{"is_basi_tarihi": "geçersiz tarih biçimi"})
+			return
+		}
+		if errs, err := validate.WithinProjectBounds(ctx, h.pool, pid, t, "is_basi_tarihi"); err != nil {
+			httpx.Internal(w, r)
+			return
+		} else if len(errs) > 0 {
+			httpx.ValidationFailed(w, r, errs)
+			return
+		}
+		tarih = &t
+	}
+
+	detaylar := []byte(b.IsBasiDetaylari)
+	if len(detaylar) == 0 {
+		detaylar = nil
+	}
+
+	var m Machine
+	err := scanMachine(h.pool.QueryRow(ctx,
+		`WITH upd AS (
+		   UPDATE project_machines SET
+		     is_basi_tarihi    = COALESCE($3::date, is_basi_tarihi),
+		     is_basi_detaylari = COALESCE($4::jsonb, is_basi_detaylari)
+		   WHERE id=$1 AND project_id=$2
+		   RETURNING id
+		 )
+		 SELECT `+machineSelectCols+`
+		 FROM project_machines pm JOIN company_equipment ce ON ce.id = pm.company_equipment_id
+		 WHERE pm.id=$1 AND EXISTS (SELECT 1 FROM upd WHERE upd.id = pm.id)`,
+		id, pid, tarih, detaylar), &m)
 	if err != nil {
 		httpx.Internal(w, r)
 		return

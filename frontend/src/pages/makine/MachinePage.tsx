@@ -26,8 +26,18 @@ type Machine = {
   aciklama?: string;
   atanma_tarihi: string;
   is_basi_tarihi?: string;
+  is_basi_detaylari?: IsBasiDetay;
   from_transfer_id?: string;
   teslim_alindi_tarihi?: string;
+};
+
+type IsBasiDetay = {
+  mevcut_deger?: number;
+  ariza_var?: boolean;
+  hasar_var?: boolean;
+  hasar_aciklama?: string;
+  operator?: string;
+  planlanan_sure_gun?: number;
 };
 
 type RentalDoc = { id: string; title: string; url: string };
@@ -176,9 +186,22 @@ export default function MachinePage({
   const [rentalUploading, setRentalUploading] = useState(false);
   const rentalRef = useRef<HTMLInputElement>(null);
 
+  // İş başı tarihi — Faz D: proje ana sözleşme tarihinden önce, bugünden
+  // sonra girilemez. sozlesmeTarihi <input min> için, backend son savunma hattı.
+  const [sozlesmeTarihi, setSozlesmeTarihi] = useState<string | undefined>(undefined);
+  const [isBasiTarihi, setIsBasiTarihi] = useState("");
+  const [isBasiSaving, setIsBasiSaving] = useState(false);
+  const [isBasiError, setIsBasiError] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsForm, setDetailsForm] = useState<IsBasiDetay>({});
+  const todayISO = new Date().toISOString().slice(0, 10);
+
   useEffect(() => {
     if (!pid) return;
     loadMachines();
+    api<{ contract: { sozlesme_tarihi?: string } }>(`/projects/${pid}/main-contract`, { projectId: pid })
+      .then(r => setSozlesmeTarihi(r.contract?.sozlesme_tarihi || undefined))
+      .catch(() => setSozlesmeTarihi(undefined));
   }, [pid]);
 
   function loadMachines() {
@@ -298,6 +321,48 @@ export default function MachinePage({
     const m = machines.find(x => x.id === id);
     if (m?.sahiplik === "kiralik") loadRentalDocs(m.company_equipment_id);
     else setRentalDocs([]);
+    setIsBasiTarihi(m?.is_basi_tarihi ?? "");
+    setDetailsForm(m?.is_basi_detaylari ?? {});
+    setIsBasiError(null);
+  }
+
+  async function saveIsBasiTarihi(machineId: string, tarih: string) {
+    if (!pid) return;
+    setIsBasiSaving(true);
+    setIsBasiError(null);
+    try {
+      const r = await api<{ machine: Machine }>(`/projects/${pid}/machines/${machineId}/is-basi`, {
+        method: "PATCH", projectId: pid, body: { is_basi_tarihi: tarih || undefined },
+      });
+      setMachines(prev => prev.map(m => m.id === machineId ? r.machine : m));
+      setIsBasiTarihi(tarih);
+    } catch (e) {
+      if (e instanceof RequestError && e.api?.details && typeof e.api.details === "object") {
+        const d = e.api.details as Record<string, string>;
+        setIsBasiError(d.is_basi_tarihi ?? "Kaydedilemedi.");
+      } else {
+        setIsBasiError("Kaydedilemedi.");
+      }
+    } finally {
+      setIsBasiSaving(false);
+    }
+  }
+
+  async function saveIsBasiDetaylari(machineId: string) {
+    if (!pid) return;
+    setIsBasiSaving(true);
+    setIsBasiError(null);
+    try {
+      const r = await api<{ machine: Machine }>(`/projects/${pid}/machines/${machineId}/is-basi`, {
+        method: "PATCH", projectId: pid, body: { is_basi_detaylari: detailsForm },
+      });
+      setMachines(prev => prev.map(m => m.id === machineId ? r.machine : m));
+      setDetailsOpen(false);
+    } catch {
+      setIsBasiError("Detaylar kaydedilemedi.");
+    } finally {
+      setIsBasiSaving(false);
+    }
   }
 
   async function loadRentalDocs(equipmentId: string) {
@@ -626,6 +691,29 @@ export default function MachinePage({
                 {/* Expanded: Log panel */}
                 {isExpanded && (
                   <div className="border-t border-beton-800 bg-beton-950 px-4 py-4 space-y-4">
+                    {/* İş Başı Tarihi — Faz D: bugünden sonra ve sözleşme tarihinden önce girilemez */}
+                    <div className="flex flex-wrap items-end gap-2 pb-3 border-b border-beton-800">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-beton-400">İş Başı Tarihi</label>
+                        <input
+                          type="date"
+                          value={isBasiTarihi}
+                          min={sozlesmeTarihi}
+                          max={todayISO}
+                          disabled={isBasiSaving}
+                          onChange={e => saveIsBasiTarihi(m.id, e.target.value)}
+                          className="border border-beton-800 bg-beton-900 rounded px-2 py-1 text-sm text-beton-100 w-40"
+                        />
+                      </div>
+                      <button
+                        onClick={() => setDetailsOpen(true)}
+                        className="px-3 py-1.5 rounded border border-beton-700 text-xs text-beton-300 hover:border-emniyet-500 hover:text-emniyet-500"
+                      >
+                        İş Başı Detaylarını Gir
+                      </button>
+                      {isBasiError && <p className="text-xs text-red-400">{isBasiError}</p>}
+                    </div>
+
                     <h3 className="text-sm font-semibold text-beton-100">Günlük Puantaj — {m.ad}</h3>
 
                     {/* Add log form */}
@@ -1106,6 +1194,107 @@ export default function MachinePage({
           </div>
         </div>
       )}
+
+      {/* İş Başı Detayları modalı — Faz D: tipe göre değişen alanlar */}
+      {detailsOpen && expandedId && (() => {
+        const m = machines.find(x => x.id === expandedId);
+        if (!m) return null;
+        const mevcutLabel = logBirimi === "km" ? "Mevcut Km" : logBirimi === "her-ikisi" ? "Mevcut Km / Saat" : "Mevcut Çalışma Saati";
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+            <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 space-y-4 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-lg font-bold text-beton-100">İş Başı Detayları — {m.ad}</h2>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-beton-400">{mevcutLabel}</label>
+                <input
+                  type="number" min="0"
+                  value={detailsForm.mevcut_deger ?? ""}
+                  onChange={e => setDetailsForm(f => ({ ...f, mevcut_deger: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-beton-400">Operatör</label>
+                <input
+                  placeholder="Operatör adı"
+                  value={detailsForm.operator ?? ""}
+                  onChange={e => setDetailsForm(f => ({ ...f, operator: e.target.value }))}
+                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-beton-400">Projede Planlanan Kullanım Süresi (gün)</label>
+                <input
+                  type="number" min="0"
+                  value={detailsForm.planlanan_sure_gun ?? ""}
+                  onChange={e => setDetailsForm(f => ({ ...f, planlanan_sure_gun: e.target.value ? parseInt(e.target.value) : undefined }))}
+                  className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-beton-400">Arıza Durumu</label>
+                <div className="flex rounded-md border border-beton-800 overflow-hidden text-sm w-fit">
+                  <button type="button" onClick={() => setDetailsForm(f => ({ ...f, ariza_var: false }))}
+                    className={`px-3 py-1.5 ${!detailsForm.ariza_var ? "bg-emniyet-500 text-beton-950 font-medium" : "bg-beton-950 text-beton-300"}`}>
+                    Hayır
+                  </button>
+                  <button type="button" onClick={() => setDetailsForm(f => ({ ...f, ariza_var: true }))}
+                    className={`px-3 py-1.5 border-l border-beton-800 ${detailsForm.ariza_var ? "bg-red-600 text-white font-medium" : "bg-beton-950 text-beton-300"}`}>
+                    Evet
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-beton-400">Görünür Hasar Durumu</label>
+                <div className="flex rounded-md border border-beton-800 overflow-hidden text-sm w-fit">
+                  <button type="button" onClick={() => setDetailsForm(f => ({ ...f, hasar_var: false }))}
+                    className={`px-3 py-1.5 ${!detailsForm.hasar_var ? "bg-emniyet-500 text-beton-950 font-medium" : "bg-beton-950 text-beton-300"}`}>
+                    Hayır
+                  </button>
+                  <button type="button" onClick={() => setDetailsForm(f => ({ ...f, hasar_var: true }))}
+                    className={`px-3 py-1.5 border-l border-beton-800 ${detailsForm.hasar_var ? "bg-red-600 text-white font-medium" : "bg-beton-950 text-beton-300"}`}>
+                    Evet
+                  </button>
+                </div>
+              </div>
+
+              {detailsForm.hasar_var && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-beton-400">Hasar Açıklaması</label>
+                  <textarea
+                    rows={2}
+                    value={detailsForm.hasar_aciklama ?? ""}
+                    onChange={e => setDetailsForm(f => ({ ...f, hasar_aciklama: e.target.value }))}
+                    className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500 resize-none"
+                  />
+                </div>
+              )}
+
+              {isBasiError && <p className="text-sm text-red-400">{isBasiError}</p>}
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  onClick={() => setDetailsOpen(false)}
+                  className="px-4 py-1.5 rounded-lg border border-beton-700 text-sm text-beton-300 hover:bg-beton-800"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={() => saveIsBasiDetaylari(m.id)}
+                  disabled={isBasiSaving}
+                  className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium disabled:opacity-50"
+                >
+                  {isBasiSaving ? "Kaydediliyor…" : "Kaydet"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

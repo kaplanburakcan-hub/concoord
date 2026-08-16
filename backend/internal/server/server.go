@@ -662,6 +662,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/machines/{id}", machinesH.UpdateMachine)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/machines/{id}", machinesH.DeleteMachine)
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/machines/{id}/mark-delivered", machinesH.MarkDelivered)
+			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/machines/{id}/is-basi", machinesH.UpdateIsBasi)
 			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/machines/{machineID}/logs", machinesH.ListLogs)
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/machines/{machineID}/logs", machinesH.CreateLog)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/machines/{machineID}/logs/{id}", machinesH.DeleteLog)
