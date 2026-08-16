@@ -1,11 +1,13 @@
 package machines
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ipks/ipks/backend/internal/httpx"
@@ -147,17 +149,53 @@ type machineBody struct {
 	KayitYeri string `json:"kayit_yeri"`
 }
 
+// findMatchingEquipment — tipe göre eşleştirme anahtarıyla (araç→plaka,
+// iş makinesi→seri no, ekipman→seri no ya da demirbaş no) envanterde
+// zaten var olan bir kayıt arar. Anahtar boşsa (örn. plaka girilmedi)
+// eşleştirme yapılamaz — nil döner, YENİ kayıt açılır.
+func (h *Handler) findMatchingEquipment(ctx context.Context, tx pgx.Tx, tip string, plaka, seriNo, demirbasNo *string) (equipmentID uuid.UUID, currentProjectID *uuid.UUID, found bool) {
+	var query string
+	var arg *string
+	switch tip {
+	case "arac":
+		if plaka == nil || *plaka == "" {
+			return
+		}
+		query, arg = `SELECT id, current_project_id FROM company_equipment WHERE tip='arac' AND plaka=$1 LIMIT 1`, plaka
+	case "is_makinesi":
+		if seriNo == nil || *seriNo == "" {
+			return
+		}
+		query, arg = `SELECT id, current_project_id FROM company_equipment WHERE tip='is_makinesi' AND seri_no=$1 LIMIT 1`, seriNo
+	case "ekipman":
+		if seriNo != nil && *seriNo != "" {
+			query, arg = `SELECT id, current_project_id FROM company_equipment WHERE tip='ekipman' AND seri_no=$1 LIMIT 1`, seriNo
+		} else if demirbasNo != nil && *demirbasNo != "" {
+			query, arg = `SELECT id, current_project_id FROM company_equipment WHERE tip='ekipman' AND demirbas_no=$1 LIMIT 1`, demirbasNo
+		} else {
+			return
+		}
+	default:
+		return
+	}
+	if err := tx.QueryRow(ctx, query, arg).Scan(&equipmentID, &currentProjectID); err != nil {
+		return uuid.Nil, nil, false
+	}
+	return equipmentID, currentProjectID, true
+}
+
 // CreateMachine — "Proje" modunda (varsayılan) hem company_equipment hem
 // project_machines ataması tek transaction'da oluşturulur. "Firma
 // Envanteri" modunda sadece company_equipment satırı oluşturulur; bu
 // durumda oluşan kayıt bu projenin listesinde GÖRÜNMEZ (hiçbir projeye
 // atanmadı) — çağıran taraf CreatedMachine yerine boş bir onay bekler.
 //
-// Envanterde zaten var olan bir makineyle eşleştirme + transfer talebi
-// akışı (kullanıcının tarif ettiği "başka projede kullanılıyor" uyarısı)
-// Faz B'de eklenecek; bu fazda her "Proje" modundaki kayıt her zaman
-// YENİ bir company_equipment satırı açar (mevcut davranışla birebir
-// aynı sonucu verir, sadece artık doğru şekilde modellenmiş olur).
+// Her iki modda da önce envanterde eşleşme aranır (bkz.
+// findMatchingEquipment): eşleşme yoksa ya da eşleşen kayıt henüz
+// hiçbir projeye atanmamışsa/zaten bu projedeyse, mevcut kayıt
+// kullanılır/güncellenir (yeni company_equipment açılmaz). Eşleşen
+// kayıt BAŞKA bir projede aktifse 409 döner — istemci bunu "transfer
+// talebi oluştur" uyarısına çevirir (bkz. equipmenttransfers paketi).
 func (h *Handler) CreateMachine(w http.ResponseWriter, r *http.Request) {
 	pid, ok := parseID(w, r, "projectID")
 	if !ok {
@@ -192,34 +230,72 @@ func (h *Handler) CreateMachine(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
 
-	var currentProjectID *uuid.UUID
-	if b.KayitYeri == "proje" {
-		currentProjectID = &pid
-	}
-	var equipmentID uuid.UUID
-	err = tx.QueryRow(ctx,
-		`INSERT INTO company_equipment
-		    (tip, ad, plaka, marka, model, seri_no, demirbas_no, uretim_yili,
-		     sahiplik, tedarikci, gunluk_ucret, durum,
-		     son_bakim_tarihi, sonraki_bakim_tarihi, aciklama, current_project_id)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-		 RETURNING id`,
-		b.Tip, b.Ad, b.Plaka, b.Marka, b.Model, b.SeriNo, b.DemirbasNo, b.UretimYili,
-		b.Sahiplik, b.Tedarikci, b.GunlukUcret, b.Durum,
-		b.SonBakimTarihi, b.SonrakiBakimTarihi, b.Aciklama, currentProjectID,
-	).Scan(&equipmentID)
-	if err != nil {
-		httpx.Internal(w, r)
+	matchID, matchProjectID, matched := h.findMatchingEquipment(ctx, tx, b.Tip, b.Plaka, b.SeriNo, b.DemirbasNo)
+
+	if matched && matchProjectID != nil && *matchProjectID != pid {
+		var projectName string
+		_ = tx.QueryRow(ctx, `SELECT name FROM projects WHERE id=$1`, *matchProjectID).Scan(&projectName)
+		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
+			"İlgili iş makinesi/araç/ekipman başka bir projede kullanılmaktadır. Lütfen projenize transferini talep edin.",
+			map[string]string{"company_equipment_id": matchID.String(), "current_project_name": projectName})
 		return
 	}
 
 	if b.KayitYeri == "firma_envanteri" {
+		if matched {
+			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
+				"Bu makine/ekipman/araç zaten firma envanterinde kayıtlı.", nil)
+			return
+		}
+		var equipmentID uuid.UUID
+		if err := tx.QueryRow(ctx,
+			`INSERT INTO company_equipment
+			    (tip, ad, plaka, marka, model, seri_no, demirbas_no, uretim_yili,
+			     sahiplik, tedarikci, gunluk_ucret, durum,
+			     son_bakim_tarihi, sonraki_bakim_tarihi, aciklama, current_project_id)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NULL)
+			 RETURNING id`,
+			b.Tip, b.Ad, b.Plaka, b.Marka, b.Model, b.SeriNo, b.DemirbasNo, b.UretimYili,
+			b.Sahiplik, b.Tedarikci, b.GunlukUcret, b.Durum,
+			b.SonBakimTarihi, b.SonrakiBakimTarihi, b.Aciklama,
+		).Scan(&equipmentID); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
 		if err := tx.Commit(ctx); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
 		httpx.JSON(w, http.StatusCreated, map[string]any{"company_equipment_id": equipmentID})
 		return
+	}
+
+	// "Proje" modu: eşleşme varsa (envanterde atanmamış ya da zaten bu
+	// projedeyse) mevcut company_equipment kaydını kullan; yoksa yeni aç.
+	var equipmentID uuid.UUID
+	if matched {
+		equipmentID = matchID
+		if _, err := tx.Exec(ctx,
+			`UPDATE company_equipment SET current_project_id=$2, updated_at=now() WHERE id=$1`,
+			equipmentID, pid); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+	} else {
+		if err := tx.QueryRow(ctx,
+			`INSERT INTO company_equipment
+			    (tip, ad, plaka, marka, model, seri_no, demirbas_no, uretim_yili,
+			     sahiplik, tedarikci, gunluk_ucret, durum,
+			     son_bakim_tarihi, sonraki_bakim_tarihi, aciklama, current_project_id)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+			 RETURNING id`,
+			b.Tip, b.Ad, b.Plaka, b.Marka, b.Model, b.SeriNo, b.DemirbasNo, b.UretimYili,
+			b.Sahiplik, b.Tedarikci, b.GunlukUcret, b.Durum,
+			b.SonBakimTarihi, b.SonrakiBakimTarihi, b.Aciklama, pid,
+		).Scan(&equipmentID); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
 	}
 
 	var m Machine

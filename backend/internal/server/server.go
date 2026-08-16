@@ -21,6 +21,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/dashboard"
 	"github.com/ipks/ipks/backend/internal/design"
 	"github.com/ipks/ipks/backend/internal/documents"
+	"github.com/ipks/ipks/backend/internal/equipmenttransfers"
 	"github.com/ipks/ipks/backend/internal/fixedexpenses"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/idarihakedis"
@@ -99,6 +100,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	// --- Faz 3 bağımlılıkları (taşeron + hakediş finansal çekirdeği) ---
 	payH := payments.NewHandler(pool, eval, recorder, notifySvc, log)
 	paymentPlansH := paymentplans.NewHandler(pool, recorder, notifySvc)
+	equipmentTransfersH := equipmenttransfers.NewHandler(pool, recorder, notifySvc)
 	taskH := tasks.NewHandler(pool, eval, recorder, notifySvc, log)
 
 	// --- Faz 5 bağımlılıkları (malzeme onay süreci / MAR) ---
@@ -334,6 +336,18 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("payments.approve_plan_change")).Get("/projects/{projectID}/payment-plan-changes", paymentPlansH.ListPending)
 			pr.With(mw.RequirePermission("payments.approve_plan_change")).Post("/projects/{projectID}/payment-plan-changes/{id}/approve", paymentPlansH.Approve)
 			pr.With(mw.RequirePermission("payments.approve_plan_change")).Post("/projects/{projectID}/payment-plan-changes/{id}/reject", paymentPlansH.Reject)
+		})
+
+		// Makine/Ekipman/Araç Envanteri Faz B — proje-arası transfer talebi.
+		// Create'i, transferi talep eden proje kullanıcısı açar (aynı
+		// projects.edit yetkisiyle makine ekleyebilen herkes); List/
+		// Approve/Reject sadece equipment.approve_transfer yetkisi olanlarda.
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/equipment-transfers", equipmentTransfersH.Create)
+			pr.With(mw.RequirePermission("equipment.approve_transfer")).Get("/projects/{projectID}/equipment-transfers", equipmentTransfersH.ListPending)
+			pr.With(mw.RequirePermission("equipment.approve_transfer")).Post("/projects/{projectID}/equipment-transfers/{id}/approve", equipmentTransfersH.Approve)
+			pr.With(mw.RequirePermission("equipment.approve_transfer")).Post("/projects/{projectID}/equipment-transfers/{id}/reject", equipmentTransfersH.Reject)
 		})
 
 		// Faz D (Nakit Akış) — İdari Hakedişler (nakit giriş kaynağı).

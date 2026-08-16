@@ -137,6 +137,7 @@ const GROUPS: NavGroup[] = [
       { to: "/makine/araclar", label: "Tanımlı Araçlar", perm: "projects.view", icon: I.makine },
       { to: "/makine/is-makineleri", label: "İş Makineleri", perm: "projects.view", icon: I.makine },
       { to: "/makine/ekipmanlar", label: "Ekipmanlar", perm: "projects.view", icon: I.makine },
+      { to: "/makine/transfer-talepleri", label: "Transfer Talepleri", perm: "equipment.approve_transfer", icon: I.izin },
     ],
   },
 ];

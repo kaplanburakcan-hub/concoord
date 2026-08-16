@@ -51,6 +51,10 @@ const (
 	TypeEVMThresholdAlert   = "evm_threshold_alert"   // CPI/SPI eşik ihlali → PY
 	TypeMilestoneLateAlert  = "milestone_late_alert"  // geciken milestone → PY
 	TypeFindingAgingAlert   = "finding_aging_alert"   // yaşlanan açık İSG bulgusu → PY
+
+	// Makine/Ekipman/Araç Envanteri Faz B — proje-arası transfer talebi
+	TypeEquipmentTransferRequested = "equipment_transfer_requested" // talep açıldı → kaynak projenin onay yetkilileri
+	TypeEquipmentTransferDecided   = "equipment_transfer_decided"   // karar verildi → talep sahibi
 )
 
 const (

@@ -47,6 +47,7 @@ import ToplantiPage from "./pages/project/ToplantiPage";
 import FotograflarPage from "./pages/project/FotograflarPage";
 import AraclarPage from "./pages/makine/AraclarPage";
 import IsMakineleriPage from "./pages/makine/IsMakineleriPage";
+import TransferTalepleriPage from "./pages/makine/TransferTalepleriPage";
 import EkipmanlarPage from "./pages/makine/EkipmanlarPage";
 import ComingSoon from "./components/ComingSoon";
 import SahaTutanaklariPage from "./pages/project/SahaTutanaklariPage";
@@ -360,6 +361,7 @@ export default function App() {
                       <Route path="/makine/araclar" element={<RequirePerm perm="projects.view"><AraclarPage /></RequirePerm>} />
                       <Route path="/makine/is-makineleri" element={<RequirePerm perm="projects.view"><IsMakineleriPage /></RequirePerm>} />
                       <Route path="/makine/ekipmanlar" element={<RequirePerm perm="projects.view"><EkipmanlarPage /></RequirePerm>} />
+                      <Route path="/makine/transfer-talepleri" element={<RequirePerm perm="equipment.approve_transfer"><TransferTalepleriPage /></RequirePerm>} />
                     </Routes>
                   </AppShell>
                 </ProjectProvider>

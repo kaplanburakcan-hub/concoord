@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { api } from "../../api/client";
+import { api, RequestError } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 import { AD_KATALOG, AD_DIGER, photoUrl, trLower, type Tip } from "./ekipmanKatalog";
 
@@ -157,6 +157,12 @@ export default function MachinePage({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [logError, setLogError] = useState<string | null>(null);
 
+  // Envanter çakışması — Faz B: girilen plaka/seri no/demirbaş no zaten
+  // başka bir projede aktif bir makineyle eşleşiyorsa backend 409 döner.
+  const [conflict, setConflict] = useState<{ companyEquipmentId: string; currentProjectName: string; machineName: string } | null>(null);
+  const [transferRequesting, setTransferRequesting] = useState(false);
+  const [transferRequestedMsg, setTransferRequestedMsg] = useState<string | null>(null);
+
   useEffect(() => {
     if (!pid) return;
     loadMachines();
@@ -229,10 +235,32 @@ export default function MachinePage({
         setMachines(prev => [...prev, r.machine]);
         setFormOpen(false);
       }
-    } catch {
-      setSaveError("Kaydedilemedi. Lütfen tekrar deneyin.");
+    } catch (e) {
+      if (e instanceof RequestError && e.status === 409 && e.api?.details && typeof e.api.details === "object" && "company_equipment_id" in e.api.details) {
+        const d = e.api.details as { company_equipment_id: string; current_project_name: string };
+        setConflict({ companyEquipmentId: d.company_equipment_id, currentProjectName: d.current_project_name, machineName: form.ad ?? "" });
+      } else {
+        setSaveError("Kaydedilemedi. Lütfen tekrar deneyin.");
+      }
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function requestTransfer() {
+    if (!pid || !conflict) return;
+    setTransferRequesting(true);
+    try {
+      await api(`/projects/${pid}/equipment-transfers`, {
+        method: "POST", projectId: pid, body: { company_equipment_id: conflict.companyEquipmentId },
+      });
+      setTransferRequestedMsg(`"${conflict.machineName}" için ${conflict.currentProjectName} projesinden transfer talebi oluşturuldu. Onay bekleniyor.`);
+      setConflict(null);
+    } catch {
+      setSaveError("Transfer talebi oluşturulamadı. Lütfen tekrar deneyin.");
+      setConflict(null);
+    } finally {
+      setTransferRequesting(false);
     }
   }
 
@@ -908,6 +936,55 @@ export default function MachinePage({
                 className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium disabled:opacity-50"
               >
                 {saving ? "Kaydediliyor…" : kayitYeri === "firma_envanteri" && !editId ? "Envantere Kaydet" : "Kaydet"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Envanter çakışması uyarısı — Faz B: eşleşen kayıt başka bir aktif projede */}
+      {conflict && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+          <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 space-y-4">
+            <h2 className="text-lg font-bold text-beton-100">Ekipman Başka Projede Kullanılıyor</h2>
+            <p className="text-sm text-beton-300">
+              "<span className="font-medium text-beton-100">{conflict.machineName}</span>" ilgili iş makinesi/araç/ekipman
+              hâlihazırda <span className="font-medium text-amber-400">{conflict.currentProjectName}</span> projesinde
+              kullanılmaktadır. Lütfen projenize transferini talep edin.
+            </p>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setConflict(null)}
+                className="px-4 py-1.5 rounded-lg border border-beton-700 text-sm text-beton-300 hover:bg-beton-800"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={requestTransfer}
+                disabled={transferRequesting}
+                className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium disabled:opacity-50"
+              >
+                {transferRequesting ? "Gönderiliyor…" : "Transfer Talebi Oluştur"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer talebi oluşturuldu bilgisi */}
+      {transferRequestedMsg && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+          <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 space-y-4">
+            <h2 className="text-lg font-bold text-beton-100">Transfer Talebi Oluşturuldu</h2>
+            <p className="text-sm text-green-400 bg-green-950/30 border border-green-900 rounded-md px-3 py-2">
+              {transferRequestedMsg}
+            </p>
+            <div className="flex justify-end pt-1">
+              <button
+                onClick={() => setTransferRequestedMsg(null)}
+                className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium"
+              >
+                Tamam
               </button>
             </div>
           </div>
