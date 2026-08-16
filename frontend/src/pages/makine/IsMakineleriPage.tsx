@@ -5,6 +5,7 @@ export default function IsMakineleriPage() {
     <MachinePage
       tip="is_makinesi"
       tipLabel="İş Makineleri"
+      showSeriNo
       showBakim
       logBirimi="saat"
     />

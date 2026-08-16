@@ -8,12 +8,14 @@ import { AD_KATALOG, AD_DIGER, photoUrl, trLower, type Tip } from "./ekipmanKata
 type Machine = {
   id: string;
   project_id: string;
+  company_equipment_id: string;
   tip: string;
   ad: string;
   plaka?: string;
   marka?: string;
   model?: string;
   seri_no?: string;
+  demirbas_no?: string;
   uretim_yili?: number;
   sahiplik: string;
   tedarikci?: string;
@@ -22,7 +24,11 @@ type Machine = {
   son_bakim_tarihi?: string;
   sonraki_bakim_tarihi?: string;
   aciklama?: string;
+  atanma_tarihi: string;
+  is_basi_tarihi?: string;
 };
+
+type KayitYeri = "proje" | "firma_envanteri";
 
 type MachineLog = {
   id: string;
@@ -39,6 +45,7 @@ interface Props {
   tipLabel: string;
   showPlaka?: boolean;
   showSeriNo?: boolean;
+  showDemirbasNo?: boolean;
   showBakim?: boolean;
   logBirimi?: "saat" | "km" | "her-ikisi";
 }
@@ -116,6 +123,7 @@ export default function MachinePage({
   tipLabel,
   showPlaka = false,
   showSeriNo = false,
+  showDemirbasNo = false,
   showBakim = false,
   logBirimi = "saat",
 }: Props) {
@@ -130,8 +138,10 @@ export default function MachinePage({
   const [formOpen, setFormOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Machine>>(emptyMachine(tip));
+  const [kayitYeri, setKayitYeri] = useState<KayitYeri>("proje");
   const [saving, setSaving] = useState(false);
   const [adCustom, setAdCustom] = useState(false);
+  const [inventorySavedMsg, setInventorySavedMsg] = useState<string | null>(null);
 
   // Expanded machine (logs panel)
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -164,15 +174,33 @@ export default function MachinePage({
   function openAdd(presetAd?: string) {
     setEditId(null);
     setForm(presetAd ? { ...emptyMachine(tip), ad: presetAd } : emptyMachine(tip));
+    setKayitYeri("proje");
     setAdCustom(false);
+    setInventorySavedMsg(null);
     setFormOpen(true);
   }
 
   function openEdit(m: Machine) {
     setEditId(m.id);
     setForm({ ...m });
+    setKayitYeri("proje");
     setAdCustom(!!m.ad && !AD_KATALOG[tip].includes(m.ad));
+    setInventorySavedMsg(null);
     setFormOpen(true);
+  }
+
+  // mutableFields — backend katı JSON çözümleme yapıyor (bilinmeyen alan
+  // = 400). openEdit formu tam Machine nesnesini (id, project_id,
+  // atanma_tarihi, created_at… dahil) form state'ine kopyaladığı için
+  // PATCH/POST gövdesine SADECE düzenlenebilir alanlar gönderilmeli.
+  function mutableFields(f: Partial<Machine>) {
+    return {
+      ad: f.ad, plaka: f.plaka, marka: f.marka, model: f.model,
+      seri_no: f.seri_no, demirbas_no: f.demirbas_no, uretim_yili: f.uretim_yili,
+      sahiplik: f.sahiplik, tedarikci: f.tedarikci, gunluk_ucret: f.gunluk_ucret,
+      durum: f.durum, son_bakim_tarihi: f.son_bakim_tarihi,
+      sonraki_bakim_tarihi: f.sonraki_bakim_tarihi, aciklama: f.aciklama,
+    };
   }
 
   async function saveMachine() {
@@ -183,16 +211,24 @@ export default function MachinePage({
     try {
       if (editId) {
         const r = await api<{ machine: Machine }>(`/projects/${pid}/machines/${editId}`, {
-          method: "PATCH", body: form, projectId: pid,
+          method: "PATCH", body: mutableFields(form), projectId: pid,
         });
         setMachines(prev => prev.map(m => m.id === editId ? r.machine : m));
+        setFormOpen(false);
+      } else if (kayitYeri === "firma_envanteri") {
+        await api<{ company_equipment_id: string }>(`/projects/${pid}/machines`, {
+          method: "POST", body: { ...mutableFields(form), tip, kayit_yeri: "firma_envanteri" }, projectId: pid,
+        });
+        setInventorySavedMsg(`"${form.ad}" firma envanterine kaydedildi (bu projeye atanmadı).`);
+        setForm(emptyMachine(tip));
+        setAdCustom(false);
       } else {
         const r = await api<{ machine: Machine }>(`/projects/${pid}/machines`, {
-          method: "POST", body: { ...form, tip }, projectId: pid,
+          method: "POST", body: { ...mutableFields(form), tip, kayit_yeri: "proje" }, projectId: pid,
         });
         setMachines(prev => [...prev, r.machine]);
+        setFormOpen(false);
       }
-      setFormOpen(false);
     } catch {
       setSaveError("Kaydedilemedi. Lütfen tekrar deneyin.");
     } finally {
@@ -622,6 +658,39 @@ export default function MachinePage({
               {editId ? "Makineyi Düzenle" : `${tipLabel === "Ekipmanlar" ? "Ekipman" : tipLabel === "İş Makineleri" ? "Makine" : "Araç"} Ekle`}
             </h2>
 
+            {!editId && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-beton-400">Kayıt Yeri</label>
+                <div className="flex rounded-md border border-beton-800 overflow-hidden text-sm">
+                  <button
+                    type="button"
+                    onClick={() => setKayitYeri("proje")}
+                    className={`flex-1 px-3 py-1.5 ${kayitYeri === "proje" ? "bg-emniyet-500 text-beton-950 font-medium" : "bg-beton-950 text-beton-300 hover:bg-[var(--bg-hover)]"}`}
+                  >
+                    Proje
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setKayitYeri("firma_envanteri")}
+                    className={`flex-1 px-3 py-1.5 border-l border-beton-800 ${kayitYeri === "firma_envanteri" ? "bg-emniyet-500 text-beton-950 font-medium" : "bg-beton-950 text-beton-300 hover:bg-[var(--bg-hover)]"}`}
+                  >
+                    Firma Envanteri
+                  </button>
+                </div>
+                {kayitYeri === "firma_envanteri" && (
+                  <p className="text-xs text-beton-500">
+                    Bu proje listesine eklenmez, sadece firma envanterine kaydedilir — daha sonra bir projeye atanabilir.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {inventorySavedMsg && (
+              <p className="text-sm text-green-500 bg-green-950/30 border border-green-900 rounded-md px-3 py-2">
+                {inventorySavedMsg}
+              </p>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               {/* Ad */}
               <div className="col-span-2 flex flex-col gap-1">
@@ -685,7 +754,7 @@ export default function MachinePage({
                 </div>
               )}
 
-              {/* Seri No (ekipman) */}
+              {/* Seri No (iş makinesi/ekipman) */}
               {showSeriNo && (
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-beton-400">Seri No</label>
@@ -693,6 +762,19 @@ export default function MachinePage({
                     placeholder="SN-123456"
                     value={form.seri_no ?? ""}
                     onChange={e => setForm(f => ({ ...f, seri_no: e.target.value }))}
+                    className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+                  />
+                </div>
+              )}
+
+              {/* Demirbaş No (ekipman, seri no yoksa alternatif eşleştirme anahtarı) */}
+              {showDemirbasNo && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-beton-400">Demirbaş No</label>
+                  <input
+                    placeholder="Seri no yoksa: DMB-0042"
+                    value={form.demirbas_no ?? ""}
+                    onChange={e => setForm(f => ({ ...f, demirbas_no: e.target.value }))}
                     className="rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
                   />
                 </div>
@@ -818,14 +900,14 @@ export default function MachinePage({
                 onClick={() => { setFormOpen(false); setSaveError(null); }}
                 className="px-4 py-1.5 rounded-lg border border-beton-700 text-sm text-beton-300 hover:bg-beton-800"
               >
-                İptal
+                {inventorySavedMsg ? "Kapat" : "İptal"}
               </button>
               <button
                 onClick={saveMachine}
                 disabled={saving || !form.ad?.trim()}
                 className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium disabled:opacity-50"
               >
-                {saving ? "Kaydediliyor…" : "Kaydet"}
+                {saving ? "Kaydediliyor…" : kayitYeri === "firma_envanteri" && !editId ? "Envantere Kaydet" : "Kaydet"}
               </button>
             </div>
           </div>

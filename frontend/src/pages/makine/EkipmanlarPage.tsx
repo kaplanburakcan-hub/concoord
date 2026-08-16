@@ -6,6 +6,7 @@ export default function EkipmanlarPage() {
       tip="ekipman"
       tipLabel="Ekipmanlar"
       showSeriNo
+      showDemirbasNo
       showBakim
       logBirimi="saat"
     />
