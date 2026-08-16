@@ -10,12 +10,18 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/ipks/ipks/backend/internal/auth"
+	"github.com/ipks/ipks/backend/internal/equipmenttransfers"
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/notify"
 )
 
-type Handler struct{ pool *pgxpool.Pool }
+type Handler struct {
+	pool *pgxpool.Pool
+	nt   *notify.Service
+}
 
-func NewHandler(pool *pgxpool.Pool) *Handler { return &Handler{pool: pool} }
+func NewHandler(pool *pgxpool.Pool, nt *notify.Service) *Handler { return &Handler{pool: pool, nt: nt} }
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────
 
@@ -44,8 +50,13 @@ type Machine struct {
 	Aciklama           *string   `json:"aciklama,omitempty"`
 	AtanmaTarihi       string    `json:"atanma_tarihi"`
 	IsBasiTarihi       *string   `json:"is_basi_tarihi,omitempty"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	// FromTransferID doluysa bu atama onaylı bir proje-arası transferden
+	// geldi; TeslimAlindiTarihi boşken frontend "Teslim Alındı" butonunu
+	// gösterir (bkz. MarkDelivered).
+	FromTransferID     *uuid.UUID `json:"from_transfer_id,omitempty"`
+	TeslimAlindiTarihi *string    `json:"teslim_alindi_tarihi,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 // machineCols/machineJoin — ListMachines/CreateMachine/UpdateMachine'in
@@ -58,13 +69,15 @@ const machineSelectCols = `
 	TO_CHAR(ce.sonraki_bakim_tarihi,'YYYY-MM-DD'),
 	ce.aciklama, TO_CHAR(pm.atanma_tarihi,'YYYY-MM-DD'),
 	TO_CHAR(pm.is_basi_tarihi,'YYYY-MM-DD'),
+	pm.from_transfer_id, TO_CHAR(pm.teslim_alindi_tarihi,'YYYY-MM-DD'),
 	pm.created_at, pm.updated_at`
 
 func scanMachine(row interface{ Scan(...any) error }, m *Machine) error {
 	return row.Scan(&m.ID, &m.ProjectID, &m.CompanyEquipmentID, &m.Tip, &m.Ad, &m.Plaka,
 		&m.Marka, &m.Model, &m.SeriNo, &m.DemirbasNo, &m.UretimYili, &m.Sahiplik,
 		&m.Tedarikci, &m.GunlukUcret, &m.Durum, &m.SonBakimTarihi, &m.SonrakiBakimTarihi,
-		&m.Aciklama, &m.AtanmaTarihi, &m.IsBasiTarihi, &m.CreatedAt, &m.UpdatedAt)
+		&m.Aciklama, &m.AtanmaTarihi, &m.IsBasiTarihi, &m.FromTransferID, &m.TeslimAlindiTarihi,
+		&m.CreatedAt, &m.UpdatedAt)
 }
 
 type MachineLog struct {
@@ -411,6 +424,48 @@ func (h *Handler) DeleteMachine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// MarkDelivered — hedef proje kullanıcısı, onaylı bir transferle gelen
+// atamanın fiziksel teslimini onaylar. Sadece from_transfer_id dolu ve
+// henüz teslim_alindi_tarihi boş atamalarda geçerlidir (bkz. Faz C).
+// equipment.approve_transfer yetkisi olan hedef proje üyelerine
+// (üst onaycılar) bildirim gider.
+func (h *Handler) MarkDelivered(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	id, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+	ctx := r.Context()
+	var equipmentAd string
+	if err := h.pool.QueryRow(ctx,
+		`UPDATE project_machines pm SET teslim_alindi_tarihi=CURRENT_DATE
+		 FROM company_equipment ce
+		 WHERE pm.id=$1 AND pm.project_id=$2 AND pm.company_equipment_id=ce.id
+		   AND pm.from_transfer_id IS NOT NULL AND pm.teslim_alindi_tarihi IS NULL
+		 RETURNING ce.ad`,
+		id, pid).Scan(&equipmentAd); err != nil {
+		if err == pgx.ErrNoRows {
+			httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound,
+				"Teslim alınacak bir transfer ataması bulunamadı ya da zaten teslim alındı.", nil)
+			return
+		}
+		httpx.Internal(w, r)
+		return
+	}
+	uid, _ := auth.UserIDFrom(ctx)
+	var projectName string
+	_ = h.pool.QueryRow(ctx, `SELECT name FROM projects WHERE id=$1`, pid).Scan(&projectName)
+	equipmenttransfers.NotifyApprovers(ctx, h.pool, h.nt, pid, uid, notify.Input{
+		Type:       notify.TypeEquipmentDelivered,
+		Title:      equipmentAd + " — " + projectName + " projesinde teslim alındı",
+		EntityType: "project_machines", EntityID: &id, ProjectID: &pid,
+	})
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "delivered"})
 }
 
 // ── Machine Logs ──────────────────────────────────────────────────────────────

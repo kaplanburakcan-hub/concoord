@@ -239,8 +239,8 @@ func (h *Handler) decide(w http.ResponseWriter, r *http.Request, approve bool) {
 			return
 		}
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO project_machines (project_id, company_equipment_id) VALUES ($1,$2)`,
-			toProjectID, equipmentID); err != nil {
+			`INSERT INTO project_machines (project_id, company_equipment_id, from_transfer_id) VALUES ($1,$2,$3)`,
+			toProjectID, equipmentID, id); err != nil {
 			httpx.Internal(w, r)
 			return
 		}

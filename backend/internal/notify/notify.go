@@ -55,6 +55,7 @@ const (
 	// Makine/Ekipman/Araç Envanteri Faz B — proje-arası transfer talebi
 	TypeEquipmentTransferRequested = "equipment_transfer_requested" // talep açıldı → kaynak projenin onay yetkilileri
 	TypeEquipmentTransferDecided   = "equipment_transfer_decided"   // karar verildi → talep sahibi
+	TypeEquipmentDelivered         = "equipment_delivered"          // hedef projede teslim alındı → onay yetkilileri
 )
 
 const (

@@ -1,5 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { api, RequestError } from "../../api/client";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { api, apiFetchBlob, apiUpload, RequestError } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 import { AD_KATALOG, AD_DIGER, photoUrl, trLower, type Tip } from "./ekipmanKatalog";
 
@@ -26,7 +26,11 @@ type Machine = {
   aciklama?: string;
   atanma_tarihi: string;
   is_basi_tarihi?: string;
+  from_transfer_id?: string;
+  teslim_alindi_tarihi?: string;
 };
+
+type RentalDoc = { id: string; title: string; url: string };
 
 type KayitYeri = "proje" | "firma_envanteri";
 
@@ -163,6 +167,15 @@ export default function MachinePage({
   const [transferRequesting, setTransferRequesting] = useState(false);
   const [transferRequestedMsg, setTransferRequestedMsg] = useState<string | null>(null);
 
+  // Teslim alma — Faz C: transferle gelen atamanın fiziksel teslimini onaylar.
+  const [deliverBusyId, setDeliverBusyId] = useState<string | null>(null);
+  const [deliverError, setDeliverError] = useState<string | null>(null);
+
+  // Kiralama sözleşmesi — Faz C: sahiplik=kiralik makinelerde PDF sözleşme yükleme.
+  const [rentalDocs, setRentalDocs] = useState<RentalDoc[]>([]);
+  const [rentalUploading, setRentalUploading] = useState(false);
+  const rentalRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (!pid) return;
     loadMachines();
@@ -282,6 +295,65 @@ export default function MachinePage({
     setLogForm(emptyLog());
     setLogError(null);
     loadLogs(id);
+    const m = machines.find(x => x.id === id);
+    if (m?.sahiplik === "kiralik") loadRentalDocs(m.company_equipment_id);
+    else setRentalDocs([]);
+  }
+
+  async function loadRentalDocs(equipmentId: string) {
+    if (!pid) return;
+    try {
+      const d = await api<{ documents: { id: string; title: string; latest_version?: number }[] }>(
+        `/projects/${pid}/documents?entity_type=company_equipment&entity_id=${equipmentId}&category=KiralamaSozlesmesi`,
+        { projectId: pid });
+      const withUrls = await Promise.all(
+        (d.documents ?? []).filter(x => x.latest_version).map(async (doc) => {
+          const url = await apiFetchBlob(`/projects/${pid}/documents/${doc.id}/versions/${doc.latest_version}/download`);
+          return { id: doc.id, title: doc.title, url } as RentalDoc;
+        })
+      );
+      setRentalDocs(withUrls);
+    } catch {
+      setRentalDocs([]);
+    }
+  }
+
+  async function uploadRentalContract(files: FileList | null, equipmentId: string) {
+    if (!files || !pid) return;
+    setRentalUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        if (file.size > 20 * 1024 * 1024) { alert(`${file.name} 20MB sınırını aşıyor.`); continue; }
+        const doc = await api<{ document: { id: string } }>(`/projects/${pid}/documents`, {
+          method: "POST", projectId: pid,
+          body: { title: file.name, doc_category: "KiralamaSozlesmesi", entity_type: "company_equipment", entity_id: equipmentId },
+        });
+        const fd = new FormData();
+        fd.append("file", file);
+        await apiUpload(`/projects/${pid}/documents/${doc.document.id}/versions`, fd);
+      }
+      await loadRentalDocs(equipmentId);
+    } catch {
+      setDeliverError("Kiralama sözleşmesi yüklenemedi.");
+    } finally {
+      setRentalUploading(false);
+      if (rentalRef.current) rentalRef.current.value = "";
+    }
+  }
+
+  async function markDelivered(id: string) {
+    if (!pid) return;
+    setDeliverBusyId(id);
+    setDeliverError(null);
+    try {
+      await api(`/projects/${pid}/machines/${id}/mark-delivered`, { method: "POST", projectId: pid });
+      const today = new Date().toISOString().slice(0, 10);
+      setMachines(prev => prev.map(m => m.id === id ? { ...m, teslim_alindi_tarihi: today } : m));
+    } catch {
+      setDeliverError("Teslim alma onayı kaydedilemedi. Lütfen tekrar deneyin.");
+    } finally {
+      setDeliverBusyId(null);
+    }
   }
 
   function loadLogs(machineId: string) {
@@ -421,6 +493,8 @@ export default function MachinePage({
         <span className="text-xs text-beton-400 ml-1">{filtered.length} kayıt</span>
       </div>
 
+      {deliverError && <p className="text-sm text-red-400">{deliverError}</p>}
+
       {/* Machine List — katalog tipine göre gruplanmış (fotoğraf + mevcut kayıtlar) */}
       {groups.length === 0 ? (
         <div className="rounded-xl border border-dashed border-beton-800 p-12 text-center text-beton-400 text-sm">
@@ -496,6 +570,16 @@ export default function MachinePage({
 
                   {/* Actions */}
                   <div className="flex gap-1 shrink-0 items-center" onClick={e => e.stopPropagation()}>
+                    {m.from_transfer_id && !m.teslim_alindi_tarihi && (
+                      <button
+                        onClick={() => markDelivered(m.id)}
+                        disabled={deliverBusyId === m.id}
+                        title="Transferle gelen bu ekipmanın fiziksel teslimini onayla"
+                        className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-medium"
+                      >
+                        {deliverBusyId === m.id ? "…" : "Teslim Alındı"}
+                      </button>
+                    )}
                     {confirmDeleteId === m.id ? (
                       <>
                         <span className="text-xs text-red-600 font-medium mr-1">Emin misiniz?</span>
@@ -657,6 +741,38 @@ export default function MachinePage({
                             ))}
                           </tbody>
                         </table>
+                      </div>
+                    )}
+
+                    {/* Kiralama Sözleşmesi — sadece kiralık makinelerde */}
+                    {m.sahiplik === "kiralik" && (
+                      <div className="border-t border-beton-800 pt-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs text-beton-400 uppercase tracking-wide">
+                            Kiralama Sözleşmesi ({rentalDocs.length})
+                          </p>
+                          <input ref={rentalRef} type="file" accept="application/pdf,image/*" multiple className="hidden"
+                            onChange={(e) => uploadRentalContract(e.target.files, m.company_equipment_id)} />
+                          <button onClick={() => rentalRef.current?.click()} disabled={rentalUploading}
+                            className="text-xs rounded border border-beton-700 px-2 py-1 text-beton-300 hover:border-emniyet-500 disabled:opacity-50">
+                            {rentalUploading ? "Yükleniyor…" : "📎 Sözleşme Ekle"}
+                          </button>
+                        </div>
+                        {rentalDocs.length > 0 ? (
+                          <ul className="space-y-1">
+                            {rentalDocs.map((d) => (
+                              <li key={d.id}>
+                                <a href={d.url} download={d.title} className="text-xs text-emniyet-500 hover:underline">
+                                  {d.title}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-xs text-beton-500">
+                            Henüz kiralama sözleşmesi yüklenmedi.
+                          </p>
+                        )}
                       </div>
                     )}
 

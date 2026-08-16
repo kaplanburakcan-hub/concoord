@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../../api/client";
+import { api, apiFetchBlob, apiUpload } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 
 // Makine/Ekipman/Araç Envanteri Faz B — proje-arası transfer talebi onayı.
@@ -31,6 +31,11 @@ export default function TransferTalepleriPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  // Nakliye irsaliyesi — Faz C: fiziksel nakliye yapılan talepler için
+  // transfer talebine bağlı irsaliye belgesi (entity_type=equipment_transfer_requests).
+  const [irsaliyeByTransfer, setIrsaliyeByTransfer] = useState<Record<string, { id: string; title: string; url: string }[]>>({});
+  const [irsaliyeUploading, setIrsaliyeUploading] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     if (!pid) return;
     setErr(null);
@@ -38,10 +43,49 @@ export default function TransferTalepleriPage() {
       const r = await api<{ transfers: Transfer[] }>(
         `/projects/${pid}/equipment-transfers?status=pending`, { projectId: pid });
       setTransfers(r.transfers ?? []);
+      for (const t of r.transfers ?? []) loadIrsaliye(t.id);
     } catch { setErr("Bekleyen talepler yüklenemedi ya da erişim yetkiniz yok."); }
   }, [pid]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function loadIrsaliye(transferId: string) {
+    if (!pid) return;
+    try {
+      const d = await api<{ documents: { id: string; title: string; latest_version?: number }[] }>(
+        `/projects/${pid}/documents?entity_type=equipment_transfer_requests&entity_id=${transferId}&category=NakliyeIrsaliyesi`,
+        { projectId: pid });
+      const withUrls = await Promise.all(
+        (d.documents ?? []).filter(x => x.latest_version).map(async (doc) => {
+          const url = await apiFetchBlob(`/projects/${pid}/documents/${doc.id}/versions/${doc.latest_version}/download`);
+          return { id: doc.id, title: doc.title, url };
+        })
+      );
+      setIrsaliyeByTransfer(prev => ({ ...prev, [transferId]: withUrls }));
+    } catch { /* sessizce boş listede kalır */ }
+  }
+
+  async function uploadIrsaliye(files: FileList | null, transferId: string) {
+    if (!files || !pid) return;
+    setIrsaliyeUploading(transferId);
+    try {
+      for (const file of Array.from(files)) {
+        if (file.size > 20 * 1024 * 1024) { alert(`${file.name} 20MB sınırını aşıyor.`); continue; }
+        const doc = await api<{ document: { id: string } }>(`/projects/${pid}/documents`, {
+          method: "POST", projectId: pid,
+          body: { title: file.name, doc_category: "NakliyeIrsaliyesi", entity_type: "equipment_transfer_requests", entity_id: transferId },
+        });
+        const fd = new FormData();
+        fd.append("file", file);
+        await apiUpload(`/projects/${pid}/documents/${doc.document.id}/versions`, fd);
+      }
+      await loadIrsaliye(transferId);
+    } catch {
+      setErr("Nakliye irsaliyesi yüklenemedi.");
+    } finally {
+      setIrsaliyeUploading(null);
+    }
+  }
 
   async function decide(id: string, approve: boolean) {
     if (!pid) return;
@@ -90,6 +134,33 @@ export default function TransferTalepleriPage() {
                 <div className="text-xs text-beton-400">Hedef proje</div>
                 <div className="text-sm font-semibold text-amber-400">{t.to_project_name}</div>
               </div>
+            </div>
+            <div className="mt-3 border-t border-beton-800 pt-2.5">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs text-beton-400 uppercase tracking-wide">
+                  Nakliye İrsaliyesi ({(irsaliyeByTransfer[t.id] ?? []).length})
+                </p>
+                <input id={`irsaliye-${t.id}`} type="file" accept="application/pdf,image/*" multiple className="hidden"
+                  onChange={(e) => uploadIrsaliye(e.target.files, t.id)} />
+                <button onClick={() => document.getElementById(`irsaliye-${t.id}`)?.click()}
+                  disabled={irsaliyeUploading === t.id}
+                  className="text-xs rounded border border-beton-700 px-2 py-1 text-beton-300 hover:border-emniyet-500 disabled:opacity-50">
+                  {irsaliyeUploading === t.id ? "Yükleniyor…" : "📎 İrsaliye Ekle"}
+                </button>
+              </div>
+              {(irsaliyeByTransfer[t.id] ?? []).length > 0 ? (
+                <ul className="space-y-1">
+                  {(irsaliyeByTransfer[t.id] ?? []).map((d) => (
+                    <li key={d.id}>
+                      <a href={d.url} download={d.title} className="text-xs text-emniyet-500 hover:underline">
+                        {d.title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-beton-500">Henüz irsaliye yüklenmedi (araçlar için gerekmeyebilir).</p>
+              )}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <input

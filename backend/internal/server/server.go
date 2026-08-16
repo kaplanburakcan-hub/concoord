@@ -140,7 +140,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	statementsH := statements.NewHandler(pool, notifySvc)
 
 	// --- Faz 26: Makine & Ekipman ---
-	machinesH := machines.NewHandler(pool)
+	machinesH := machines.NewHandler(pool, notifySvc)
 
 	// --- Faz 27: Yazışmalar (Gelen/Giden Evrak) ---
 	correspondenceH := correspondence.NewHandler(pool)
@@ -661,6 +661,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/machines", machinesH.CreateMachine)
 			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/machines/{id}", machinesH.UpdateMachine)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/machines/{id}", machinesH.DeleteMachine)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/machines/{id}/mark-delivered", machinesH.MarkDelivered)
 			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/machines/{machineID}/logs", machinesH.ListLogs)
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/machines/{machineID}/logs", machinesH.CreateLog)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/machines/{machineID}/logs/{id}", machinesH.DeleteLog)

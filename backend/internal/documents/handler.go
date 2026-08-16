@@ -40,6 +40,8 @@ var docCategories = map[string]bool{
 	"DenetimFotografi":   true,
 	"IdariHakedisFatura": true,
 	"ProjeGorseli":       true,
+	"NakliyeIrsaliyesi":  true,
+	"KiralamaSozlesmesi": true,
 }
 
 type Handler struct {
