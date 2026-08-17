@@ -56,6 +56,9 @@ const (
 	TypeEquipmentTransferRequested = "equipment_transfer_requested" // talep açıldı → kaynak projenin onay yetkilileri
 	TypeEquipmentTransferDecided   = "equipment_transfer_decided"   // karar verildi → talep sahibi
 	TypeEquipmentDelivered         = "equipment_delivered"          // hedef projede teslim alındı → onay yetkilileri
+
+	// Makine/Ekipman/Araç Envanteri Faz E — kiralama sözleşmesi hatırlatması
+	TypeRentalContractMissing = "rental_contract_missing" // kiralık ekipmanın sözleşmesi 7+ gündür yüklenmedi → onay yetkilileri
 )
 
 const (

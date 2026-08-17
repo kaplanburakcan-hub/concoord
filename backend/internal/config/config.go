@@ -71,6 +71,11 @@ type Config struct {
 	// Prod hata bildirimi (opsiyonel): 5xx/panik olaylarını gönderen webhook
 	// (Slack/Teams uyumlu JSON). Boşsa yalnızca loglanır.
 	ErrorWebhookURL string
+
+	// Makine/Ekipman/Araç Envanteri Faz E: dışarıdan (Render Cron Job)
+	// tetiklenen /internal/cron/* uçları için paylaşılan gizli anahtar.
+	// Boşsa bu uçlar 503 ile kapalı kalır (yanlışlıkla açık bırakılmasın).
+	CronSecret string
 }
 
 func Load() (*Config, error) {
@@ -116,6 +121,7 @@ func Load() (*Config, error) {
 	c.LoginRateLimitPerMin = getint("IPKS_LOGIN_RATE_LIMIT", 10)
 	c.ClamdAddr = os.Getenv("IPKS_CLAMD_ADDR")
 	c.ErrorWebhookURL = os.Getenv("IPKS_ERROR_WEBHOOK_URL")
+	c.CronSecret = os.Getenv("IPKS_CRON_SECRET")
 
 	if c.DBDSN == "" {
 		return nil, fmt.Errorf("IPKS_DB_DSN zorunludur")

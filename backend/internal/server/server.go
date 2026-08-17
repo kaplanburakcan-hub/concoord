@@ -202,6 +202,13 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			})
 		})
 
+		// ---- Cron tetiklemeli iç uçlar (Faz E): oturum değil, paylaşılan
+		// gizli anahtar ister — dışarıdan (Render Cron Job) günlük çağrılır.
+		api.Route("/internal/cron", func(cr chi.Router) {
+			cr.Use(cronSecretGuard(cfg.CronSecret))
+			cr.Post("/check-rental-contracts", machinesH.CheckRentalContracts)
+		})
+
 		// ---- Admin Paneli v1 (tümü kimlik doğrulamalı + izin korumalı) ----
 		api.Route("/admin", func(ad chi.Router) {
 			ad.Use(mw.Authenticate)
@@ -680,4 +687,25 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	})
 
 	return r
+}
+
+// cronSecretGuard — /internal/cron/* uçları için oturum yerine paylaşılan
+// gizli anahtar kontrolü (X-Cron-Secret header). secret boşsa (env var
+// hiç ayarlanmamışsa) uç tamamen kapalı kalır — yanlışlıkla açık bir cron
+// endpoint'i prod'da kalmasın diye varsayılan güvenli.
+func cronSecretGuard(secret string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if secret == "" {
+				httpx.Error(w, r, http.StatusServiceUnavailable, httpx.CodeInternal,
+					"Cron uçları yapılandırılmamış (IPKS_CRON_SECRET eksik).", nil)
+				return
+			}
+			if r.Header.Get("X-Cron-Secret") != secret {
+				httpx.Error(w, r, http.StatusUnauthorized, httpx.CodeUnauthorized, "Geçersiz anahtar.", nil)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
