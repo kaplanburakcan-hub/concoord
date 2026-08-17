@@ -179,14 +179,12 @@ export default function PortfolioPage() {
                     />
                   )}
                 </div>
-                {c.parasal_pct !== undefined && (
-                  <div
-                    className="absolute bottom-2 h-4 w-5 -translate-x-1/2 text-green-600 dark:text-green-400"
-                    style={{ left: `${Math.min(100, c.parasal_pct)}%` }}
-                  >
-                    <svg className="h-full w-full"><use href="#ico-cash" /></svg>
-                  </div>
-                )}
+                <div
+                  className="absolute bottom-2 h-4 w-5 -translate-x-1/2 text-green-600 dark:text-green-400"
+                  style={{ left: `${Math.min(100, c.parasal_pct ?? 0)}%` }}
+                >
+                  <svg className="h-full w-full"><use href="#ico-cash" /></svg>
+                </div>
               </div>
               {c.parasal_pct === undefined && c.spi !== undefined && (
                 <p className="mt-1 text-[10.5px] text-beton-500">Ana sözleşme bedeli girilmemiş.</p>
