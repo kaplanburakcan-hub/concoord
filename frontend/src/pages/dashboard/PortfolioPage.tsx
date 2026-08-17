@@ -5,6 +5,12 @@ import { api } from "../../api/client";
 // Faz 9 — Portföy dashboard'u (Plan §3): projeler arası özet kartlar.
 // SPI/CPI ve kümülatif tutar yalnızca ilgili projede finansal rapor izni
 // olan kullanıcıya döner (backend süzer); taşeron kapsamlı projeler listelenmez.
+//
+// İlerleme üç ayrı eksende gösterilir (tek bir "ilerleme %" hangi anlama
+// geldiği belirsizdi — bkz. kullanıcı geri bildirimi):
+//   Zamansal — bitişe kalan gün sayısı (künye tarihlerinden, herkese açık)
+//   Fiziki   — EV/BAC, ekskavatör işaretçili turuncu bar (herkese açık)
+//   Parasal  — AC/sözleşme bedeli, yeşil bar (yalnızca finansal izinle)
 
 type Card = {
   project_id: string;
@@ -18,6 +24,11 @@ type Card = {
   open_findings: number;
   pending_approvals: number;
   net_payable_cum?: number;
+  start_date?: string;
+  end_date?: string;
+  elapsed_pct?: number;
+  days_to_end?: number;
+  parasal_pct?: number;
 };
 
 export default function PortfolioPage() {
@@ -50,6 +61,19 @@ export default function PortfolioPage() {
         <p className="mt-4 text-sm text-beton-400">Görüntülenecek proje yok.</p>
       )}
 
+      {/* shared icon defs */}
+      <svg width="0" height="0" className="absolute">
+        <symbol id="ico-excavator" viewBox="0 0 100 64">
+          <g fill="currentColor">
+            <rect x="8" y="46" width="60" height="10" rx="5" />
+            <path d="M18 46 L18 30 Q18 24 24 24 L46 24 L54 34 L60 34 L60 46 Z" />
+            <path d="M40 26 L64 10" stroke="currentColor" strokeWidth="6" strokeLinecap="round" fill="none" />
+            <path d="M64 10 L83 21" stroke="currentColor" strokeWidth="6" strokeLinecap="round" fill="none" />
+            <path d="M83 21 L94 18 L91 31 L80 29 Z" />
+          </g>
+        </symbol>
+      </svg>
+
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards?.map((c) => (
           <button
@@ -64,27 +88,105 @@ export default function PortfolioPage() {
             </div>
             <h2 className="mt-1 text-sm font-semibold text-white">{c.name}</h2>
 
-            <div className="mt-3 h-2 rounded bg-beton-800 overflow-hidden">
-              <div
-                className="h-full bg-emniyet-500"
-                style={{ width: `${Math.min(100, c.progress_pct)}%` }}
-              />
+            {/* Zamansal İlerleme */}
+            <div className="mt-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[9.5px] font-bold uppercase tracking-wider text-beton-500">
+                  Zamansal İlerleme
+                </span>
+                {c.days_to_end !== undefined ? (
+                  <b className="font-mono text-xs font-bold text-red-600 dark:text-red-400">
+                    {c.days_to_end < 0 ? `${-c.days_to_end} gün gecikti` : `Bitişe ${c.days_to_end} gün`}
+                  </b>
+                ) : (
+                  <b className="font-mono text-xs text-beton-500">—</b>
+                )}
+              </div>
+              {c.elapsed_pct !== undefined ? (
+                <>
+                  <div
+                    className="relative mt-1.5 h-1.5 rounded-full bg-beton-800"
+                    style={{
+                      backgroundImage:
+                        "repeating-linear-gradient(90deg, rgb(var(--beton-700)) 0 3px, transparent 3px 8px)",
+                      backgroundPosition: "center",
+                      backgroundSize: "100% 2px",
+                      backgroundRepeat: "no-repeat",
+                    }}
+                  >
+                    <div
+                      className="h-full rounded-full bg-red-600 dark:bg-red-400"
+                      style={{ width: `${Math.min(100, c.elapsed_pct)}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 flex justify-between font-mono text-[9.5px] text-beton-500">
+                    <span>{fmtDate(c.start_date)}</span>
+                    <span>{fmtDate(c.end_date)}</span>
+                  </div>
+                </>
+              ) : (
+                <p className="mt-1.5 text-[10.5px] text-beton-500">Proje tarihleri tanımlı değil.</p>
+              )}
             </div>
-            <p className="mt-1 font-mono text-[11px] text-beton-400">
-              ilerleme %{c.progress_pct.toFixed(1)}
-            </p>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-mono">
+            {/* Fiziki İlerleme */}
+            <div className="mt-3.5">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[9.5px] font-bold uppercase tracking-wider text-beton-500">
+                  Fiziki İlerleme
+                </span>
+                <b className="font-mono text-xs font-bold text-beton-100">{c.progress_pct.toFixed(1)}%</b>
+              </div>
+              <div className="relative mt-4 h-1.5">
+                <div className="absolute inset-x-0 bottom-0 h-1.5 rounded-full bg-beton-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-orange-600 dark:bg-orange-400"
+                    style={{ width: `${Math.min(100, c.progress_pct)}%` }}
+                  />
+                </div>
+                <div
+                  className="absolute top-0 h-[22px] w-[30px] -translate-x-1/2 text-orange-600 dark:text-orange-400"
+                  style={{ left: `${Math.min(100, c.progress_pct)}%` }}
+                >
+                  <svg className="h-full w-full"><use href="#ico-excavator" /></svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Parasal İlerleme */}
+            <div className="mt-3.5">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[9.5px] font-bold uppercase tracking-wider text-beton-500">
+                  Parasal İlerleme
+                </span>
+                <b className="font-mono text-xs font-bold text-beton-100">
+                  {c.parasal_pct !== undefined ? `${c.parasal_pct.toFixed(1)}%` : c.spi !== undefined ? "—" : "•••"}
+                </b>
+              </div>
+              <div className="mt-1.5 h-1.5 rounded-full bg-beton-800 overflow-hidden">
+                {c.parasal_pct !== undefined && (
+                  <div
+                    className="h-full rounded-full bg-green-600 dark:bg-green-400"
+                    style={{ width: `${Math.min(100, c.parasal_pct)}%` }}
+                  />
+                )}
+              </div>
+              {c.parasal_pct !== undefined && c.net_payable_cum !== undefined && (
+                <p className="mt-1 font-mono text-[10.5px] text-beton-400">
+                  {c.net_payable_cum.toLocaleString("tr-TR")} {c.currency} harcandı
+                </p>
+              )}
+              {c.parasal_pct === undefined && c.spi !== undefined && (
+                <p className="mt-1 text-[10.5px] text-beton-500">Sözleşme bedeli girilmemiş.</p>
+              )}
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-mono">
               <Metric label="SPI" value={fmtIdx(c.spi)} bad={(c.spi ?? 1) > 0 && (c.spi ?? 1) < 0.9} />
               <Metric label="CPI" value={fmtIdx(c.cpi)} bad={(c.cpi ?? 1) > 0 && (c.cpi ?? 1) < 0.9} />
               <Metric label="Açık İSG" value={String(c.open_findings)} bad={c.open_findings > 0} />
               <Metric label="Bekleyen onay" value={String(c.pending_approvals)} />
             </div>
-            {c.net_payable_cum !== undefined && (
-              <p className="mt-2 font-mono text-[11px] text-beton-400">
-                Kümülatif gerçekleşen: {c.net_payable_cum.toLocaleString("tr-TR")} {c.currency}
-              </p>
-            )}
           </button>
         ))}
       </div>
@@ -96,6 +198,10 @@ function fmtIdx(v?: number) {
   if (v === undefined) return "•••"; // finansal izin yok
   if (v === 0) return "—"; // tanımsız
   return v.toFixed(3);
+}
+function fmtDate(s?: string) {
+  if (!s) return "—";
+  return new Date(s).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 function Metric({ label, value, bad }: { label: string; value: string; bad?: boolean }) {
   return (

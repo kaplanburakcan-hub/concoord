@@ -35,6 +35,12 @@ type EVMResult struct {
 	// künyedeki ayrı bir alandır, boş bırakılabilir.
 	ContractAmount       *float64 `json:"contract_amount,omitempty"`
 	FinancialProgressPct float64  `json:"financial_progress_pct"`
+
+	// Zamansal ilerleme (Portföy'de "Zamansal İlerleme"): proje künyesi
+	// başlangıç/bitiş tarihleri. Herkese açık (finansal izin gerekmez —
+	// ProgressPct/fiziki ile aynı görünürlük ilkesi).
+	StartDate *time.Time `json:"start_date,omitempty"`
+	EndDate   *time.Time `json:"end_date,omitempty"`
 }
 
 // LoadEVM — proje için EVM verisini derler. Kümülatif PV/EV/AC ve endeksler
@@ -56,6 +62,7 @@ func LoadEVM(ctx context.Context, pool *pgxpool.Pool, pid uuid.UUID, now time.Ti
 		res.BAC = *budget
 	}
 	res.ContractAmount = contractAmt
+	res.StartDate, res.EndDate = start, end
 
 	// Sözleşme toplamı (EV ölçeği için; ana sözleşme değil ALT sözleşmeler —
 	// EV kesinleşmiş TAŞERON hakedişlerinden türediği için payda da odur).

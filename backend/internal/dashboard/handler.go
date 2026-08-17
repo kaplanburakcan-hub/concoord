@@ -416,12 +416,23 @@ type portfolioCardDTO struct {
 	Name         string     `json:"name"`
 	Status       string     `json:"status"`
 	Currency     string     `json:"currency"`
-	ProgressPct  float64    `json:"progress_pct"`
+	ProgressPct  float64    `json:"progress_pct"` // fiziki ilerleme (EV/BAC) — herkese açık
 	SPI          *float64   `json:"spi,omitempty"` // yalnızca finansal izinle
 	CPI          *float64   `json:"cpi,omitempty"`
 	OpenFindings int        `json:"open_findings"`
 	Pending      int        `json:"pending_approvals"` // hakediş+MAR+PR
 	NetPayableCum *float64  `json:"net_payable_cum,omitempty"`
+
+	// Zamansal ilerleme — künye tarihleri varsa herkese açık (parasal
+	// değil, izin gerektirmez). Bitiş geçmişse DaysToEnd negatif döner.
+	StartDate  *string  `json:"start_date,omitempty"`
+	EndDate    *string  `json:"end_date,omitempty"`
+	ElapsedPct *float64 `json:"elapsed_pct,omitempty"`
+	DaysToEnd  *int     `json:"days_to_end,omitempty"`
+
+	// Parasal ilerleme (AC/sözleşme bedeli) — SPI/CPI ile aynı finansal
+	// izin kapısından geçer.
+	ParasalPct *float64 `json:"parasal_pct,omitempty"`
 }
 
 func (h *Handler) Portfolio(w http.ResponseWriter, r *http.Request) {
@@ -488,6 +499,20 @@ func (h *Handler) Portfolio(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		card.ProgressPct = evm.ProgressPct
+		if evm.StartDate != nil && evm.EndDate != nil && evm.EndDate.After(*evm.StartDate) {
+			sd, ed := evm.StartDate.Format("2006-01-02"), evm.EndDate.Format("2006-01-02")
+			card.StartDate, card.EndDate = &sd, &ed
+			elapsed := round2(now.Sub(*evm.StartDate).Hours() / evm.EndDate.Sub(*evm.StartDate).Hours() * 100)
+			if elapsed < 0 {
+				elapsed = 0
+			}
+			if elapsed > 100 {
+				elapsed = 100
+			}
+			card.ElapsedPct = &elapsed
+			days := int(evm.EndDate.Sub(now).Hours() / 24)
+			card.DaysToEnd = &days
+		}
 		canFin, err := h.eval.Can(ctx, uid, &p.id, "reports.view_financial_reports")
 		if err != nil {
 			httpx.Internal(w, r)
@@ -496,6 +521,10 @@ func (h *Handler) Portfolio(w http.ResponseWriter, r *http.Request) {
 		if canFin {
 			spi, cpi, ac := evm.SPI, evm.CPI, evm.AC
 			card.SPI, card.CPI, card.NetPayableCum = &spi, &cpi, &ac
+			if evm.ContractAmount != nil && *evm.ContractAmount > 0 {
+				fp := evm.FinancialProgressPct
+				card.ParasalPct = &fp
+			}
 		}
 		if err := h.pool.QueryRow(ctx, `
 			SELECT
