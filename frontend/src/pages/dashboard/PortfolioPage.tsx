@@ -72,6 +72,14 @@ export default function PortfolioPage() {
             <path d="M83 21 L94 18 L91 31 L80 29 Z" />
           </g>
         </symbol>
+        <symbol id="ico-cash" viewBox="0 0 100 64">
+          <g fill="currentColor">
+            <rect x="8" y="12" width="84" height="12" rx="2" />
+            <rect x="8" y="26" width="84" height="12" rx="2" />
+            <rect x="8" y="40" width="84" height="12" rx="2" />
+          </g>
+          <rect x="38" y="8" width="16" height="48" rx="2" fill="rgb(var(--beton-900))" opacity=".9" />
+        </symbol>
       </svg>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -137,7 +145,7 @@ export default function PortfolioPage() {
                 </span>
                 <b className="font-mono text-xs font-bold text-beton-100">{c.progress_pct.toFixed(1)}%</b>
               </div>
-              <div className="relative mt-4 h-1.5">
+              <div className="relative mt-5 h-6">
                 <div className="absolute inset-x-0 bottom-0 h-1.5 rounded-full bg-beton-800 overflow-hidden">
                   <div
                     className="h-full rounded-full bg-orange-600 dark:bg-orange-400"
@@ -145,7 +153,7 @@ export default function PortfolioPage() {
                   />
                 </div>
                 <div
-                  className="absolute top-0 h-[22px] w-[30px] -translate-x-1/2 text-orange-600 dark:text-orange-400"
+                  className="absolute bottom-2 h-4 w-5 -translate-x-1/2 text-orange-600 dark:text-orange-400"
                   style={{ left: `${Math.min(100, c.progress_pct)}%` }}
                 >
                   <svg className="h-full w-full"><use href="#ico-excavator" /></svg>
@@ -163,12 +171,22 @@ export default function PortfolioPage() {
                   {c.parasal_pct !== undefined ? `${c.parasal_pct.toFixed(1)}%` : c.spi !== undefined ? "—" : "•••"}
                 </b>
               </div>
-              <div className="mt-1.5 h-1.5 rounded-full bg-beton-800 overflow-hidden">
+              <div className="relative mt-5 h-6">
+                <div className="absolute inset-x-0 bottom-0 h-1.5 rounded-full bg-beton-800 overflow-hidden">
+                  {c.parasal_pct !== undefined && (
+                    <div
+                      className="h-full rounded-full bg-green-600 dark:bg-green-400"
+                      style={{ width: `${Math.min(100, c.parasal_pct)}%` }}
+                    />
+                  )}
+                </div>
                 {c.parasal_pct !== undefined && (
                   <div
-                    className="h-full rounded-full bg-green-600 dark:bg-green-400"
-                    style={{ width: `${Math.min(100, c.parasal_pct)}%` }}
-                  />
+                    className="absolute bottom-2 h-4 w-5 -translate-x-1/2 text-green-600 dark:text-green-400"
+                    style={{ left: `${Math.min(100, c.parasal_pct)}%` }}
+                  >
+                    <svg className="h-full w-full"><use href="#ico-cash" /></svg>
+                  </div>
                 )}
               </div>
               {c.parasal_pct !== undefined && c.net_payable_cum !== undefined && (
