@@ -6,9 +6,11 @@ package dashboard
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -29,11 +31,15 @@ type EVMResult struct {
 	SCurve         []SCurvePoint `json:"s_curve"`
 	AsOfMonth      string        `json:"as_of_month"` // kümülatiflerin kesildiği ay
 
-	// Parasal ilerleme (Panel'de "Fiziki ilerleme"nin yanındaki halka grafik):
-	// AC (kesinleşen hakediş + teslim alınmış satınalma) / sözleşme bedeli.
-	// BAC (Yapım Bütçesi) ile KARIŞTIRILMAMALI — projects.contract_amount
-	// künyedeki ayrı bir alandır, boş bırakılabilir.
-	ContractAmount       *float64 `json:"contract_amount,omitempty"`
+	// Parasal ilerleme: yapılan İDARİ HAKEDİŞ toplamı (idareye/işverene
+	// kesilen hakediş — cari ödeme durumundan bağımsız) / ANA SÖZLEŞME
+	// bedeli (project_main_contracts.sozlesme_bedeli — Ana Sözleşme
+	// modülü). AC/CPI ile KARIŞTIRILMAMALI: CPI zaten harcanan maliyeti
+	// gösteriyor; parasal ilerleme burada "idareye ne kadarı hakedişe
+	// bağlandı" sorusuna cevap verir. Ana sözleşme bedeli girilmemişse
+	// nil kalır (frontend "izin yok" değil "sözleşme bedeli girilmemiş"
+	// ayrımını yapar).
+	MainContractAmount   *float64 `json:"contract_amount,omitempty"`
 	FinancialProgressPct float64  `json:"financial_progress_pct"`
 
 	// Zamansal ilerleme (Portföy'de "Zamansal İlerleme"): proje künyesi
@@ -49,20 +55,38 @@ type EVMResult struct {
 func LoadEVM(ctx context.Context, pool *pgxpool.Pool, pid uuid.UUID, now time.Time) (*EVMResult, error) {
 	res := &EVMResult{}
 
-	// Proje künyesi: bütçe (BAC) + sözleşme bedeli + plan ufku.
-	var budget, contractAmt *float64
+	// Proje künyesi: bütçe (BAC) + plan ufku.
+	var budget *float64
 	var start, end *time.Time
 	if err := pool.QueryRow(ctx, `
-		SELECT budget_total, contract_amount, currency, start_date, end_date
+		SELECT budget_total, currency, start_date, end_date
 		FROM projects WHERE id=$1 AND deleted_at IS NULL`, pid).
-		Scan(&budget, &contractAmt, &res.Currency, &start, &end); err != nil {
+		Scan(&budget, &res.Currency, &start, &end); err != nil {
 		return nil, err
 	}
 	if budget != nil {
 		res.BAC = *budget
 	}
-	res.ContractAmount = contractAmt
 	res.StartDate, res.EndDate = start, end
+
+	// Parasal ilerleme girdileri: ana sözleşme bedeli + yapılan idari
+	// hakediş toplamı (bkz. EVMResult.FinancialProgressPct doc).
+	var sozlesmeBedeli *float64
+	if err := pool.QueryRow(ctx,
+		`SELECT sozlesme_bedeli FROM project_main_contracts WHERE project_id=$1`, pid).
+		Scan(&sozlesmeBedeli); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+	var hakedisToplam float64
+	if err := pool.QueryRow(ctx,
+		`SELECT COALESCE(SUM(tutar),0) FROM idari_hakedisler WHERE project_id=$1 AND deleted_at IS NULL`, pid).
+		Scan(&hakedisToplam); err != nil {
+		return nil, err
+	}
+	if sozlesmeBedeli != nil && *sozlesmeBedeli > 0 {
+		res.MainContractAmount = sozlesmeBedeli
+		res.FinancialProgressPct = round2(hakedisToplam / *sozlesmeBedeli * 100)
+	}
 
 	// Sözleşme toplamı (EV ölçeği için; ana sözleşme değil ALT sözleşmeler —
 	// EV kesinleşmiş TAŞERON hakedişlerinden türediği için payda da odur).
@@ -180,9 +204,6 @@ func LoadEVM(ctx context.Context, pool *pgxpool.Pool, pid uuid.UUID, now time.Ti
 	res.EAC = EAC(res.BAC, res.EV, res.AC, rawCPI)
 	res.ETC = ETC(res.EAC, res.AC)
 	res.ProgressPct = ProgressPct(res.EV, res.BAC)
-	if res.ContractAmount != nil && *res.ContractAmount > 0 {
-		res.FinancialProgressPct = round2(res.AC / *res.ContractAmount * 100)
-	}
 	return res, nil
 }
 

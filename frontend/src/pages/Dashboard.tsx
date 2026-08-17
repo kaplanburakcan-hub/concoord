@@ -186,7 +186,7 @@ export default function Dashboard() {
             <Kpi label="Açık İSG" value={String(dash.open_findings.total)} bad={dash.open_findings.critical > 0} />
           </div>
           {dash.evm && !dash.evm.contract_amount && (
-            <p className="-mt-2 text-xs text-beton-500">Sözleşme bedeli girilmemiş — parasal ilerleme için proje künyesinden ekleyin.</p>
+            <p className="-mt-2 text-xs text-beton-500">Ana sözleşme bedeli girilmemiş — parasal ilerleme için Ana Sözleşme sayfasından ekleyin.</p>
           )}
           {addingAccident && (
             <div className="-mt-2 rounded-xl border border-beton-800 bg-beton-900 p-4" style={{ boxShadow: "var(--shadow)" }}>

@@ -23,7 +23,6 @@ type Card = {
   cpi?: number;
   open_findings: number;
   pending_approvals: number;
-  net_payable_cum?: number;
   start_date?: string;
   end_date?: string;
   elapsed_pct?: number;
@@ -189,13 +188,8 @@ export default function PortfolioPage() {
                   </div>
                 )}
               </div>
-              {c.parasal_pct !== undefined && c.net_payable_cum !== undefined && (
-                <p className="mt-1 font-mono text-[10.5px] text-beton-400">
-                  {c.net_payable_cum.toLocaleString("tr-TR")} {c.currency} harcandı
-                </p>
-              )}
               {c.parasal_pct === undefined && c.spi !== undefined && (
-                <p className="mt-1 text-[10.5px] text-beton-500">Sözleşme bedeli girilmemiş.</p>
+                <p className="mt-1 text-[10.5px] text-beton-500">Ana sözleşme bedeli girilmemiş.</p>
               )}
             </div>
 

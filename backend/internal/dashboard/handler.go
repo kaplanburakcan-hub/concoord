@@ -521,7 +521,7 @@ func (h *Handler) Portfolio(w http.ResponseWriter, r *http.Request) {
 		if canFin {
 			spi, cpi, ac := evm.SPI, evm.CPI, evm.AC
 			card.SPI, card.CPI, card.NetPayableCum = &spi, &cpi, &ac
-			if evm.ContractAmount != nil && *evm.ContractAmount > 0 {
+			if evm.MainContractAmount != nil && *evm.MainContractAmount > 0 {
 				fp := evm.FinancialProgressPct
 				card.ParasalPct = &fp
 			}
