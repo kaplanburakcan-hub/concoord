@@ -13,12 +13,14 @@ const DISIPLINLER = [
   "Diğer",
 ];
 
+// Yazışmalar sayfasındaki Durum rozetleriyle aynı renk paleti (bkz.
+// CorrespondencePage.tsx DURUM_STYLE) — okunaklılık için.
 const DURUMLAR: { value: string; label: string; cls: string }[] = [
-  { value: "taslak",            label: "Taslak",           cls: "bg-beton-700 text-beton-300" },
-  { value: "incelemede",        label: "İncelemede",       cls: "bg-yellow-900/60 text-yellow-300" },
-  { value: "onaylı",            label: "Onaylı",           cls: "bg-green-900/60 text-green-300" },
-  { value: "revizyon_gerekli",  label: "Rev. Gerekli",     cls: "bg-red-900/60 text-red-300" },
-  { value: "iptal",             label: "İptal",            cls: "bg-beton-800 text-beton-500 line-through" },
+  { value: "taslak",            label: "Taslak",           cls: "bg-beton-800 text-beton-300 border-beton-700" },
+  { value: "incelemede",        label: "İncelemede",       cls: "bg-yellow-500/15 text-yellow-300 border-yellow-500/40" },
+  { value: "onaylı",            label: "Onaylı",           cls: "bg-green-500/15 text-green-300 border-green-500/40" },
+  { value: "revizyon_gerekli",  label: "Rev. Gerekli",     cls: "bg-red-500/15 text-red-300 border-red-500/40" },
+  { value: "iptal",             label: "İptal",            cls: "bg-beton-800 text-beton-500 border-beton-700 line-through" },
 ];
 
 const inpBase =
@@ -89,7 +91,7 @@ function ViewRow({
       </td>
       <td className="py-2 px-3 text-beton-400 text-xs whitespace-nowrap">{isoToDisplay(doc.tarih)}</td>
       <td className="py-2 px-3">
-        <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${dm.cls}`}>
+        <span className={`inline-block rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${dm.cls}`}>
           {dm.label}
         </span>
       </td>
@@ -410,7 +412,7 @@ export default function TasarimVeProjelerPage() {
             {DURUMLAR.filter((dm) => stats.byDurum[dm.value] > 0).map((dm) => (
               <span
                 key={dm.value}
-                className={`text-xs px-2.5 py-1 rounded-full font-medium ${dm.cls}`}
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${dm.cls}`}
               >
                 {dm.label}: {stats.byDurum[dm.value]}
               </span>

@@ -137,14 +137,14 @@ export default function PortfolioPage() {
             </div>
 
             {/* Fiziki İlerleme */}
-            <div className="mt-3.5">
+            <div className="mt-6">
               <div className="flex items-baseline justify-between">
                 <span className="text-[9.5px] font-bold uppercase tracking-wider text-beton-500">
                   Fiziki İlerleme
                 </span>
                 <b className="font-mono text-xs font-bold text-beton-100">{c.progress_pct.toFixed(1)}%</b>
               </div>
-              <div className="relative mt-5 h-6">
+              <div className="relative mt-2 h-6">
                 <div className="absolute inset-x-0 bottom-0 h-1.5 rounded-full bg-beton-800 overflow-hidden">
                   <div
                     className="h-full rounded-full bg-orange-600 dark:bg-orange-400"
@@ -161,16 +161,16 @@ export default function PortfolioPage() {
             </div>
 
             {/* Parasal İlerleme */}
-            <div className="mt-3.5">
+            <div className="mt-6">
               <div className="flex items-baseline justify-between">
                 <span className="text-[9.5px] font-bold uppercase tracking-wider text-beton-500">
                   Parasal İlerleme
                 </span>
                 <b className="font-mono text-xs font-bold text-beton-100">
-                  {c.parasal_pct !== undefined ? `${c.parasal_pct.toFixed(1)}%` : c.spi !== undefined ? "—" : "•••"}
+                  {c.parasal_pct !== undefined ? `${c.parasal_pct.toFixed(1)}%` : c.spi !== undefined ? "0.0%" : "•••"}
                 </b>
               </div>
-              <div className="relative mt-5 h-6">
+              <div className="relative mt-2 h-6">
                 <div className="absolute inset-x-0 bottom-0 h-1.5 rounded-full bg-beton-800 overflow-hidden">
                   {c.parasal_pct !== undefined && (
                     <div
@@ -186,16 +186,16 @@ export default function PortfolioPage() {
                   <svg className="h-full w-full"><use href="#ico-cash" /></svg>
                 </div>
               </div>
-              {c.parasal_pct === undefined && c.spi !== undefined && (
-                <p className="mt-1 text-[10.5px] text-beton-500">Ana sözleşme bedeli girilmemiş.</p>
-              )}
+              <p className="mt-1 text-[10.5px] text-beton-500 min-h-[13px]">
+                {c.parasal_pct === undefined && c.spi !== undefined ? "Ana sözleşme bedeli girilmemiş." : " "}
+              </p>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-mono">
-              <Metric label="SPI" value={fmtIdx(c.spi)} bad={(c.spi ?? 1) > 0 && (c.spi ?? 1) < 0.9} />
-              <Metric label="CPI" value={fmtIdx(c.cpi)} bad={(c.cpi ?? 1) > 0 && (c.cpi ?? 1) < 0.9} />
-              <Metric label="Açık İSG" value={String(c.open_findings)} bad={c.open_findings > 0} />
-              <Metric label="Bekleyen onay" value={String(c.pending_approvals)} />
+              <Metric label="SPI" value={fmtIdx(c.spi)} tone={!c.spi ? "neutral" : c.spi < 1 ? "bad" : "good"} />
+              <Metric label="CPI" value={fmtIdx(c.cpi)} tone={!c.cpi ? "neutral" : c.cpi < 1 ? "bad" : "good"} />
+              <Metric label="Açık İSG" value={String(c.open_findings)} tone="info" />
+              <Metric label="Bekleyen onay" value={String(c.pending_approvals)} tone="warn" />
             </div>
           </button>
         ))}
@@ -213,11 +213,25 @@ function fmtDate(s?: string) {
   if (!s) return "—";
   return new Date(s).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
-function Metric({ label, value, bad }: { label: string; value: string; bad?: boolean }) {
+// Yazışmalar sayfasındaki Durum rozetleriyle aynı görsel dil (bkz.
+// CorrespondencePage.tsx DURUM_STYLE): bg-COLOR-500/15 + text-COLOR-300 +
+// border-COLOR-500/40, rounded-full pill.
+const TONE_STYLE: Record<string, string> = {
+  good: "bg-green-500/15 text-green-300 border-green-500/40",
+  bad: "bg-red-500/15 text-red-300 border-red-500/40",
+  info: "bg-blue-500/15 text-blue-300 border-blue-500/40",
+  warn: "bg-yellow-500/15 text-yellow-300 border-yellow-500/40",
+  neutral: "bg-beton-800 text-beton-400 border-beton-700",
+};
+function Metric({
+  label, value, tone,
+}: { label: string; value: string; tone: "good" | "bad" | "info" | "warn" | "neutral" }) {
   return (
     <div className="rounded bg-beton-950 border border-beton-800 px-2 py-1.5">
-      <span className="block text-[10px] uppercase tracking-wider text-beton-500">{label}</span>
-      <span className={bad ? "text-red-400" : "text-beton-100"}>{value}</span>
+      <span className="block text-[10px] uppercase tracking-wider text-beton-500 mb-1">{label}</span>
+      <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-mono font-semibold ${TONE_STYLE[tone]}`}>
+        {value}
+      </span>
     </div>
   );
 }

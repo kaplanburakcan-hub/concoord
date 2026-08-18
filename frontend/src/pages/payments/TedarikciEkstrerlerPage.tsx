@@ -25,11 +25,13 @@ type StatementPayment = {
 const PAYMENT_METHOD_LABEL: Record<string, string> = { nakit: "Nakit", havale: "Havale", cek: "Çek" };
 
 // ── Sabitler ─────────────────────────────────────────────────────────────────
+// Yazışmalar sayfasındaki Durum rozetleriyle aynı renk paleti (bkz.
+// CorrespondencePage.tsx DURUM_STYLE) — okunaklılık için.
 const DURUM_META: Record<string, { label: string; cls: string }> = {
-  bekliyor:     { label: "Bekliyor",      cls: "bg-yellow-900/60 text-yellow-300" },
-  kismi_odendi: { label: "Kısmi Ödendi",  cls: "bg-blue-900/60 text-blue-300" },
-  odendi:       { label: "Ödendi",        cls: "bg-green-900/60 text-green-300" },
-  iptal:        { label: "İptal",         cls: "bg-beton-800 text-beton-500 line-through" },
+  bekliyor:     { label: "Bekliyor",      cls: "bg-yellow-500/15 text-yellow-300 border-yellow-500/40" },
+  kismi_odendi: { label: "Kısmi Ödendi",  cls: "bg-blue-500/15 text-blue-300 border-blue-500/40" },
+  odendi:       { label: "Ödendi",        cls: "bg-green-500/15 text-green-300 border-green-500/40" },
+  iptal:        { label: "İptal",         cls: "bg-beton-800 text-beton-500 border-beton-700 line-through" },
 };
 
 const inpBase =
@@ -461,7 +463,7 @@ export default function TedarikciEkstrerlerPage() {
                       {fmt(bakiye)}
                     </td>
                     <td className="py-2 px-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${dm.cls}`}>
+                      <span className={`inline-block rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${dm.cls}`}>
                         {dm.label}
                       </span>
                     </td>
