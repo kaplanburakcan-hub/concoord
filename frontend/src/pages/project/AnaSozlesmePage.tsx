@@ -112,6 +112,13 @@ export default function AnaSozlesmePage() {
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
   const pdfRef = useRef<HTMLInputElement>(null);
 
+  // Kaydet-ve-kilitle akışı: sözleşme kaydedilince otomatik kilitlenir
+  // (bkz. backend contracts.Upsert). Kilitliyken "view" — özet gösterilir;
+  // "Güncelle / Revize Et" tıklanınca "edit"e geçilir. Şimdilik revizyon
+  // da doğrudan kilitlenir, onay hiyerarşisi yok (bkz. ilgili commit notu).
+  const [mode, setMode] = useState<"view" | "edit">("edit");
+  const [meta, setMeta] = useState<{ isLocked: boolean; updatedAt?: string; updatedByName?: string }>({ isLocked: false });
+
   const empty = (): ContractForm => ({
     sozlesme_turu: "goturu_bedel",
     fiyat_farki_var: false,
@@ -132,13 +139,15 @@ export default function AnaSozlesmePage() {
 
   const [form, setForm] = useState<ContractForm>(empty());
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     if (!pid) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     setErr(null);
     try {
       const res = await api<{ contract: any }>(`/projects/${pid}/main-contract`, { projectId: pid });
       const c = res.contract;
+      setMeta({ isLocked: !!c.is_locked, updatedAt: c.updated_at, updatedByName: c.updated_by_name });
+      setMode(c.is_locked ? "view" : "edit");
       setForm({
         sozlesme_turu: c.sozlesme_turu ?? "goturu_bedel",
         fiyat_farki_var: c.fiyat_farki_var ?? false,
@@ -164,11 +173,13 @@ export default function AnaSozlesmePage() {
     } catch (e) {
       if (e instanceof RequestError && e.status === 404) {
         setForm(empty());
+        setMeta({ isLocked: false });
+        setMode("edit");
       } else {
         setErr("Sözleşme verileri yüklenemedi.");
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [pid]);
 
@@ -260,6 +271,7 @@ export default function AnaSozlesmePage() {
       await api(`/projects/${pid}/main-contract`, { method: "PUT", body, projectId: pid });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      await load(true); // meta (is_locked/updated_by) + mode="view" tazelenir
     } catch (e) {
       if (e instanceof RequestError && e.api?.details) {
         setFieldErr(e.api.details as Record<string, string>);
@@ -306,14 +318,23 @@ export default function AnaSozlesmePage() {
           <h1 className="text-xl font-semibold text-chrome-text">Ana Sözleşme</h1>
           <p className="text-sm text-chrome-text-2 mt-0.5">{current.name}</p>
         </div>
-        {canEdit && (
+        {canEdit && mode === "edit" && (
           <button
             onClick={handleSave}
             disabled={saving}
             className="px-5 py-2 rounded-md bg-accent text-white text-sm font-medium
                        hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
-            {saving ? "Kaydediliyor…" : "Kaydet"}
+            {saving ? "Kaydediliyor…" : "Kaydet ve Kilitle"}
+          </button>
+        )}
+        {canEdit && mode === "view" && (
+          <button
+            onClick={() => setMode("edit")}
+            className="px-5 py-2 rounded-md border border-accent text-accent text-sm font-medium
+                       hover:bg-accent/10 transition-colors"
+          >
+            Güncelle / Revize Et
           </button>
         )}
       </div>
@@ -325,10 +346,14 @@ export default function AnaSozlesmePage() {
       )}
       {saved && (
         <div className="rounded-md bg-green-500/10 border border-green-500/30 px-4 py-3 text-sm text-green-400">
-          Sözleşme bilgileri kaydedildi.
+          Sözleşme kaydedildi ve kilitlendi.
         </div>
       )}
 
+      {mode === "view" ? (
+        <ContractSummary form={form} meta={meta} />
+      ) : (
+      <>
       {/* ── 1. Sözleşme Türü ─────────────────────────────────────────────── */}
       <Section title="Sözleşme Türü">
         <div className="flex flex-col gap-3">
@@ -684,16 +709,27 @@ export default function AnaSozlesmePage() {
       </Section>
 
       {canEdit && (
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end gap-2 pt-2">
+          {meta.isLocked && (
+            <button
+              onClick={() => load()}
+              className="px-6 py-2 rounded-md border border-chrome-border text-sm text-chrome-text-2
+                         hover:text-chrome-text hover:border-chrome-text-2 transition-colors"
+            >
+              Vazgeç
+            </button>
+          )}
           <button
             onClick={handleSave}
             disabled={saving}
             className="px-6 py-2 rounded-md bg-accent text-white text-sm font-medium
                        hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
-            {saving ? "Kaydediliyor…" : "Sözleşmeyi Kaydet"}
+            {saving ? "Kaydediliyor…" : "Sözleşmeyi Kaydet ve Kilitle"}
           </button>
         </div>
+      )}
+      </>
       )}
 
     </div>
@@ -701,6 +737,97 @@ export default function AnaSozlesmePage() {
 }
 
 // ── Alt bileşenler ────────────────────────────────────────────────────────────
+
+// ContractSummary — kilitli sözleşmenin salt okunur özeti ("view" modu).
+// Tüm form yerine sadece kritik alanları gösterir; ayrıntılı değişiklik
+// için "Güncelle / Revize Et" ile tekrar edit moduna geçilir.
+function ContractSummary({ form, meta }: {
+  form: ContractForm;
+  meta: { isLocked: boolean; updatedAt?: string; updatedByName?: string };
+}) {
+  const showBirim = form.sozlesme_turu === "birim_fiyat" || form.sozlesme_turu === "karma";
+  const showLump = form.sozlesme_turu === "goturu_bedel" || form.sozlesme_turu === "karma";
+
+  function updatedAtDisplay(): string {
+    if (!meta.updatedAt) return "";
+    const d = new Date(meta.updatedAt);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+      " " + d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-md bg-beton-800/40 border border-chrome-border px-4 py-2.5 text-xs text-chrome-text-2 flex items-center gap-1.5">
+        <span>🔒</span>
+        <span>
+          Sözleşme kilitli{meta.updatedByName ? ` — son güncelleyen: ${meta.updatedByName}` : ""}
+          {updatedAtDisplay() && ` · ${updatedAtDisplay()}`}
+        </span>
+      </div>
+
+      <Section title="Sözleşme Türü ve Fiyat Farkı">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <SummaryRow label="Sözleşme Türü" value={TUR_LABEL[form.sozlesme_turu]} />
+          <SummaryRow label="Fiyat Farkı" value={form.fiyat_farki_var ? "Var" : "Yok"} />
+          {form.fiyat_farki_var && form.fiyat_farki_formulu && (
+            <SummaryRow label="Fiyat Farkı Formülü" value={form.fiyat_farki_formulu} full />
+          )}
+        </div>
+      </Section>
+
+      {showLump && (
+        <Section title={form.sozlesme_turu === "karma" ? "Götürü Bedel Bölüm Tutarı" : "Sözleşme Bedeli"}>
+          <p className="text-lg font-semibold text-chrome-text tabular-nums">
+            {form.sozlesme_bedeli ? `${form.sozlesme_bedeli} ${form.sozlesme_para_birimi}` : "—"}
+          </p>
+        </Section>
+      )}
+
+      {showBirim && (
+        <Section title={form.sozlesme_turu === "karma" ? "Birim Fiyatlı Bölüm Kalemleri" : "Birim Fiyat Kalemleri"}>
+          {form.birim_fiyat_kalemleri.length === 0 ? (
+            <p className="text-sm text-chrome-text-3">Kalem girilmemiş.</p>
+          ) : (
+            <p className="text-sm text-chrome-text">{form.birim_fiyat_kalemleri.length} kalem tanımlı.</p>
+          )}
+        </Section>
+      )}
+
+      <Section title="Tarihler ve Süre">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <SummaryRow label="Sözleşme Tarihi" value={form.sozlesme_tarihi || "—"} />
+          <SummaryRow label="Yer Teslim Tarihi" value={form.yer_teslim_tarihi || "—"} />
+          <SummaryRow label="İşin Süresi" value={form.is_suresi_gun ? `${form.is_suresi_gun} takvim günü` : "—"} />
+          <SummaryRow label="Kesin Kabul" value={form.gecici_kabul_sonrasi_gun ? `Geçici kabulden ${form.gecici_kabul_sonrasi_gun} gün sonra` : "—"} />
+        </div>
+      </Section>
+
+      <Section title="İş Artışı / Eksilişi">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <SummaryRow label="Azami Artış Oranı" value={form.max_artis_orani ? `+%${form.max_artis_orani}` : "—"} />
+          <SummaryRow label="Azami Eksiliş Oranı" value={form.max_eksilis_orani ? `−%${form.max_eksilis_orani}` : "—"} />
+        </div>
+      </Section>
+
+      <Section title="Diğer Bilgiler">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <SummaryRow label="SGK İşyeri Numarası" value={form.sgk_is_yeri_no || "—"} />
+          <SummaryRow label="Sözleşme PDF Eki" value={form.pdf_dosya_adi || "—"} />
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+function SummaryRow({ label, value, full }: { label: string; value: string; full?: boolean }) {
+  return (
+    <div className={full ? "sm:col-span-2" : undefined}>
+      <p className="text-xs text-chrome-text-3 mb-0.5">{label}</p>
+      <p className="text-chrome-text">{value}</p>
+    </div>
+  );
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

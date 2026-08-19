@@ -42,6 +42,7 @@ const I = {
   tasarim: <svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>,
   ekstrem: <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>,
   puantaj: <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>,
+  sigorta: <svg viewBox="0 0 24 24"><path d="M12 2l9 4v6c0 5-4 8-9 10-5-2-9-5-9-10V6z"/><path d="M9 12l2 2 4-4"/></svg>,
 };
 
 const GROUPS: NavGroup[] = [
@@ -69,6 +70,7 @@ const GROUPS: NavGroup[] = [
         ],
       },
       { to: "/hakedis/idari", label: "İdari Hakedişler", perm: "progress_payments.view", icon: I.idarihakedis, end: true },
+      { to: "/proje/sigorta-policeler", label: "Sigorta ve Poliçeler", perm: "projects.view", icon: I.sigorta },
       {
         to: "/satinalma", label: "Satın Alma ve Tedarik", perm: "procurement.view", icon: I.satinalma,
         children: [

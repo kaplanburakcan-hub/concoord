@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
 )
 
@@ -47,6 +48,8 @@ type Contract struct {
 	PdfDosyaURL           string            `json:"pdf_dosya_url"`
 	PdfDosyaAdi           string            `json:"pdf_dosya_adi"`
 	UpdatedAt             *string           `json:"updated_at,omitempty"`
+	IsLocked              bool              `json:"is_locked"`
+	UpdatedByName         string            `json:"updated_by_name,omitempty"`
 }
 
 // Get — proje ana sözleşmesini döner. Henüz kaydedilmemişse 404.
@@ -59,18 +62,21 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	var c Contract
 	var kalemleriJSON []byte
 	err := h.db.QueryRow(r.Context(), `
-		SELECT id, project_id,
-		       sozlesme_turu, fiyat_farki_var, COALESCE(fiyat_farki_formulu,''),
-		       sozlesme_bedeli, COALESCE(sozlesme_para_birimi,'TRY'),
-		       birim_fiyat_kalemleri,
-		       TO_CHAR(sozlesme_tarihi,'YYYY-MM-DD'),
-		       TO_CHAR(yer_teslim_tarihi,'YYYY-MM-DD'),
-		       is_suresi_gun, gecici_kabul_sonrasi_gun,
-		       max_artis_orani, max_eksilis_orani,
-		       COALESCE(sgk_is_yeri_no,''),
-		       COALESCE(pdf_dosya_url,''), COALESCE(pdf_dosya_adi,''),
-		       TO_CHAR(updated_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"')
-		FROM project_main_contracts WHERE project_id=$1`, pid).
+		SELECT c.id, c.project_id,
+		       c.sozlesme_turu, c.fiyat_farki_var, COALESCE(c.fiyat_farki_formulu,''),
+		       c.sozlesme_bedeli, COALESCE(c.sozlesme_para_birimi,'TRY'),
+		       c.birim_fiyat_kalemleri,
+		       TO_CHAR(c.sozlesme_tarihi,'YYYY-MM-DD'),
+		       TO_CHAR(c.yer_teslim_tarihi,'YYYY-MM-DD'),
+		       c.is_suresi_gun, c.gecici_kabul_sonrasi_gun,
+		       c.max_artis_orani, c.max_eksilis_orani,
+		       COALESCE(c.sgk_is_yeri_no,''),
+		       COALESCE(c.pdf_dosya_url,''), COALESCE(c.pdf_dosya_adi,''),
+		       TO_CHAR(c.updated_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+		       c.is_locked, COALESCE(u.full_name,'')
+		FROM project_main_contracts c
+		LEFT JOIN users u ON u.id = c.updated_by
+		WHERE c.project_id=$1`, pid).
 		Scan(&c.ID, &c.ProjectID,
 			&c.SozlesmeTuru, &c.FiyatFarkiVar, &c.FiyatFarkiFormulu,
 			&c.SozlesmeBedeli, &c.SozlesmeParaBirimi,
@@ -80,7 +86,8 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 			&c.MaxArtisOrani, &c.MaxEksilisOrani,
 			&c.SgkIsYeriNo,
 			&c.PdfDosyaURL, &c.PdfDosyaAdi,
-			&c.UpdatedAt)
+			&c.UpdatedAt,
+			&c.IsLocked, &c.UpdatedByName)
 
 	if err == pgx.ErrNoRows {
 		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Ana sözleşme henüz girilmemiş.", nil)
@@ -99,9 +106,19 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // Upsert — proje ana sözleşmesini kaydeder (INSERT … ON CONFLICT UPDATE).
+// Her başarılı kayıt sözleşmeyi otomatik kilitler (is_locked=true) — ayrı
+// bir "kilitle" adımı yok, "Sözleşmeyi Kaydet ve Kilitle" tek eylem.
+// Şimdilik revizyonlar da doğrudan kilitlenir; onay hiyerarşisine bağlama
+// (revize → onaya gönder → onaylanınca kilitle + bildirim) ileride ayrı
+// bir iş olarak ele alınacak.
 func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 	pid, ok := parseID(w, r, "projectID")
 	if !ok {
+		return
+	}
+	uid, ok := auth.UserIDFrom(r.Context())
+	if !ok {
+		httpx.Error(w, r, http.StatusUnauthorized, httpx.CodeUnauthorized, "Kimlik doğrulama gerekli.", nil)
 		return
 	}
 
@@ -135,12 +152,12 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		    is_suresi_gun, gecici_kabul_sonrasi_gun,
 		    max_artis_orani, max_eksilis_orani,
 		    sgk_is_yeri_no, pdf_dosya_url, pdf_dosya_adi,
-		    updated_at
+		    created_by, updated_by, is_locked, updated_at
 		) VALUES (
 		    $1,$2,$3,$4,$5,$6,$7,
 		    $8::date,$9::date,
 		    $10,$11,$12,$13,$14,$15,$16,
-		    NOW()
+		    $17,$17,TRUE,NOW()
 		)
 		ON CONFLICT (project_id) DO UPDATE SET
 		    sozlesme_turu            = EXCLUDED.sozlesme_turu,
@@ -158,6 +175,8 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		    sgk_is_yeri_no           = EXCLUDED.sgk_is_yeri_no,
 		    pdf_dosya_url            = EXCLUDED.pdf_dosya_url,
 		    pdf_dosya_adi            = EXCLUDED.pdf_dosya_adi,
+		    updated_by               = EXCLUDED.updated_by,
+		    is_locked                = TRUE,
 		    updated_at               = NOW()
 		RETURNING id`,
 		pid,
@@ -167,6 +186,7 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		body.IsSuresiGun, body.GeciciKabulSonrasiGun,
 		body.MaxArtisOrani, body.MaxEksilisOrani,
 		nilStr(body.SgkIsYeriNo), nilStr(body.PdfDosyaURL), nilStr(body.PdfDosyaAdi),
+		uid,
 	).Scan(&id)
 
 	if err != nil {

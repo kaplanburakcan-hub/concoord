@@ -25,6 +25,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/fixedexpenses"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/idarihakedis"
+	"github.com/ipks/ipks/backend/internal/insurance"
 	"github.com/ipks/ipks/backend/internal/machines"
 	"github.com/ipks/ipks/backend/internal/materials"
 	"github.com/ipks/ipks/backend/internal/meetings"
@@ -121,6 +122,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 	// --- Faz 18: Ana Sözleşme ---
 	contractH := contracts.NewHandler(pool)
+
+	// --- Sigorta ve Poliçeler ---
+	insuranceH := insurance.NewHandler(pool)
 
 	// --- Faz 19: Proje Keşfi ---
 	surveyH := survey.NewHandler(pool)
@@ -532,6 +536,15 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.Use(mw.Authenticate)
 			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/main-contract", contractH.Get)
 			pr.With(mw.RequirePermission("projects.edit")).Put("/projects/{projectID}/main-contract", contractH.Upsert)
+		})
+
+		// ---- Sigorta ve Poliçeler ----
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/insurance-policies", insuranceH.List)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/insurance-policies", insuranceH.Create)
+			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/insurance-policies/{id}", insuranceH.Update)
+			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/insurance-policies/{id}", insuranceH.Delete)
 		})
 
 		// ---- Faz 19: Proje Keşfi ----
