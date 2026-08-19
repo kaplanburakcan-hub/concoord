@@ -147,12 +147,12 @@ export default function PortfolioPage() {
               <div className="relative mt-2 h-6">
                 <div className="absolute inset-x-0 bottom-0 h-1.5 rounded-full bg-beton-800 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-orange-600 dark:bg-orange-400"
+                    className="h-full rounded-full bg-[var(--group-accent)]"
                     style={{ width: `${Math.min(100, c.progress_pct)}%` }}
                   />
                 </div>
                 <div
-                  className="absolute bottom-2 h-4 w-5 -translate-x-1/2 text-orange-600 dark:text-orange-400"
+                  className="absolute bottom-2 h-4 w-5 -translate-x-1/2 text-[var(--group-accent)]"
                   style={{ left: `${Math.min(100, c.progress_pct)}%` }}
                 >
                   <svg className="h-full w-full"><use href="#ico-excavator" /></svg>
