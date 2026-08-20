@@ -8,6 +8,8 @@ import { useProjects } from "../projects/ProjectContext";
 import SCurve from "./dashboard/SCurve";
 import type { SCurvePoint } from "./dashboard/SCurve";
 import MultiDonut from "./dashboard/MultiDonut";
+import RadialRing from "./dashboard/RadialRing";
+import Gauge from "./dashboard/Gauge";
 
 // Faz 9 — rol duyarlı proje dashboard'u. Finansal blok (EVM) backend'de izinle
 // süzülür: reports.view_financial_reports yoksa `evm` alanı hiç gelmez; taşeron
@@ -159,21 +161,49 @@ export default function Dashboard() {
 
       {dash && (
         <div className="mt-6 grid gap-4">
-          {/* Kompakt KPI şeridi — tek satırda at-a-glance göstergeler
-              (Panel v2 konsept önizlemesinde onaylanan yoğun yerleşim). */}
-          <div className={"grid gap-3 " + (dash.evm ? "grid-cols-3 md:grid-cols-6" : "grid-cols-2 md:grid-cols-3")}>
-            <Kpi label="Fiziksel İlerleme" value={`%${dash.progress_pct.toFixed(1)}`} />
+          {/* İlerleme göstergeleri: Fiziksel/Zamansal/Parasal İlerleme yüzde
+              halkaları + altlarında SPI (fiziksel+zamansal ile aynı grupta,
+              ikisinin karşılaştırması olduğu için) ve CPI (parasal ile aynı
+              grupta, maliyetle ilgili olduğu için) ibre göstergeleri.
+              Zamansal İlerleme yeni bir backend alanı GEREKTİRMEZ — mevcut
+              EVM verisinden (PV/BAC, "planlanan % tamamlanma") türetilir. */}
+          <div className="rounded-xl border border-beton-800 bg-beton-900 p-5" style={{ boxShadow: "var(--shadow)" }}>
+            <div className="grid grid-cols-3 gap-3">
+              <ProgressRing label="Fiziksel İlerleme" pct={dash.progress_pct} color="#2f6fed" />
+              {dash.evm ? (
+                <ProgressRing
+                  label="Zamansal İlerleme"
+                  pct={dash.evm.bac > 0 ? (dash.evm.pv / dash.evm.bac) * 100 : 0}
+                  color="#f59e0b"
+                  sub="PV/BAC"
+                />
+              ) : (
+                <ProgressRing label="Zamansal İlerleme" pct={0} color="#f59e0b" empty />
+              )}
+              {dash.evm?.contract_amount ? (
+                <ProgressRing label="Parasal İlerleme" pct={dash.evm.financial_progress_pct} color="#22c55e" />
+              ) : (
+                <ProgressRing label="Parasal İlerleme" pct={0} color="#22c55e" empty />
+              )}
+            </div>
             {dash.evm && (
-              <>
-                {dash.evm.contract_amount ? (
-                  <Kpi label="Parasal İlerleme" value={`%${dash.evm.financial_progress_pct.toFixed(1)}`} />
-                ) : (
-                  <Kpi label="Parasal İlerleme" value="—" />
-                )}
-                <Kpi label="SPI" value={idx(dash.evm.spi)} bad={dash.evm.spi > 0 && dash.evm.spi < 0.9} />
-                <Kpi label="CPI" value={idx(dash.evm.cpi)} bad={dash.evm.cpi > 0 && dash.evm.cpi < 0.9} />
-              </>
+              <div className="mt-3 grid grid-cols-3 gap-3">
+                <div className="col-span-2 flex flex-col items-center gap-1 pt-2 border-t border-beton-800">
+                  <Gauge value={dash.evm.spi} />
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-beton-400">SPI — Zamansal Performans</p>
+                </div>
+                <div className="flex flex-col items-center gap-1 pt-2 border-t border-beton-800">
+                  <Gauge value={dash.evm.cpi} />
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-beton-400">CPI — Maliyet Performansı</p>
+                </div>
+              </div>
             )}
+            {dash.evm && !dash.evm.contract_amount && (
+              <p className="mt-3 text-xs text-beton-500">Ana sözleşme bedeli girilmemiş — parasal ilerleme için Ana Sözleşme sayfasından ekleyin.</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <Kpi
               label="Kazasız Gün"
               value={dash.accident_free_days.has_reference ? String(dash.accident_free_days.days) : "—"}
@@ -185,9 +215,6 @@ export default function Dashboard() {
             />
             <Kpi label="Açık İSG" value={String(dash.open_findings.total)} bad={dash.open_findings.critical > 0} />
           </div>
-          {dash.evm && !dash.evm.contract_amount && (
-            <p className="-mt-2 text-xs text-beton-500">Ana sözleşme bedeli girilmemiş — parasal ilerleme için Ana Sözleşme sayfasından ekleyin.</p>
-          )}
           {addingAccident && (
             <div className="-mt-2 rounded-xl border border-beton-800 bg-beton-900 p-4" style={{ boxShadow: "var(--shadow)" }}>
               <div className="flex flex-wrap items-end gap-2">
@@ -639,6 +666,24 @@ function Card({ title, action, children }: { title: string; action?: ReactNode; 
         {action}
       </div>
       <div className="mt-3 flex-1 min-h-0">{children}</div>
+    </div>
+  );
+}
+// ProgressRing — İlerleme Göstergeleri kartındaki tek bir yüzde halkası +
+// etiket. `empty` (ör. ana sözleşme bedeli girilmemiş) iken halka soluk
+// gösterilir ve "Veri yok" yazar — Kpi bileşenindeki "—" deseniyle tutarlı.
+function ProgressRing({ label, pct, color, sub, empty }: {
+  label: string; pct: number; color: string; sub?: string; empty?: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1.5 text-center">
+      <RadialRing pct={pct} color={empty ? "rgb(var(--beton-700))" : color} />
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-beton-400">{label}</p>
+      {empty ? (
+        <p className="text-[10.5px] text-beton-500">Veri yok</p>
+      ) : sub ? (
+        <p className="text-[10.5px] text-beton-500">{sub}</p>
+      ) : null}
     </div>
   );
 }
