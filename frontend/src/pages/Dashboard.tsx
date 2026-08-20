@@ -191,10 +191,12 @@ export default function Dashboard() {
                 <div className="col-span-2 flex flex-col items-center gap-1 pt-2 border-t border-beton-800">
                   <Gauge value={dash.evm.spi} />
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-beton-400">SPI — Zamansal Performans</p>
+                  <p className="text-[10.5px] text-beton-500">{spiHint(dash.evm.spi)}</p>
                 </div>
                 <div className="flex flex-col items-center gap-1 pt-2 border-t border-beton-800">
                   <Gauge value={dash.evm.cpi} />
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-beton-400">CPI — Maliyet Performansı</p>
+                  <p className="text-[10.5px] text-beton-500">{cpiHint(dash.evm.cpi)}</p>
                 </div>
               </div>
             )}
@@ -640,6 +642,18 @@ function CoverImageCard({ projectId, coverImage, canUpload, onChanged }: {
 
 function idx(v: number) {
   return v === 0 ? "—" : v.toFixed(3);
+}
+// spiHint/cpiHint — Gauge bileşeninin kendi renk bantlarıyla (<0.9 kırmızı,
+// 0.9-1.1 amber, >1.1 yeşil) aynı eşikte, ibrenin altına anlamını yazan kısa metin.
+function spiHint(v: number): string {
+  if (v >= 1.1) return "Planlanandan önde";
+  if (v >= 0.9) return "Planda";
+  return "Planlanandan geride";
+}
+function cpiHint(v: number): string {
+  if (v >= 1.1) return "Bütçe altında";
+  if (v >= 0.9) return "Bütçede";
+  return "Bütçe üzerinde";
 }
 function planSourceTR(s: string) {
   if (s === "manual") return "aylık dağılım girişi";
