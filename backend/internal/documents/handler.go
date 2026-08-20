@@ -34,14 +34,15 @@ const maxUploadBytes = 100 << 20 // 100 MB
 var docCategories = map[string]bool{
 	"Contract": true, "Addendum": true, "Submittal": true, "Drawing": true,
 	"Delivery": true, "OHS": true, "Other": true,
-	"SahaTutanagi":       true, // DB CHECK'te vardı (migration 000035), map'te eksikti — bug fix
-	"SahaFotografi":      true,
-	"ImalatFotografi":    true,
-	"DenetimFotografi":   true,
-	"IdariHakedisFatura": true,
-	"ProjeGorseli":       true,
-	"NakliyeIrsaliyesi":  true,
-	"KiralamaSozlesmesi": true,
+	"SahaTutanagi":        true, // DB CHECK'te vardı (migration 000035), map'te eksikti — bug fix
+	"SahaFotografi":       true,
+	"ImalatFotografi":     true,
+	"DenetimFotografi":    true,
+	"IdariHakedisFatura":  true,
+	"IdariHakedisBelgesi": true,
+	"ProjeGorseli":        true,
+	"NakliyeIrsaliyesi":   true,
+	"KiralamaSozlesmesi":  true,
 }
 
 type Handler struct {

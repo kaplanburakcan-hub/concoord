@@ -4,17 +4,25 @@
 // Kapsam bilinçli olarak dar tutuldu: idarenin kendi onay süreci sistem
 // DIŞINDA gerçekleşir (idare zaten onaylamıştır), bu yüzden burada saha
 // tutanaklarındaki gibi ayrı bir çok adımlı onay zinciri KURULMAZ — doğrudan
-// "onaylanmış kayıt girişi" formu. Fatura mevcut polimorfik documents
-// motoruyla bağlanır (entity_type='idari_hakedis_fatura').
+// "onaylanmış kayıt girişi" formu. Fatura ve hakediş belgesi (imzalı kapak
+// sayfası/komple hakediş) mevcut polimorfik documents motoruyla bağlanır
+// (entity_type='idari_hakedis_fatura', kategori IdariHakedisFatura/
+// IdariHakedisBelgesi).
 //
 // gelen_odeme_tarihi alanı doldurulunca/güncellenince/temizlenince
 // cash_events'e (direction='in') karşılık gelen satır yazılır/güncellenir/
 // silinir — nakit akışına giriş burada tetiklenir.
+//
+// tutar KULLANICIDAN ALINMAZ — gerçek hakediş raporu düzenine göre
+// (Sözleşme Fiyatları+Fiyat Farkı=C, C-Önceki=E, E×KDV%=F, E+F=G,
+// Σkesintiler=H, G-H=Yükleniciye Ödenecek) burada hesaplanır (bkz. calc).
 package idarihakedis
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -32,27 +40,53 @@ type Handler struct{ pool *pgxpool.Pool }
 
 func NewHandler(pool *pgxpool.Pool) *Handler { return &Handler{pool: pool} }
 
+// KesintiKalem — rapordaki a-i kesinti/mahsup kalemleri + serbest ek satırlar.
+type KesintiKalem struct {
+	Ad    string  `json:"ad"`
+	Tutar float64 `json:"tutar"`
+}
+
 type IdariHakedis struct {
-	ID               uuid.UUID `json:"id"`
-	ProjectID        uuid.UUID `json:"project_id"`
-	DonemNo          int       `json:"donem_no"`
-	Aciklama         string    `json:"aciklama"`
-	Tutar            float64   `json:"tutar"`
-	KdvPct           float64   `json:"kdv_pct"`
-	FaturaNo         *string   `json:"fatura_no,omitempty"`
-	GelenOdemeTarihi *string   `json:"gelen_odeme_tarihi,omitempty"`
-	CreatedByName    string    `json:"created_by_name"`
-	CreatedAt        time.Time `json:"created_at"`
-	RowVersion       int       `json:"row_version"`
+	ID                      uuid.UUID      `json:"id"`
+	ProjectID               uuid.UUID      `json:"project_id"`
+	DonemNo                 int            `json:"donem_no"`
+	Aciklama                string         `json:"aciklama"`
+	HakedisTarihi           *string        `json:"hakedis_tarihi,omitempty"`
+	SozlesmeFiyatlariTutari float64        `json:"sozlesme_fiyatlari_tutari"`
+	FiyatFarkiTutari        float64        `json:"fiyat_farki_tutari"`
+	OncekiHakedisToplami    float64        `json:"onceki_hakedis_toplami"`
+	KdvPct                  float64        `json:"kdv_pct"`
+	Kesintiler              []KesintiKalem `json:"kesintiler"`
+	Tutar                   float64        `json:"tutar"` // = Yükleniciye Ödenecek Tutar (G-H)
+	FaturaNo                *string        `json:"fatura_no,omitempty"`
+	GelenOdemeTarihi        *string        `json:"gelen_odeme_tarihi,omitempty"`
+	CreatedByName           string         `json:"created_by_name"`
+	CreatedAt               time.Time      `json:"created_at"`
+	RowVersion              int            `json:"row_version"`
 }
 
 const listCols = `
-	i.id, i.project_id, i.donem_no, i.aciklama, i.tutar::float8, i.kdv_pct::float8,
-	i.fatura_no, to_char(i.gelen_odeme_tarihi,'YYYY-MM-DD'), u.full_name, i.created_at, i.row_version`
+	i.id, i.project_id, i.donem_no, i.aciklama,
+	to_char(i.hakedis_tarihi,'YYYY-MM-DD'),
+	i.sozlesme_fiyatlari_tutari::float8, i.fiyat_farki_tutari::float8,
+	i.onceki_hakedis_toplami::float8, i.kdv_pct::float8, i.kesintiler,
+	i.tutar::float8, i.fatura_no, to_char(i.gelen_odeme_tarihi,'YYYY-MM-DD'),
+	u.full_name, i.created_at, i.row_version`
 
 func scanRow(row pgx.Row, i *IdariHakedis) error {
-	return row.Scan(&i.ID, &i.ProjectID, &i.DonemNo, &i.Aciklama, &i.Tutar, &i.KdvPct,
-		&i.FaturaNo, &i.GelenOdemeTarihi, &i.CreatedByName, &i.CreatedAt, &i.RowVersion)
+	var kesintilerJSON []byte
+	if err := row.Scan(&i.ID, &i.ProjectID, &i.DonemNo, &i.Aciklama,
+		&i.HakedisTarihi,
+		&i.SozlesmeFiyatlariTutari, &i.FiyatFarkiTutari,
+		&i.OncekiHakedisToplami, &i.KdvPct, &kesintilerJSON,
+		&i.Tutar, &i.FaturaNo, &i.GelenOdemeTarihi,
+		&i.CreatedByName, &i.CreatedAt, &i.RowVersion); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(kesintilerJSON, &i.Kesintiler); err != nil {
+		i.Kesintiler = []KesintiKalem{}
+	}
+	return nil
 }
 
 func parseID(w http.ResponseWriter, r *http.Request, key string) (uuid.UUID, bool) {
@@ -71,6 +105,20 @@ func requireUser(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 		return uuid.Nil, false
 	}
 	return uid, true
+}
+
+// calc — rapor düzenindeki A-H hesap zinciri.
+// c=A+B, e=c-d(önceki), f=e×kdv%, g=e+f, hSum=Σkesintiler, odenecek=g-hSum.
+func calc(a, b, d, kdvPct float64, kesintiler []KesintiKalem) (c, e, f, g, hSum, odenecek float64) {
+	c = a + b
+	e = c - d
+	f = e * kdvPct / 100
+	g = e + f
+	for _, k := range kesintiler {
+		hSum += k.Tutar
+	}
+	odenecek = g - hSum
+	return
 }
 
 // ── List ─────────────────────────────────────────────────────────────────
@@ -105,28 +153,35 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 // ── Create ───────────────────────────────────────────────────────────────
 
-type createReq struct {
-	DonemNo          int      `json:"donem_no"`
-	Aciklama         string   `json:"aciklama"`
-	Tutar            float64  `json:"tutar"`
-	KdvPct           *float64 `json:"kdv_pct"`
-	FaturaNo         *string  `json:"fatura_no"`
-	GelenOdemeTarihi *string  `json:"gelen_odeme_tarihi"`
+type reqBody struct {
+	DonemNo                 int            `json:"donem_no"`
+	Aciklama                string         `json:"aciklama"`
+	HakedisTarihi           *string        `json:"hakedis_tarihi"`
+	SozlesmeFiyatlariTutari float64        `json:"sozlesme_fiyatlari_tutari"`
+	FiyatFarkiTutari        float64        `json:"fiyat_farki_tutari"`
+	OncekiHakedisToplami    float64        `json:"onceki_hakedis_toplami"`
+	KdvPct                  *float64       `json:"kdv_pct"`
+	Kesintiler              []KesintiKalem `json:"kesintiler"`
+	FaturaNo                *string        `json:"fatura_no"`
+	GelenOdemeTarihi        *string        `json:"gelen_odeme_tarihi"`
+	RowVersion              int            `json:"row_version"`
 }
 
-func validate(donemNo int, aciklama string, tutar float64, gelenOdemeTarihi *string) map[string]string {
+func validate(donemNo int, sozlesmeFiyatlariTutari float64, hakedisTarihi, gelenOdemeTarihi *string) map[string]string {
 	f := map[string]string{}
 	if donemNo <= 0 {
 		f["donem_no"] = "0'dan büyük olmalı"
 	}
-	if strings.TrimSpace(aciklama) == "" {
-		f["aciklama"] = "açıklama zorunlu"
+	if sozlesmeFiyatlariTutari < 0 {
+		f["sozlesme_fiyatlari_tutari"] = "negatif olamaz"
 	}
-	if tutar <= 0 {
-		f["tutar"] = "0'dan büyük olmalı"
+	if s := strDeref(hakedisTarihi); s != "" {
+		if _, err := time.Parse("2006-01-02", s); err != nil {
+			f["hakedis_tarihi"] = "geçerli bir tarih (YYYY-MM-DD) girin"
+		}
 	}
-	if gelenOdemeTarihi != nil && strings.TrimSpace(*gelenOdemeTarihi) != "" {
-		if _, err := time.Parse("2006-01-02", *gelenOdemeTarihi); err != nil {
+	if s := strDeref(gelenOdemeTarihi); s != "" {
+		if _, err := time.Parse("2006-01-02", s); err != nil {
 			f["gelen_odeme_tarihi"] = "geçerli bir tarih (YYYY-MM-DD) girin"
 		}
 	}
@@ -142,11 +197,11 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var req createReq
+	var req reqBody
 	if !httpx.DecodeJSON(w, r, &req) {
 		return
 	}
-	if f := validate(req.DonemNo, req.Aciklama, req.Tutar, req.GelenOdemeTarihi); len(f) > 0 {
+	if f := validate(req.DonemNo, req.SozlesmeFiyatlariTutari, req.HakedisTarihi, req.GelenOdemeTarihi); len(f) > 0 {
 		httpx.ValidationFailed(w, r, f)
 		return
 	}
@@ -154,7 +209,21 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.KdvPct != nil {
 		kdvPct = *req.KdvPct
 	}
+	aciklama := strings.TrimSpace(req.Aciklama)
+	if aciklama == "" {
+		aciklama = fmt.Sprintf("Hakediş No %d", req.DonemNo)
+	}
+	if req.Kesintiler == nil {
+		req.Kesintiler = []KesintiKalem{}
+	}
+	_, _, _, _, _, odenecek := calc(req.SozlesmeFiyatlariTutari, req.FiyatFarkiTutari, req.OncekiHakedisToplami, kdvPct, req.Kesintiler)
+	kesintilerJSON, err := json.Marshal(req.Kesintiler)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
 	gelenTarih := strDeref(req.GelenOdemeTarihi)
+	hakedisTarih := strDeref(req.HakedisTarihi)
 
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {
@@ -166,10 +235,14 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var id uuid.UUID
 	if err := tx.QueryRow(r.Context(), `
 		INSERT INTO idari_hakedisler
-			(project_id, donem_no, aciklama, tutar, kdv_pct, fatura_no, gelen_odeme_tarihi, created_by)
-		VALUES ($1,$2,$3,$4,$5,$6,NULLIF($7,'')::date,$8)
+			(project_id, donem_no, aciklama, hakedis_tarihi,
+			 sozlesme_fiyatlari_tutari, fiyat_farki_tutari, onceki_hakedis_toplami,
+			 kdv_pct, kesintiler, tutar, fatura_no, gelen_odeme_tarihi, created_by)
+		VALUES ($1,$2,$3,NULLIF($4,'')::date,$5,$6,$7,$8,$9,$10,$11,NULLIF($12,'')::date,$13)
 		RETURNING id`,
-		pid, req.DonemNo, strings.TrimSpace(req.Aciklama), req.Tutar, kdvPct, req.FaturaNo, gelenTarih, uid,
+		pid, req.DonemNo, aciklama, hakedisTarih,
+		req.SozlesmeFiyatlariTutari, req.FiyatFarkiTutari, req.OncekiHakedisToplami,
+		kdvPct, kesintilerJSON, odenecek, req.FaturaNo, gelenTarih, uid,
 	).Scan(&id); err != nil {
 		if isUniqueViolation(err) {
 			httpx.ValidationFailed(w, r, map[string]string{"donem_no": "bu dönem no zaten kullanılıyor"})
@@ -179,7 +252,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if gelenTarih != "" {
-		if err := writeCashEvent(r.Context(), tx, pid, id, req.Aciklama, req.Tutar, gelenTarih, uid); err != nil {
+		if err := writeCashEvent(r.Context(), tx, pid, id, aciklama, odenecek, gelenTarih, uid); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
@@ -192,15 +265,6 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 // ── Update ───────────────────────────────────────────────────────────────
-
-type updateReq struct {
-	Aciklama         string   `json:"aciklama"`
-	Tutar            float64  `json:"tutar"`
-	KdvPct           *float64 `json:"kdv_pct"`
-	FaturaNo         *string  `json:"fatura_no"`
-	GelenOdemeTarihi *string  `json:"gelen_odeme_tarihi"`
-	RowVersion       int      `json:"row_version"`
-}
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	pid, ok := parseID(w, r, "projectID")
@@ -215,13 +279,13 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var req updateReq
+	var req reqBody
 	if !httpx.DecodeJSON(w, r, &req) {
 		return
 	}
 	// donem_no update edilmiyor (kimlik alanı gibi davranır — kaza ile
 	// dönem numarasını değiştirmek nakit akışı geçmişini karıştırabilir).
-	if f := validate(1, req.Aciklama, req.Tutar, req.GelenOdemeTarihi); len(f) > 0 {
+	if f := validate(1, req.SozlesmeFiyatlariTutari, req.HakedisTarihi, req.GelenOdemeTarihi); len(f) > 0 {
 		delete(f, "donem_no")
 		httpx.ValidationFailed(w, r, f)
 		return
@@ -230,7 +294,21 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.KdvPct != nil {
 		kdvPct = *req.KdvPct
 	}
+	aciklama := strings.TrimSpace(req.Aciklama)
+	if aciklama == "" {
+		aciklama = "Hakediş"
+	}
+	if req.Kesintiler == nil {
+		req.Kesintiler = []KesintiKalem{}
+	}
+	_, _, _, _, _, odenecek := calc(req.SozlesmeFiyatlariTutari, req.FiyatFarkiTutari, req.OncekiHakedisToplami, kdvPct, req.Kesintiler)
+	kesintilerJSON, err := json.Marshal(req.Kesintiler)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
 	gelenTarih := strDeref(req.GelenOdemeTarihi)
+	hakedisTarih := strDeref(req.HakedisTarihi)
 
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {
@@ -241,10 +319,14 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	ct, err := tx.Exec(r.Context(), `
 		UPDATE idari_hakedisler SET
-			aciklama=$3, tutar=$4, kdv_pct=$5, fatura_no=$6,
-			gelen_odeme_tarihi=NULLIF($7,'')::date, updated_at=now(), row_version=row_version+1
-		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL AND row_version=$8`,
-		id, pid, strings.TrimSpace(req.Aciklama), req.Tutar, kdvPct, req.FaturaNo, gelenTarih, req.RowVersion)
+			aciklama=$3, hakedis_tarihi=NULLIF($4,'')::date,
+			sozlesme_fiyatlari_tutari=$5, fiyat_farki_tutari=$6, onceki_hakedis_toplami=$7,
+			kdv_pct=$8, kesintiler=$9, tutar=$10, fatura_no=$11,
+			gelen_odeme_tarihi=NULLIF($12,'')::date, updated_at=now(), row_version=row_version+1
+		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL AND row_version=$13`,
+		id, pid, aciklama, hakedisTarih,
+		req.SozlesmeFiyatlariTutari, req.FiyatFarkiTutari, req.OncekiHakedisToplami,
+		kdvPct, kesintilerJSON, odenecek, req.FaturaNo, gelenTarih, req.RowVersion)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -261,7 +343,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if gelenTarih != "" {
-		if err := writeCashEvent(r.Context(), tx, pid, id, req.Aciklama, req.Tutar, gelenTarih, uid); err != nil {
+		if err := writeCashEvent(r.Context(), tx, pid, id, aciklama, odenecek, gelenTarih, uid); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
