@@ -6,6 +6,9 @@ import { useProjects } from "../ProjectContext";
 
 // Faz 8 — İSG bulguları: foto (data-URL, offline kuyruk uyumlu) + GPS/lokasyon,
 // yaşam döngüsü Open→InProgress→Closed, termin takibi (gecikenler vurgulu).
+// Faz 9 — kanban görünüm: bulgular önem derecesine göre sütunlanır, 5. sütun
+// (İş Kazası) ayrı ohs_accidents tablosundan gelir (kendi İnceleniyor/Kapandı
+// durumu var, findings'in Open/InProgress/Closed zincirinden bağımsız).
 
 type Finding = {
   id: string; inspection_id?: string; subcontractor_id?: string; subcontractor_name?: string;
@@ -15,11 +18,22 @@ type Finding = {
   reported_by_name: string; closed_by_name?: string; closed_at?: string; close_note?: string;
   row_version: number; created_at: string;
 };
+type Accident = {
+  id: string; accident_date: string; description: string; status: string;
+  created_by_name: string; created_at: string;
+  closed_by_name?: string; closed_at?: string; close_note?: string; row_version: number;
+};
+type FreeDays = { days: number; reference_date: string | null; since_accident: boolean; has_reference: boolean };
 type Sub = { id: string; company_name: string };
 type DocVersion = { version_no: number; original_name: string };
 
+const SEV_ORDER = ["Observation", "Minor", "Major", "Critical"] as const;
 const SEV_LABEL: Record<string, string> = {
   Observation: "Gözlem", Minor: "Küçük", Major: "Büyük", Critical: "Kritik",
+};
+const SEV_HINT: Record<string, string> = {
+  Observation: "bilgilendirme amaçlı", Minor: "düşük risk",
+  Major: "orta risk — termin takipli", Critical: "acil müdahale",
 };
 const SEV_STYLE: Record<string, string> = {
   Observation: "bg-beton-800 text-beton-200 border-beton-700",
@@ -33,6 +47,11 @@ const ST_STYLE: Record<string, string> = {
   InProgress: "bg-blue-500/15 text-blue-300 border-blue-500/40",
   Closed: "bg-green-500/15 text-green-300 border-green-500/40",
 };
+const ACC_ST_LABEL: Record<string, string> = { Investigating: "İnceleniyor", Closed: "Kapandı" };
+const ACC_ST_STYLE: Record<string, string> = {
+  Investigating: "bg-violet-500/15 text-violet-300 border-violet-500/40",
+  Closed: "bg-green-500/15 text-green-300 border-green-500/40",
+};
 
 function fileToDataURL(f: File): Promise<string> {
   return new Promise((res, rej) => {
@@ -42,6 +61,7 @@ function fileToDataURL(f: File): Promise<string> {
     r.readAsDataURL(f);
   });
 }
+function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 export default function FindingsPage() {
   const { current } = useProjects();
@@ -50,13 +70,15 @@ export default function FindingsPage() {
   const canInspect = can("ohs.perform_inspection");
 
   const [findings, setFindings] = useState<Finding[]>([]);
+  const [accidents, setAccidents] = useState<Accident[]>([]);
+  const [freeDays, setFreeDays] = useState<FreeDays | null>(null);
   const [subs, setSubs] = useState<Sub[]>([]);
   const [statusFilter, setStatusFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  // form
+  // bulgu formu
   const [severity, setSeverity] = useState("Minor");
   const [desc, setDesc] = useState("");
   const [loc, setLoc] = useState("");
@@ -65,6 +87,12 @@ export default function FindingsPage() {
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+
+  // kaza kaydı formu
+  const [showAccidentForm, setShowAccidentForm] = useState(false);
+  const [accDate, setAccDate] = useState(todayISO());
+  const [accDesc, setAccDesc] = useState("");
+  const [accBusy, setAccBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -78,6 +106,14 @@ export default function FindingsPage() {
       const s = await api<{ subcontractors: Sub[] }>(`/projects/${pid}/subcontractors`, { projectId: pid });
       setSubs(s.subcontractors);
     } catch { /* taşeron listesi yetkisi yoksa form taşeronsuz çalışır */ }
+    try {
+      const a = await api<{ accidents: Accident[] }>(`/projects/${pid}/ohs-accidents`, { projectId: pid });
+      setAccidents(a.accidents);
+    } catch { /* kaza kaydı yetkisi yoksa sütun boş kalır */ }
+    try {
+      const fd = await api<FreeDays>(`/projects/${pid}/ohs-accidents/free-days`, { projectId: pid });
+      setFreeDays(fd);
+    } catch { /* sayaç yetkisi yoksa gösterilmez */ }
   }, [pid, statusFilter]);
 
   useEffect(() => { load(); }, [load]);
@@ -139,6 +175,32 @@ export default function FindingsPage() {
     } catch { setErr("Durum geçişi yapılamadı (yetki ya da durum uygun değil)."); }
   }
 
+  async function createAccident() {
+    if (!pid || !accDesc.trim()) return;
+    setAccBusy(true); setErr(null);
+    try {
+      await api(`/projects/${pid}/ohs-accidents`, {
+        method: "POST", projectId: pid,
+        body: { accident_date: accDate, description: accDesc.trim() },
+      });
+      setAccDesc(""); setAccDate(todayISO()); setShowAccidentForm(false);
+      load();
+    } catch (e) {
+      setErr(e instanceof Error && e.message ? e.message : "Kaza kaydı oluşturulamadı.");
+    } finally { setAccBusy(false); }
+  }
+
+  async function closeAccident(a: Accident) {
+    const note = prompt("Kapatma notu (zorunlu):")?.trim() ?? "";
+    if (!note) return;
+    try {
+      await api(`/projects/${pid}/ohs-accidents/${a.id}/close`, {
+        method: "POST", projectId: pid, body: { note, row_version: a.row_version },
+      });
+      load();
+    } catch { setErr("Kaza kaydı kapatılamadı (yetki ya da durum uygun değil)."); }
+  }
+
   async function downloadPhoto(documentId: string) {
     try {
       const det = await api<{ versions: DocVersion[] }>(
@@ -155,33 +217,75 @@ export default function FindingsPage() {
 
   const overdue = findings.filter((f) => f.overdue).length;
 
+  function accidentVisible(a: Accident) {
+    if (!statusFilter) return true;
+    if (statusFilter === "Closed") return a.status === "Closed";
+    if (statusFilter === "InProgress") return a.status === "Investigating";
+    return false; // "Open" bulgu durumunun kaza kaydında karşılığı yok
+  }
+  const visibleAccidents = accidents.filter(accidentVisible);
+
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        {/* Modül içi geçiş kenar çubuğu alt başlıklarında (İSG → Bulgular /
-            Denetimler / Cezalar); başlık yanındaki soluk bağlantılar kaldırıldı. */}
         <h1 className="text-lg font-display font-medium text-beton-100">İSG Bulguları</h1>
         {overdue > 0 && (
           <span className="rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-xs text-red-300">
             {overdue} bulgunun termini geçti
           </span>
         )}
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-          className="ml-auto rounded-md bg-beton-900 border border-beton-700 px-2 py-1 text-xs text-beton-200">
-          <option value="">Tümü</option>
-          <option value="Open">Açık</option>
-          <option value="InProgress">Devam Ediyor</option>
-          <option value="Closed">Kapandı</option>
-        </select>
-        {canInspect && (
-          <button onClick={() => setShowForm((v) => !v)}
-            className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
-            Yeni Bulgu
-          </button>
-        )}
+
+        <div className="ml-auto flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 rounded-xl border border-beton-800 bg-beton-900 pl-2.5 pr-3 py-1.5"
+            style={{ boxShadow: "var(--shadow)" }}>
+            <div className="w-7 h-7 rounded-lg grid place-items-center text-sm bg-[var(--group-accent)] text-white-solid">🛡</div>
+            <div>
+              <p className="text-base font-extrabold leading-none tabular-nums text-beton-100">
+                {freeDays?.has_reference ? freeDays.days : "—"}
+              </p>
+              <p className="text-[9.5px] uppercase tracking-wide text-beton-500 font-semibold mt-0.5">Kazasız Gün</p>
+            </div>
+            {canInspect && (
+              <button onClick={() => setShowAccidentForm((v) => !v)}
+                className="ml-1.5 text-[10px] text-emniyet-500 hover:underline whitespace-nowrap">
+                {showAccidentForm ? "vazgeç" : "+ kaza kaydı ekle"}
+              </button>
+            )}
+          </div>
+
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-md bg-beton-900 border border-beton-700 px-2 py-1 text-xs text-beton-200">
+            <option value="">Tümü</option>
+            <option value="Open">Açık</option>
+            <option value="InProgress">Devam Ediyor</option>
+            <option value="Closed">Kapandı</option>
+          </select>
+          {canInspect && (
+            <button onClick={() => setShowForm((v) => !v)}
+              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
+              Yeni Bulgu
+            </button>
+          )}
+        </div>
       </div>
       {err && <p className="text-sm text-red-400">{err}</p>}
       {msg && <p className="text-sm text-emniyet-500">{msg}</p>}
+
+      {showAccidentForm && (
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4" style={{ boxShadow: "var(--shadow)" }}>
+          <div className="flex flex-wrap items-end gap-2">
+            <input type="date" value={accDate} onChange={(e) => setAccDate(e.target.value)}
+              max={todayISO()}
+              className="rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100" />
+            <input value={accDesc} onChange={(e) => setAccDesc(e.target.value)} placeholder="Kısa açıklama"
+              className="flex-1 min-w-[160px] rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100" />
+            <button onClick={createAccident} disabled={accBusy || !accDesc.trim()}
+              className="rounded-md bg-red-500/90 hover:bg-red-500 disabled:opacity-50 text-white-solid text-xs font-semibold px-3 py-1.5">
+              {accBusy ? "Kaydediliyor…" : "Kaza kaydını gir"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 space-y-3">
@@ -190,7 +294,7 @@ export default function FindingsPage() {
               Önem
               <select value={severity} onChange={(e) => setSeverity(e.target.value)}
                 className="mt-1 block rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100">
-                {Object.entries(SEV_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {SEV_ORDER.map((k) => <option key={k} value={k}>{SEV_LABEL[k]}</option>)}
               </select>
             </label>
             <label className="text-xs text-beton-300">
@@ -230,56 +334,103 @@ export default function FindingsPage() {
         </div>
       )}
 
-      <div className="rounded-lg border border-beton-800 divide-y divide-beton-800">
-        {findings.map((f) => (
-          <div key={f.id} className="px-3 py-2 text-sm space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`rounded border px-1.5 py-0.5 text-xs ${SEV_STYLE[f.severity]}`}>
-                {SEV_LABEL[f.severity]}
-              </span>
-              <span className={`rounded border px-1.5 py-0.5 text-xs ${ST_STYLE[f.status]}`}>
-                {ST_LABEL[f.status]}
-              </span>
-              {f.overdue && (
-                <span className="rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-xs text-red-300">
-                  termin geçti{f.due_date ? ` (${f.due_date})` : ""}
-                </span>
-              )}
-              {f.status !== "Closed" && (
-                <span className="text-xs text-beton-500">{f.age_days} gündür açık</span>
-              )}
-              <span className="ml-auto text-xs text-beton-400">
-                {new Date(f.created_at).toLocaleDateString("tr-TR")} · {f.reported_by_name}
-              </span>
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {SEV_ORDER.map((sev) => {
+          const items = findings.filter((f) => f.severity === sev);
+          return (
+            <div key={sev} className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden flex flex-col">
+              <div className={`px-3 py-2 border-b border-beton-800 ${SEV_STYLE[sev]}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold">{SEV_LABEL[sev]}</span>
+                  <span className="text-[11px] font-bold opacity-80">{items.length}</span>
+                </div>
+                <p className="text-[10px] opacity-70 mt-0.5">{SEV_HINT[sev]}</p>
+              </div>
+              <div className="p-2 space-y-2 flex-1 min-h-[90px]">
+                {items.length === 0 && <p className="text-[11px] text-beton-500 px-1 py-2">Kayıt yok.</p>}
+                {items.map((f) => (
+                  <div key={f.id} className="rounded-md border border-beton-800 bg-beton-950/40 p-2 text-xs space-y-1">
+                    <p className="font-semibold text-beton-100 leading-snug"
+                      style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                      {f.description}
+                    </p>
+                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10.5px] text-beton-400">
+                      {f.subcontractor_name && <span>{f.subcontractor_name}</span>}
+                      {f.location && <span>📍 {f.location}</span>}
+                      {f.photo_document_id && can("documents.download") && (
+                        <button onClick={() => downloadPhoto(f.photo_document_id!)}
+                          className="text-emniyet-500 hover:underline">Fotoğraf</button>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between pt-0.5">
+                      <span className={f.overdue ? "text-[10px] text-red-400 font-semibold" : "text-[10px] text-beton-500"}>
+                        {f.overdue
+                          ? `gecikti${f.due_date ? " · " + f.due_date : ""}`
+                          : new Date(f.created_at).toLocaleDateString("tr-TR")}
+                      </span>
+                      <span className={`rounded-full border px-1.5 py-0.5 text-[9.5px] font-semibold ${ST_STYLE[f.status]}`}>
+                        {ST_LABEL[f.status]}
+                      </span>
+                    </div>
+                    {f.status !== "Closed" && (
+                      <div className="flex gap-2 pt-0.5">
+                        {f.status === "Open" && (
+                          <button onClick={() => transition(f, "start")}
+                            className="text-[10.5px] text-blue-300 hover:underline">Ele Al</button>
+                        )}
+                        {canInspect && (
+                          <button onClick={() => transition(f, "close")}
+                            className="text-[10.5px] text-green-300 hover:underline">Kapat</button>
+                        )}
+                      </div>
+                    )}
+                    {f.status === "Closed" && f.close_note && (
+                      <p className="text-[10px] text-beton-500 pt-0.5">Kapatma: {f.close_note}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-            <p className="text-beton-100">{f.description}</p>
-            <div className="flex items-center gap-3 text-xs text-beton-400 flex-wrap">
-              {f.subcontractor_name && <span>Taşeron: {f.subcontractor_name}</span>}
-              {f.location && <span>{f.location}</span>}
-              {f.gps_lat != null && f.gps_lng != null && (
-                <span>GPS: {f.gps_lat.toFixed(5)}, {f.gps_lng.toFixed(5)}</span>
-              )}
-              {f.photo_document_id && can("documents.download") && (
-                <button onClick={() => downloadPhoto(f.photo_document_id!)}
-                  className="text-emniyet-500 hover:underline">Fotoğraf</button>
-              )}
-              {f.status === "Closed" && f.close_note && (
-                <span className="text-beton-500">Kapatma: {f.close_note} ({f.closed_by_name})</span>
-              )}
-              <span className="ml-auto flex gap-3">
-                {f.status === "Open" && (
-                  <button onClick={() => transition(f, "start")}
-                    className="text-blue-300 hover:underline">Ele Al</button>
-                )}
-                {f.status !== "Closed" && canInspect && (
-                  <button onClick={() => transition(f, "close")}
-                    className="text-green-300 hover:underline">Kapat</button>
-                )}
-              </span>
+          );
+        })}
+
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden flex flex-col">
+          <div className="px-3 py-2 border-b border-beton-800 bg-violet-500/15 text-violet-300">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold">İş Kazası</span>
+              <span className="text-[11px] font-bold opacity-80">{visibleAccidents.length}</span>
             </div>
+            <p className="text-[10px] opacity-70 mt-0.5">ohs_accidents kaydı</p>
           </div>
-        ))}
-        {!findings.length && <p className="px-3 py-4 text-sm text-beton-500">Bulgu yok.</p>}
+          <div className="p-2 space-y-2 flex-1 min-h-[90px]">
+            {visibleAccidents.length === 0 && <p className="text-[11px] text-beton-500 px-1 py-2">Kayıt yok.</p>}
+            {visibleAccidents.map((a) => (
+              <div key={a.id} className="rounded-md border border-beton-800 bg-beton-950/40 p-2 text-xs space-y-1">
+                <p className="font-semibold text-beton-100 leading-snug"
+                  style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  {a.description}
+                </p>
+                <div className="flex items-center justify-between pt-0.5">
+                  <span className="text-[10px] text-beton-500">
+                    {new Date(a.accident_date).toLocaleDateString("tr-TR")} · {a.created_by_name}
+                  </span>
+                  <span className={`rounded-full border px-1.5 py-0.5 text-[9.5px] font-semibold ${ACC_ST_STYLE[a.status]}`}>
+                    {ACC_ST_LABEL[a.status]}
+                  </span>
+                </div>
+                {a.status === "Investigating" && canInspect && (
+                  <div className="pt-0.5">
+                    <button onClick={() => closeAccident(a)}
+                      className="text-[10.5px] text-green-300 hover:underline">Kapat</button>
+                  </div>
+                )}
+                {a.status === "Closed" && a.close_note && (
+                  <p className="text-[10px] text-beton-500 pt-0.5">Kapatma: {a.close_note} ({a.closed_by_name})</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

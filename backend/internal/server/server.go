@@ -393,7 +393,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 		api.Group(func(pr chi.Router) {
 			pr.Use(mw.Authenticate)
 			pr.With(mw.RequirePermission("ohs.view")).Get("/projects/{projectID}/ohs-accidents", ohsAccidentsH.List)
+			pr.With(mw.RequirePermission("ohs.view")).Get("/projects/{projectID}/ohs-accidents/free-days", ohsAccidentsH.FreeDays)
 			pr.With(mw.RequirePermission("ohs.perform_inspection")).Post("/projects/{projectID}/ohs-accidents", ohsAccidentsH.Create)
+			pr.With(mw.RequirePermission("ohs.perform_inspection")).Post("/projects/{projectID}/ohs-accidents/{id}/close", ohsAccidentsH.Close)
 			pr.With(mw.RequirePermission("ohs.perform_inspection")).Delete("/projects/{projectID}/ohs-accidents/{id}", ohsAccidentsH.Delete)
 		})
 

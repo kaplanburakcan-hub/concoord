@@ -24,12 +24,17 @@ type Handler struct{ pool *pgxpool.Pool }
 func NewHandler(pool *pgxpool.Pool) *Handler { return &Handler{pool: pool} }
 
 type Accident struct {
-	ID            uuid.UUID `json:"id"`
-	ProjectID     uuid.UUID `json:"project_id"`
-	AccidentDate  string    `json:"accident_date"`
-	Description   string    `json:"description"`
-	CreatedByName string    `json:"created_by_name"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID            uuid.UUID  `json:"id"`
+	ProjectID     uuid.UUID  `json:"project_id"`
+	AccidentDate  string     `json:"accident_date"`
+	Description   string     `json:"description"`
+	Status        string     `json:"status"`
+	CreatedByName string     `json:"created_by_name"`
+	CreatedAt     time.Time  `json:"created_at"`
+	ClosedByName  *string    `json:"closed_by_name,omitempty"`
+	ClosedAt      *time.Time `json:"closed_at,omitempty"`
+	CloseNote     *string    `json:"close_note,omitempty"`
+	RowVersion    int        `json:"row_version"`
 }
 
 func parseID(w http.ResponseWriter, r *http.Request, key string) (uuid.UUID, bool) {
@@ -57,9 +62,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := h.pool.Query(r.Context(), `
 		SELECT a.id, a.project_id, to_char(a.accident_date,'YYYY-MM-DD'), a.description,
-		       u.full_name, a.created_at
+		       a.status, u.full_name, a.created_at, cu.full_name, a.closed_at, a.close_note,
+		       a.row_version
 		FROM ohs_accidents a
 		JOIN users u ON u.id = a.created_by
+		LEFT JOIN users cu ON cu.id = a.closed_by
 		WHERE a.project_id=$1 AND a.deleted_at IS NULL
 		ORDER BY a.accident_date DESC`, pid)
 	if err != nil {
@@ -71,7 +78,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var a Accident
 		if err := rows.Scan(&a.ID, &a.ProjectID, &a.AccidentDate, &a.Description,
-			&a.CreatedByName, &a.CreatedAt); err != nil {
+			&a.Status, &a.CreatedByName, &a.CreatedAt, &a.ClosedByName, &a.ClosedAt, &a.CloseNote,
+			&a.RowVersion); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
@@ -145,6 +153,71 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+type closeReq struct {
+	Note       string `json:"note"`
+	RowVersion int    `json:"row_version"`
+}
+
+// Close — Investigating→Closed. Kaza kaydının statik alanları (tarih/açıklama)
+// hâlâ düzenlenebilir kalır; yalnızca inceleme durumu tek yönlü kapanır
+// (ohs_findings'teki gibi ayrı bir kilit tetikleyicisi yok, WHERE koşulu
+// status='Investigating' yeterli çünkü tekrar açma akışı yok).
+func (h *Handler) Close(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	id, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+	uid, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var req closeReq
+	if !httpx.DecodeJSON(w, r, &req) {
+		return
+	}
+	note := strings.TrimSpace(req.Note)
+	if note == "" {
+		httpx.ValidationFailed(w, r, map[string]string{"note": "kapatma notu zorunludur"})
+		return
+	}
+	ct, err := h.pool.Exec(r.Context(), `
+		UPDATE ohs_accidents
+		SET status='Closed', closed_by=$3, closed_at=now(), close_note=$4, row_version=row_version+1
+		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL AND status='Investigating'
+		  AND ($5=0 OR row_version=$5)`,
+		id, pid, uid, note, req.RowVersion)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	if ct.RowsAffected() == 0 {
+		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
+			"Kayıt bulunamadı, zaten kapatılmış ya da başkası tarafından güncellendi.", nil)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "Closed"})
+}
+
+// FreeDays — Dashboard'daki kazasız gün widget'ının HTTP karşılığı,
+// İSG Bulguları sayfasında dashboard'un tamamını çekmeden aynı sayacı
+// göstermek için.
+func (h *Handler) FreeDays(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	fd, err := LoadFreeDays(r.Context(), h.pool, pid)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, fd)
 }
 
 // FreeDaysSummary — dashboard kartı için: bugün ile referans tarih
