@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 
@@ -155,9 +156,15 @@ export default function TaseronDashboardPage() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Başlık */}
-      <div>
-        <h1 className="font-display font-extrabold text-xl text-white">Taşeron & Tedarikçi Dashboard</h1>
-        <p className="text-sm text-beton-400 mt-1">{current.name}</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="font-display font-extrabold text-xl text-white">Taşeron & Tedarikçi Dashboard</h1>
+          <p className="text-sm text-beton-400 mt-1">{current.name}</p>
+        </div>
+        <Link to="/taseronlar/sozlesme-takip"
+          className="rounded-md border border-emniyet-500 px-3 py-2 text-sm font-medium text-emniyet-500 hover:bg-emniyet-500/10">
+          📋 Sözleşme Takip
+        </Link>
       </div>
 
       {/* KPI Kartları */}

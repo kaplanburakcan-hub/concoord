@@ -14,6 +14,7 @@ import ProjectDetailPage from "./pages/projects/ProjectDetailPage";
 import DocumentsPage from "./pages/documents/DocumentsPage";
 import SubcontractorsPage from "./pages/payments/SubcontractorsPage";
 import TaseronDashboardPage from "./pages/payments/TaseronDashboardPage";
+import SozlesmeTakipPage from "./pages/payments/SozlesmeTakipPage";
 import ProgressPaymentsPage from "./pages/payments/ProgressPaymentsPage";
 import ProgressPaymentDetailPage from "./pages/payments/ProgressPaymentDetailPage";
 import TasksPage from "./pages/tasks/TasksPage";
@@ -138,6 +139,14 @@ export default function App() {
                         element={
                           <RequirePerm perm="contracts.view">
                             <SubcontractorsPage />
+                          </RequirePerm>
+                        }
+                      />
+                      <Route
+                        path="/taseronlar/sozlesme-takip"
+                        element={
+                          <RequirePerm perm="contracts.view">
+                            <SozlesmeTakipPage />
                           </RequirePerm>
                         }
                       />

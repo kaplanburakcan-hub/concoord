@@ -309,6 +309,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("contracts.upload")).Patch("/projects/{projectID}/subcontractors/{subID}/work-items/{id}", payH.UpdateWorkItem)
 			pr.With(mw.RequirePermission("contracts.delete")).Delete("/projects/{projectID}/subcontractors/{subID}/work-items/{id}", payH.DeleteWorkItem)
 
+			// Sözleşme Takip — Proje Keşfi kalemleri × iş kalemleri (poz_no) × sözleşmeler.
+			pr.With(mw.RequirePermission("contracts.view")).Get("/projects/{projectID}/sozlesme-takip", payH.SozlesmeTakip)
+
 			// Sözleşmeler (alt sözleşme arşivi)
 			pr.With(mw.RequirePermission("contracts.view")).Get("/projects/{projectID}/contracts", payH.ListContracts)
 			pr.With(mw.RequirePermission("contracts.upload")).Post("/projects/{projectID}/contracts", payH.CreateContract)
