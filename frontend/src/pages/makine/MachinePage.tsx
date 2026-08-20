@@ -109,6 +109,62 @@ function GroupPhoto({ src, label }: { src?: string; label: string }) {
   );
 }
 
+// Kayıt sonrası kiralama sözleşmesi yükleme adımı — hem yeni makine ekleme
+// modalının (proje ataması) yerine geçen tam adım, hem de firma envanteri
+// kaydından sonra mesajın altına eklenen kompakt sürüm için tek bileşen.
+function RentalUploadPanel({
+  ad, docs, uploading, fileRef, onFiles, onDone, compact,
+}: {
+  ad: string;
+  docs: RentalDoc[];
+  uploading: boolean;
+  fileRef: React.RefObject<HTMLInputElement>;
+  onFiles: (files: FileList | null) => void;
+  onDone: () => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className={compact ? "rounded-md border border-beton-800 bg-beton-950 p-3 space-y-2" : "space-y-3"}>
+      {!compact ? (
+        <div>
+          <h2 className="text-lg font-bold text-beton-100">Kiralama Sözleşmesi</h2>
+          <p className="text-sm text-beton-400 mt-0.5">
+            "{ad}" kiralık olarak kaydedildi. Sözleşmeyi şimdi yükleyebilir ya da sonraya bırakabilirsiniz.
+          </p>
+        </div>
+      ) : (
+        <p className="text-xs text-beton-300">
+          <span className="font-medium">"{ad}"</span> kiralık — sözleşmesini şimdi yükleyin:
+        </p>
+      )}
+      <input ref={fileRef} type="file" accept="application/pdf,image/*" multiple className="hidden"
+        onChange={(e) => onFiles(e.target.files)} />
+      <div className="flex items-center gap-2 flex-wrap">
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+          className="text-xs rounded border border-beton-700 px-2.5 py-1.5 text-beton-300 hover:border-emniyet-500 disabled:opacity-50">
+          {uploading ? "Yükleniyor…" : "📎 Sözleşme Ekle"}
+        </button>
+        {docs.length > 0 && <span className="text-xs text-beton-500">{docs.length} dosya yüklendi</span>}
+      </div>
+      {docs.length > 0 && (
+        <ul className="space-y-1">
+          {docs.map((d) => (
+            <li key={d.id}>
+              <a href={d.url} download={d.title} className="text-xs text-emniyet-500 hover:underline">{d.title}</a>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex justify-end pt-1">
+        <button type="button" onClick={onDone}
+          className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium">
+          {compact ? "Tamam" : "Bitti"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Empty form state ──────────────────────────────────────────────────────────
 
 const ANA_YUKLENICI = "Ana Yüklenici";
@@ -186,6 +242,15 @@ export default function MachinePage({
   const [rentalUploading, setRentalUploading] = useState(false);
   const rentalRef = useRef<HTMLInputElement>(null);
 
+  // Kayıt sonrası kiralama sözleşmesi adımı — kiralık olarak kaydedilen bir
+  // makine/ekipman/araç için formu kapatmadan ÖNCE sözleşme yükleme adımını
+  // aynı modalda gösterir (documents motoru entity_id istediğinden kayıt
+  // olmadan yüklenemiyor). closeModalAfter=true (proje ataması): adım formun
+  // YERİNE geçer, "Bitti" tüm modalı kapatır. false (firma envanteri): form
+  // bir sonraki kayıt için sıfırlanmış hâlde açık kalır, adım mesajın altına
+  // eklenir, "Tamam" sadece adımı kapatır.
+  const [pendingRental, setPendingRental] = useState<{ companyEquipmentId: string; ad: string; closeModalAfter: boolean } | null>(null);
+
   // İş başı tarihi — Faz D: proje ana sözleşme tarihinden önce, bugünden
   // sonra girilemez. sozlesmeTarihi <input min> için, backend son savunma hattı.
   const [sozlesmeTarihi, setSozlesmeTarihi] = useState<string | undefined>(undefined);
@@ -219,6 +284,7 @@ export default function MachinePage({
     setKayitYeri("proje");
     setAdCustom(false);
     setInventorySavedMsg(null);
+    setPendingRental(null);
     setFormOpen(true);
   }
 
@@ -228,7 +294,18 @@ export default function MachinePage({
     setKayitYeri("proje");
     setAdCustom(!!m.ad && !AD_KATALOG[tip].includes(m.ad));
     setInventorySavedMsg(null);
+    setPendingRental(null);
     setFormOpen(true);
+  }
+
+  // Kayıt sonrası kiralama adımını kapatır — proje ataması ise tüm modalı
+  // da kapatır (bkz. pendingRental.closeModalAfter yorumu), firma envanteri
+  // ise form bir sonraki kayıt için zaten açık/sıfırlanmış kalır.
+  function finishPendingRental() {
+    const closeModal = pendingRental?.closeModalAfter;
+    setPendingRental(null);
+    setRentalDocs([]);
+    if (closeModal) setFormOpen(false);
   }
 
   // mutableFields — backend katı JSON çözümleme yapıyor (bilinmeyen alan
@@ -258,10 +335,14 @@ export default function MachinePage({
         setMachines(prev => prev.map(m => m.id === editId ? r.machine : m));
         setFormOpen(false);
       } else if (kayitYeri === "firma_envanteri") {
-        await api<{ company_equipment_id: string }>(`/projects/${pid}/machines`, {
+        const r = await api<{ company_equipment_id: string }>(`/projects/${pid}/machines`, {
           method: "POST", body: { ...mutableFields(form), tip, kayit_yeri: "firma_envanteri" }, projectId: pid,
         });
         setInventorySavedMsg(`"${form.ad}" firma envanterine kaydedildi (bu projeye atanmadı).`);
+        if (form.sahiplik === "kiralik") {
+          setRentalDocs([]);
+          setPendingRental({ companyEquipmentId: r.company_equipment_id, ad: form.ad!, closeModalAfter: false });
+        }
         setForm(emptyMachine(tip));
         setAdCustom(false);
       } else {
@@ -269,7 +350,12 @@ export default function MachinePage({
           method: "POST", body: { ...mutableFields(form), tip, kayit_yeri: "proje" }, projectId: pid,
         });
         setMachines(prev => [...prev, r.machine]);
-        setFormOpen(false);
+        if (form.sahiplik === "kiralik") {
+          setRentalDocs([]);
+          setPendingRental({ companyEquipmentId: r.machine.company_equipment_id, ad: form.ad!, closeModalAfter: true });
+        } else {
+          setFormOpen(false);
+        }
       }
     } catch (e) {
       if (e instanceof RequestError && e.status === 409 && e.api?.details && typeof e.api.details === "object" && "company_equipment_id" in e.api.details) {
@@ -886,6 +972,17 @@ export default function MachinePage({
       {formOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto space-y-4">
+            {pendingRental?.closeModalAfter ? (
+              <RentalUploadPanel
+                ad={pendingRental.ad}
+                docs={rentalDocs}
+                uploading={rentalUploading}
+                fileRef={rentalRef}
+                onFiles={(files) => uploadRentalContract(files, pendingRental.companyEquipmentId)}
+                onDone={finishPendingRental}
+              />
+            ) : (
+            <>
             <h2 className="text-lg font-bold text-beton-100">
               {editId ? "Makineyi Düzenle" : `${tipLabel === "Ekipmanlar" ? "Ekipman" : tipLabel === "İş Makineleri" ? "Makine" : "Araç"} Ekle`}
             </h2>
@@ -921,6 +1018,18 @@ export default function MachinePage({
               <p className="text-sm text-green-500 bg-green-950/30 border border-green-900 rounded-md px-3 py-2">
                 {inventorySavedMsg}
               </p>
+            )}
+
+            {pendingRental && !pendingRental.closeModalAfter && (
+              <RentalUploadPanel
+                ad={pendingRental.ad}
+                docs={rentalDocs}
+                uploading={rentalUploading}
+                fileRef={rentalRef}
+                onFiles={(files) => uploadRentalContract(files, pendingRental.companyEquipmentId)}
+                onDone={finishPendingRental}
+                compact
+              />
             )}
 
             <div className="grid grid-cols-2 gap-3">
@@ -1129,7 +1238,7 @@ export default function MachinePage({
             )}
             <div className="flex justify-end gap-2 pt-1">
               <button
-                onClick={() => { setFormOpen(false); setSaveError(null); }}
+                onClick={() => { setFormOpen(false); setSaveError(null); setPendingRental(null); setRentalDocs([]); }}
                 className="px-4 py-1.5 rounded-lg border border-beton-700 text-sm text-beton-300 hover:bg-beton-800"
               >
                 {inventorySavedMsg ? "Kapat" : "İptal"}
@@ -1142,6 +1251,8 @@ export default function MachinePage({
                 {saving ? "Kaydediliyor…" : kayitYeri === "firma_envanteri" && !editId ? "Envantere Kaydet" : "Kaydet"}
               </button>
             </div>
+            </>
+            )}
           </div>
         </div>
       )}
