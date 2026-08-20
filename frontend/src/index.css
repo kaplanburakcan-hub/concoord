@@ -122,6 +122,8 @@ body {
   [data-theme="light"] .text-amber-400,
   [data-theme="light"] .text-yellow-300,
   [data-theme="light"] .text-yellow-400 { color: #b45309 !important; }
+  [data-theme="light"] .text-orange-300,
+  [data-theme="light"] .text-orange-400 { color: #c2410c !important; }
   [data-theme="light"] .text-emerald-300,
   [data-theme="light"] .text-emerald-400 { color: #15803d !important; }
   [data-theme="light"] .text-sky-300,
