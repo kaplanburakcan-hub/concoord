@@ -324,16 +324,21 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
 
       {err && <p className="text-red-400 text-sm">{err}</p>}
 
-      {/* Özet kartları */}
+      {/* Özet kartları — statü rengiyle anında ayırt edilsin (Açık = durum
+          rozetleriyle aynı sarı, Süresi Geçen = kırmızı); değer 0'ken nötr kalır. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {[
-          { label: "Toplam", value: stats.toplam },
-          { label: "Açık", value: stats.acik },
-          { label: "Süresi Geçen", value: stats.suresiGecen, warn: stats.suresiGecen > 0 },
-          { label: "Bu Ay", value: stats.buAy },
-        ].map(({ label: l, value, warn }) => (
-          <div key={l} className={`rounded-lg border px-3 py-2.5 text-center ${warn ? "border-red-500/40 bg-red-500/5" : "border-beton-800 bg-beton-950"}`}>
-            <div className={`text-lg font-bold tabular-nums ${warn ? "text-red-400" : "text-white"}`}>{value}</div>
+          { label: "Toplam", value: stats.toplam, box: "border-beton-800 bg-beton-950", text: "text-white" },
+          { label: "Açık", value: stats.acik,
+            box: stats.acik > 0 ? "border-yellow-500/40 bg-yellow-500/5" : "border-beton-800 bg-beton-950",
+            text: stats.acik > 0 ? "text-yellow-300" : "text-white" },
+          { label: "Süresi Geçen", value: stats.suresiGecen,
+            box: stats.suresiGecen > 0 ? "border-red-500/40 bg-red-500/5" : "border-beton-800 bg-beton-950",
+            text: stats.suresiGecen > 0 ? "text-red-400" : "text-white" },
+          { label: "Bu Ay", value: stats.buAy, box: "border-beton-800 bg-beton-950", text: "text-white" },
+        ].map(({ label: l, value, box, text }) => (
+          <div key={l} className={`rounded-lg border px-3 py-2.5 text-center ${box}`}>
+            <div className={`text-lg font-bold tabular-nums ${text}`}>{value}</div>
             <div className="text-[10px] uppercase tracking-wider text-beton-500 mt-0.5">{l}</div>
           </div>
         ))}

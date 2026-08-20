@@ -136,11 +136,11 @@ export default function PurchaseOrdersPage() {
 
       {board && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Onay Bekleyen PR" value={board.pr_counts["Submitted"] ?? 0} />
+          <Stat label="Onay Bekleyen PR" value={board.pr_counts["Submitted"] ?? 0} tone="blue" />
           <Stat label="Açık Sipariş"
-            value={(board.po_counts["Ordered"] ?? 0) + (board.po_counts["PartiallyDelivered"] ?? 0)} />
-          <Stat label="Geciken PR" value={board.overdue_prs.length} danger />
-          <Stat label="Geciken Sipariş" value={board.overdue_pos.length} danger />
+            value={(board.po_counts["Ordered"] ?? 0) + (board.po_counts["PartiallyDelivered"] ?? 0)} tone="amber" />
+          <Stat label="Geciken PR" value={board.overdue_prs.length} tone="red" />
+          <Stat label="Geciken Sipariş" value={board.overdue_pos.length} tone="red" />
         </div>
       )}
       {err && <p className="text-sm text-red-400">{err}</p>}
@@ -235,11 +235,21 @@ export default function PurchaseOrdersPage() {
   );
 }
 
-function Stat({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
+// Statü rengiyle anında ayırt edilsin diye — ProcurementBoardPage'in akış
+// sütunlarıyla aynı ton sözlüğü (blue=onay bekliyor, amber=akışta, red=gecikti).
+// Değer 0'ken nötr kalır: boş bir kart renkle "sorun var" izlenimi vermesin.
+const STAT_TONE = {
+  neutral: { box: "border-beton-800 bg-beton-900", text: "text-white" },
+  blue:    { box: "border-blue-500/40 bg-blue-500/10", text: "text-blue-300" },
+  amber:   { box: "border-amber-500/40 bg-amber-500/10", text: "text-amber-400" },
+  red:     { box: "border-red-500/40 bg-red-500/10", text: "text-red-300" },
+} as const;
+
+function Stat({ label, value, tone = "neutral" }: { label: string; value: number; tone?: keyof typeof STAT_TONE }) {
+  const t = STAT_TONE[value > 0 ? tone : "neutral"];
   return (
-    <div className={`rounded-lg border p-3 ${danger && value > 0
-      ? "border-red-500/40 bg-red-500/10" : "border-beton-800 bg-beton-900"}`}>
-      <div className={`text-2xl font-display font-bold ${danger && value > 0 ? "text-red-300" : "text-white"}`}>
+    <div className={`rounded-lg border p-3 ${t.box}`}>
+      <div className={`text-2xl font-display font-bold ${t.text}`}>
         {value}
       </div>
       <div className="text-xs text-beton-400">{label}</div>

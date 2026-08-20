@@ -29,6 +29,16 @@ const PRIORITY_CLASS: Record<string, string> = {
   High: "text-amber-400 border-amber-600",
   Urgent: "text-red-400 border-red-600",
 };
+// Sütun statüsü rengiyle anında ayırt edilsin — Satınalma akış panosuyla
+// (ProcurementBoardPage) aynı fikir: iş ilerledikçe nötr → mavi → amber →
+// mor → yeşile geçer.
+const STATUS_HEAD_CLASS: Record<string, string> = {
+  Backlog: "bg-beton-800/60 text-beton-200 border-beton-700",
+  Todo: "bg-blue-500/15 text-blue-300 border-blue-500/40",
+  InProgress: "bg-amber-500/15 text-amber-400 border-amber-500/40",
+  Review: "bg-violet-500/15 text-violet-300 border-violet-500/40",
+  Done: "bg-green-500/15 text-green-300 border-green-500/40",
+};
 
 export default function TasksPage() {
   const { current } = useProjects();
@@ -123,15 +133,15 @@ export default function TasksPage() {
               setDragId(null);
               if (t && t.status !== s) moveTo(t, s, dropOrder(s));
             }}
-            className="rounded-lg bg-beton-900/60 border border-beton-800 p-2 min-h-[280px] flex flex-col"
+            className="rounded-lg bg-beton-900/60 border border-beton-800 min-h-[280px] flex flex-col overflow-hidden"
           >
-            <div className="flex items-center justify-between px-1 pb-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-beton-300">
+            <div className={`flex items-center justify-between px-3 py-2 border-b ${STATUS_HEAD_CLASS[s] ?? STATUS_HEAD_CLASS.Backlog}`}>
+              <span className="text-xs font-semibold uppercase tracking-wide">
                 {STATUS_LABELS[s] ?? s}
               </span>
-              <span className="text-xs text-beton-500">{byStatus[s]?.length ?? 0}</span>
+              <span className="text-xs opacity-70">{byStatus[s]?.length ?? 0}</span>
             </div>
-            <div className="flex-1 space-y-2">
+            <div className="flex-1 space-y-2 p-2">
               {(byStatus[s] ?? []).map((t) => (
                 <div
                   key={t.id}
