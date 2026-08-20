@@ -162,7 +162,7 @@ export default function ProcurementBoardPage() {
         <span className="text-xs text-beton-500">{total} kayıt</span>
         <div className="ml-auto flex gap-2">
           <button onClick={load}
-            className="rounded border border-beton-700 hover:border-emniyet-500 text-beton-200 px-3 py-1.5 text-xs">
+            className="rounded bg-[var(--group-accent)] hover:brightness-110 text-white-solid px-3 py-1.5 text-xs font-medium">
             Yenile
           </button>
           {/* Akış talepten ya da doğrudan siparişten başlayabilir; iki düğme
@@ -175,7 +175,7 @@ export default function ProcurementBoardPage() {
           )}
           {can("procurement.manage_po") && (
             <Link to="/satinalma/siparisler?yeni=1"
-              className="rounded bg-violet-500 hover:bg-violet-600 text-white font-semibold px-3 py-1.5 text-xs">
+              className="rounded bg-blue-500 hover:bg-blue-600 text-white-solid font-semibold px-3 py-1.5 text-xs">
               Yeni Sipariş
             </Link>
           )}

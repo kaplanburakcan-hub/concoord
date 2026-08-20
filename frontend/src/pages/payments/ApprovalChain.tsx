@@ -102,7 +102,7 @@ export default function ApprovalChain({
                     : rejected
                     ? "bg-red-500/20 text-red-300"
                     : isNext
-                    ? "bg-emniyet-500 text-white"
+                    ? "bg-emniyet-500 text-beton-950"
                     : "bg-beton-800 text-beton-400")
                 }
               >

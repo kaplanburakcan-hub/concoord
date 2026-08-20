@@ -219,7 +219,7 @@ function PolicyForm({
         <button
           onClick={submit}
           disabled={saving || !p.sigorta_sirketi.trim() || !p.police_no.trim()}
-          className="px-3 py-1.5 bg-emniyet-600 hover:bg-emniyet-500 text-white text-sm rounded-md disabled:opacity-40"
+          className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm rounded-md disabled:opacity-40"
         >
           {saving ? "Kaydediliyor…" : "Kaydet"}
         </button>
@@ -313,7 +313,7 @@ export default function SigortaPolicelerPage() {
         {canEdit && (
           <button
             onClick={() => { setAdding(true); setEditing(null); }}
-            className="px-3 py-1.5 bg-emniyet-600 hover:bg-emniyet-500 text-white text-sm rounded-md"
+            className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm rounded-md"
           >
             + Poliçe Ekle
           </button>
@@ -447,7 +447,7 @@ export default function SigortaPolicelerPage() {
                 Vazgeç
               </button>
               <button onClick={() => handleDelete(confirmDeleteId)}
-                className="rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white hover:brightness-110">
+                className="rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white-solid hover:brightness-110">
                 Sil
               </button>
             </div>

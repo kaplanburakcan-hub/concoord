@@ -201,7 +201,7 @@ function EditRow({
           <button
             onClick={() => onSave(d)}
             disabled={!d.baslik.trim()}
-            className="text-xs bg-emniyet-600 hover:bg-emniyet-500 text-white px-2 py-1 rounded disabled:opacity-40"
+            className="text-xs bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 px-2 py-1 rounded disabled:opacity-40"
           >
             {isNew ? "Ekle" : "Kaydet"}
           </button>

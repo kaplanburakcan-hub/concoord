@@ -604,7 +604,7 @@ export default function SahaTutanaklariPage() {
                         className="w-full h-20 object-cover rounded-md border border-beton-700"
                       />
                       <button onClick={() => formFotoSil(f.key)}
-                        className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                        className="absolute top-1 right-1 bg-red-600 text-white-solid rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
                       >✕</button>
                     </div>
                   ))}
@@ -651,10 +651,10 @@ export default function SahaTutanaklariPage() {
             </div>
             <div className="flex gap-3">
               <button onClick={() => onayVer(secili, "onaylandi")}
-                className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500"
+                className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white-solid hover:bg-green-500"
               >✓ Onayla</button>
               <button onClick={() => onayVer(secili, "reddedildi")}
-                className="flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500"
+                className="flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white-solid hover:bg-red-500"
               >✕ Reddet</button>
               <button onClick={() => { setOnayModal(false); setOnayNot(""); }}
                 className="rounded-md border border-beton-700 px-4 py-2 text-sm text-beton-300"
@@ -675,7 +675,7 @@ export default function SahaTutanaklariPage() {
             />
             <p className="text-center text-xs text-beton-400 mt-2">{fotografBuyuk.ad}</p>
             <button onClick={() => setFotografBuyuk(null)}
-              className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black"
+              className="absolute top-2 right-2 bg-black/60 text-white-solid rounded-full w-8 h-8 flex items-center justify-center hover:bg-black"
             >✕</button>
           </div>
         </div>

@@ -100,6 +100,12 @@ body {
   /* İçerikteki text-white başlıkları açık temada koyu mürekkebe döner
      (chrome/sidebar <main> dışında olduğundan beyaz kalır). */
   [data-theme="light"] main .text-white { color: rgb(15 32 54) !important; }
+  /* Renkli dolgulu buton/rozet/avatar metni: yukarıdaki kural sadece
+     başlıklar için tasarlandı ama .text-white'a genel geçtiğinden dolgu
+     üzerindeki beyaz yazıyı da karartıyordu. Bu sınıf her iki temada da
+     her zaman beyaz kalır — statik (kırmızı/yeşil/mavi) dolgulu
+     butonlarda text-white yerine bunu kullan. */
+  .text-white-solid { color: #fff; }
 
   /* --- Durum renkleri: light modda kontrast düzeltmesi ---
      Sayfalarda kullanılan semantik tonlar (red-400/300, green-300, blue-300…)

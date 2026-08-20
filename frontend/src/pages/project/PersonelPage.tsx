@@ -133,7 +133,7 @@ export default function PersonelPage() {
                   onClick={() => setFilterGorev(filterGorev === gorev ? "" : gorev)}
                   className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-all ${
                     filterGorev === gorev
-                      ? "bg-blue-500 text-white border-blue-500"
+                      ? "bg-blue-500 text-white-solid border-blue-500"
                       : "border-beton-800 text-beton-400 hover:border-blue-400"
                   }`}
                 >
@@ -203,7 +203,7 @@ export default function PersonelPage() {
                   <tr key={p.id} className="border-b border-beton-800 last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${avatarColor(p.ad_soyad)}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white-solid shrink-0 ${avatarColor(p.ad_soyad)}`}>
                           {initials(p.ad_soyad)}
                         </div>
                         <div>

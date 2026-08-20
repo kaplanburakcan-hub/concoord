@@ -621,7 +621,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
                 Vazgeç
               </button>
               <button onClick={() => doDelete(confirmDeleteId)}
-                className="rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white hover:brightness-110">
+                className="rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white-solid hover:brightness-110">
                 Sil
               </button>
             </div>

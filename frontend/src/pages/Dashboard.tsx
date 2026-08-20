@@ -148,7 +148,7 @@ export default function Dashboard() {
         </div>
         <button
           onClick={load}
-          className="rounded-md border border-beton-800 px-3 py-1 text-sm text-beton-200 hover:border-emniyet-500 transition"
+          className="rounded-md bg-[var(--group-accent)] hover:brightness-110 px-3 py-1 text-sm text-white-solid font-medium transition"
         >
           Yenile
         </button>
@@ -197,7 +197,7 @@ export default function Dashboard() {
                 <input value={accidentDesc} onChange={(e) => setAccidentDesc(e.target.value)} placeholder="Kısa açıklama"
                   className="flex-1 min-w-[160px] rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100" />
                 <button onClick={saveAccident} disabled={accidentBusy || !accidentDesc.trim()}
-                  className="rounded-md bg-red-500/90 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5">
+                  className="rounded-md bg-red-500/90 hover:bg-red-500 disabled:opacity-50 text-white-solid text-xs font-semibold px-3 py-1.5">
                   {accidentBusy ? "Kaydediliyor…" : "Kaza kaydını gir"}
                 </button>
               </div>

@@ -640,7 +640,7 @@ export default function MachinePage({
                         onClick={() => markDelivered(m.id)}
                         disabled={deliverBusyId === m.id}
                         title="Transferle gelen bu ekipmanın fiziksel teslimini onayla"
-                        className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-medium"
+                        className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white-solid text-xs font-medium"
                       >
                         {deliverBusyId === m.id ? "…" : "Teslim Alındı"}
                       </button>
@@ -650,7 +650,7 @@ export default function MachinePage({
                         <span className="text-xs text-red-600 font-medium mr-1">Emin misiniz?</span>
                         <button
                           onClick={() => deleteMachine(m.id)}
-                          className="px-2 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
+                          className="px-2 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white-solid text-xs font-medium"
                         >
                           Sil
                         </button>
@@ -1243,7 +1243,7 @@ export default function MachinePage({
                     Hayır
                   </button>
                   <button type="button" onClick={() => setDetailsForm(f => ({ ...f, ariza_var: true }))}
-                    className={`px-3 py-1.5 border-l border-beton-800 ${detailsForm.ariza_var ? "bg-red-600 text-white font-medium" : "bg-beton-950 text-beton-300"}`}>
+                    className={`px-3 py-1.5 border-l border-beton-800 ${detailsForm.ariza_var ? "bg-red-600 text-white-solid font-medium" : "bg-beton-950 text-beton-300"}`}>
                     Evet
                   </button>
                 </div>
@@ -1257,7 +1257,7 @@ export default function MachinePage({
                     Hayır
                   </button>
                   <button type="button" onClick={() => setDetailsForm(f => ({ ...f, hasar_var: true }))}
-                    className={`px-3 py-1.5 border-l border-beton-800 ${detailsForm.hasar_var ? "bg-red-600 text-white font-medium" : "bg-beton-950 text-beton-300"}`}>
+                    className={`px-3 py-1.5 border-l border-beton-800 ${detailsForm.hasar_var ? "bg-red-600 text-white-solid font-medium" : "bg-beton-950 text-beton-300"}`}>
                     Evet
                   </button>
                 </div>

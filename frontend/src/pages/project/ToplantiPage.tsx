@@ -29,19 +29,19 @@ interface AksiyonMaddesi {
 }
 
 const TURU_META: Record<string, { label: string; cls: string }> = {
-  kickoff:  { label: "Açılış",    cls: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" },
-  ilerleme: { label: "İlerleme",  cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
-  saha:     { label: "Saha",      cls: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" },
-  taseron:  { label: "Taşeron",   cls: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300" },
-  risk:     { label: "Risk",      cls: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
-  teknik:   { label: "Teknik",    cls: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" },
-  acil:     { label: "Acil",      cls: "bg-red-200 text-red-800 dark:bg-red-900/60 dark:text-red-200" },
+  kickoff:  { label: "Açılış",    cls: "bg-purple-500/15 text-purple-300 border-purple-500/40" },
+  ilerleme: { label: "İlerleme",  cls: "bg-blue-500/15 text-blue-300 border-blue-500/40" },
+  saha:     { label: "Saha",      cls: "bg-green-500/15 text-green-300 border-green-500/40" },
+  taseron:  { label: "Taşeron",   cls: "bg-orange-500/15 text-orange-300 border-orange-500/40" },
+  risk:     { label: "Risk",      cls: "bg-red-500/15 text-red-300 border-red-500/40" },
+  teknik:   { label: "Teknik",    cls: "bg-indigo-500/15 text-indigo-300 border-indigo-500/40" },
+  acil:     { label: "Acil",      cls: "bg-rose-500/15 text-rose-300 border-rose-500/40" },
 };
 
 const DURUM_META: Record<string, { label: string; cls: string }> = {
-  planli:       { label: "Planlandı",    cls: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300" },
-  gerceklesti:  { label: "Gerçekleşti", cls: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" },
-  iptal:        { label: "İptal",        cls: "bg-red-100 text-red-500 dark:bg-red-900/40 dark:text-red-300" },
+  planli:       { label: "Planlandı",    cls: "bg-beton-800 text-beton-300 border-beton-700" },
+  gerceklesti:  { label: "Gerçekleşti", cls: "bg-green-500/15 text-green-300 border-green-500/40" },
+  iptal:        { label: "İptal",        cls: "bg-red-500/15 text-red-300 border-red-500/40" },
 };
 
 function fmtDate(s?: string) {
@@ -78,8 +78,8 @@ function MeetingDetail({ m, onClose }: { m: Meeting; onClose: () => void }) {
                   {m.toplanti_no}
                 </span>
               )}
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${turuMeta.cls}`}>{turuMeta.label}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${durumMeta.cls}`}>{durumMeta.label}</span>
+              <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${turuMeta.cls}`}>{turuMeta.label}</span>
+              <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${durumMeta.cls}`}>{durumMeta.label}</span>
             </div>
             <h2 className="text-lg font-bold text-beton-100">{m.baslik}</h2>
             <p className="text-sm text-beton-400 mt-0.5">
@@ -427,8 +427,8 @@ export default function ToplantiPage() {
                           {m.toplanti_no}
                         </span>
                       )}
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${turuMeta.cls}`}>{turuMeta.label}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${durumMeta.cls}`}>{durumMeta.label}</span>
+                      <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${turuMeta.cls}`}>{turuMeta.label}</span>
+                      <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${durumMeta.cls}`}>{durumMeta.label}</span>
                     </div>
                     <div className="font-medium text-beton-100 truncate">{m.baslik}</div>
                     <div className="text-xs text-beton-400 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">

@@ -182,7 +182,7 @@ export default function PenaltiesPage() {
             <input ref={fileRef} type="file" accept="image/*" capture="environment"
               className="text-xs text-beton-300 file:mr-2 file:rounded file:border-0 file:bg-beton-800 file:px-2 file:py-1 file:text-beton-200" />
             <button onClick={issue} disabled={busy || !subID || !violation.trim()}
-              className="rounded-md bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-400 disabled:opacity-40">
+              className="rounded-md bg-red-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-red-400 disabled:opacity-40">
               {busy ? "Kesiliyor…" : "Tutanağı Kes (PDF + bildirim)"}
             </button>
           </div>

@@ -46,7 +46,7 @@ export default function UsersPage() {
           onClick={() => setShowNew((v) => !v)}
           className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold px-3 py-1.5 text-sm transition"
         >
-          {showNew ? "Kapat" : "Yeni kullanıcı"}
+          {showNew ? "Kapat" : "+ Yeni kullanıcı"}
         </button>
       </div>
 

@@ -130,7 +130,7 @@ export default function PurchaseRequestDetailPage() {
         {pr.status === "Submitted" && can("procurement.approve_pr") && (
           <>
             <button onClick={() => act("approve")}
-              className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-500">
+              className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-green-500">
               Onayla
             </button>
             <button onClick={() => setShowReject((v) => !v)}
@@ -156,7 +156,7 @@ export default function PurchaseRequestDetailPage() {
           </label>
           <button disabled={!rejectNote.trim()}
             onClick={() => act("reject", { decision_note: rejectNote.trim() })}
-            className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-40">
+            className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-red-500 disabled:opacity-40">
             Reddi Onayla
           </button>
         </div>

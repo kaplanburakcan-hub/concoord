@@ -25,10 +25,10 @@ type PuantajEntry = {
 const GOREVLER = ["İşçi", "Formen", "Teknisyen", "Mühendis", "Şef", "Yönetici", "Alt Yüklenici"];
 
 const DURUM_META: Record<string, { label: string; short: string; cls: string; cellCls: string }> = {
-  mevcut:   { label: "Mevcut",   short: "M", cls: "bg-green-900/60 text-green-300",  cellCls: "bg-green-900/40 text-green-300 font-bold" },
-  devamsiz: { label: "Devamsız", short: "D", cls: "bg-red-900/60 text-red-300",      cellCls: "bg-red-900/40 text-red-300 font-bold" },
-  izinli:   { label: "İzinli",   short: "İ", cls: "bg-yellow-900/60 text-yellow-300",cellCls: "bg-yellow-900/40 text-yellow-300 font-bold" },
-  raporlu:  { label: "Raporlu",  short: "R", cls: "bg-blue-900/60 text-blue-300",    cellCls: "bg-blue-900/40 text-blue-300 font-bold" },
+  mevcut:   { label: "Mevcut",   short: "M", cls: "bg-green-500/15 text-green-300 border-green-500/40",   cellCls: "bg-green-900/40 text-green-300 font-bold" },
+  devamsiz: { label: "Devamsız", short: "D", cls: "bg-red-500/15 text-red-300 border-red-500/40",         cellCls: "bg-red-900/40 text-red-300 font-bold" },
+  izinli:   { label: "İzinli",   short: "İ", cls: "bg-yellow-500/15 text-yellow-300 border-yellow-500/40", cellCls: "bg-yellow-900/40 text-yellow-300 font-bold" },
+  raporlu:  { label: "Raporlu",  short: "R", cls: "bg-blue-500/15 text-blue-300 border-blue-500/40",       cellCls: "bg-blue-900/40 text-blue-300 font-bold" },
 };
 const DURUM_SIRA = ["mevcut", "devamsiz", "izinli", "raporlu"];
 
@@ -319,7 +319,7 @@ export default function PersonelPuantajPage() {
               key={t}
               onClick={() => setTab(t)}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === t ? "bg-emniyet-600 text-white" : "text-beton-400 hover:text-beton-200"
+                tab === t ? "bg-emniyet-500 text-beton-950" : "text-beton-400 hover:text-beton-200"
               }`}
             >
               {t === "puantaj" ? "Puantaj Cetveli" : "Personel Listesi"}
@@ -444,7 +444,7 @@ export default function PersonelPuantajPage() {
           {/* Durum açıklaması */}
           <div className="flex gap-3 mt-3 flex-wrap">
             {Object.entries(DURUM_META).map(([k, v]) => (
-              <span key={k} className={`text-xs px-2 py-0.5 rounded-full ${v.cls}`}>
+              <span key={k} className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${v.cls}`}>
                 {v.short} = {v.label}
               </span>
             ))}
@@ -462,7 +462,7 @@ export default function PersonelPuantajPage() {
             </p>
             <button
               onClick={startAddPersonel}
-              className="px-3 py-1.5 bg-emniyet-600 hover:bg-emniyet-500 text-white text-sm rounded-md"
+              className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm rounded-md"
             >
               + Personel Ekle
             </button>
@@ -516,7 +516,7 @@ export default function PersonelPuantajPage() {
                 <button
                   onClick={savePersonel}
                   disabled={!personelForm.ad_soyad}
-                  className="px-3 py-1 bg-emniyet-600 hover:bg-emniyet-500 text-white text-sm rounded-md disabled:opacity-40"
+                  className="px-3 py-1 bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm rounded-md disabled:opacity-40"
                 >
                   Kaydet
                 </button>
