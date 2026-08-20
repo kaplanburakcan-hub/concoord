@@ -13,6 +13,16 @@ const STATUS_LABEL: Record<string, string> = {
   Archived: "Arşiv",
 };
 
+// Satınalma taleplerindeki rozet deseniyle aynı (bkz. PR_STATUS_STYLE,
+// PurchaseRequestsPage.tsx) — statü rengiyle anında ayırt edilsin.
+const STATUS_STYLE: Record<string, string> = {
+  Planning: "bg-blue-500/15 text-blue-300 border-blue-500/40",
+  Active: "bg-green-500/15 text-green-300 border-green-500/40",
+  OnHold: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+  Closed: "bg-beton-800 text-beton-200 border-beton-700",
+  Archived: "bg-beton-800 text-beton-200 border-beton-700",
+};
+
 export default function ProjectsPage() {
   const { projects, loading, reload, select } = useProjects();
   const { can } = useAuth();
@@ -75,7 +85,7 @@ export default function ProjectsPage() {
                   <Td className="text-beton-200">{p.name}</Td>
                   <Td>{p.client_name || "—"}</Td>
                   <Td>
-                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-beton-800 text-beton-200">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[p.status] ?? STATUS_STYLE.Closed}`}>
                       {STATUS_LABEL[p.status] ?? p.status}
                     </span>
                   </Td>

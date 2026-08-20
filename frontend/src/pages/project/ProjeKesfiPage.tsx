@@ -215,14 +215,14 @@ export default function ProjeKesfiPage() {
       {/* Başlık + genel toplam */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold text-chrome-text">Proje Keşfi</h1>
-          <p className="text-sm text-chrome-text-2 mt-0.5">{current.name}</p>
+          <h1 className="text-xl font-semibold text-beton-100">Proje Keşfi</h1>
+          <p className="text-sm text-beton-400 mt-0.5">{current.name}</p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-chrome-text-3">Toplam Keşif Bedeli</p>
-          <p className="text-2xl font-semibold text-chrome-text tabular-nums font-mono">
+          <p className="text-xs text-beton-500">Toplam Keşif Bedeli</p>
+          <p className="text-2xl font-semibold text-beton-100 tabular-nums font-mono">
             {fmt(grandTotal)}
-            <span className="text-sm text-chrome-text-2 ml-1">TRY</span>
+            <span className="text-sm text-beton-400 ml-1">TRY</span>
           </p>
         </div>
       </div>
@@ -240,23 +240,23 @@ export default function ProjeKesfiPage() {
         const isOpen = openKats.has(kat);
 
         return (
-          <div key={kat} className="rounded-lg border border-chrome-border bg-chrome-2/40 overflow-hidden">
+          <div key={kat} className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
             {/* Kategori başlığı */}
             <button
               onClick={() => toggleKat(kat)}
               className="w-full flex items-center justify-between px-5 py-3
-                         border-b border-chrome-border bg-chrome-2/60
-                         hover:bg-chrome-active/40 transition-colors"
+                         border-b border-beton-800 bg-beton-900
+                         hover:bg-beton-800/60 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <span className="text-chrome-text-2 text-xs transition-transform"
+                <span className="text-beton-400 text-xs transition-transform"
                       style={{ transform: isOpen ? "rotate(90deg)" : "rotate(0)" }}>▶</span>
-                <span className="text-sm font-semibold text-chrome-text">{kat}</span>
-                <span className="text-xs text-chrome-text-3">
+                <span className="text-sm font-semibold text-beton-100">{kat}</span>
+                <span className="text-xs text-beton-500">
                   {katItems.length} kalem
                 </span>
               </div>
-              <span className="text-sm font-mono tabular-nums text-chrome-text-2">
+              <span className="text-sm font-mono tabular-nums text-beton-400">
                 {total > 0 ? fmt(total) + " TRY" : "—"}
               </span>
             </button>
@@ -268,7 +268,7 @@ export default function ProjeKesfiPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="text-chrome-text-3 text-xs border-b border-chrome-border/40">
+                        <tr className="text-beton-500 text-xs border-b border-beton-800/40">
                           <th className="py-2 px-3 text-left font-medium w-14">Poz No</th>
                           <th className="py-2 px-3 text-left font-medium">Tanım</th>
                           <th className="py-2 px-3 text-left font-medium w-16">Birim</th>
@@ -281,7 +281,7 @@ export default function ProjeKesfiPage() {
                       <tbody>
                         {katItems.map(it => (
                           <tr key={it.id}
-                              className={`border-b border-chrome-border/20 group hover:bg-chrome-active/20 transition-colors
+                              className={`border-b border-beton-800/20 group hover:bg-beton-800/40 transition-colors
                                           ${it._dirty ? "bg-blue-500/5" : ""}`}>
                             {editingId === it.id ? (
                               <EditRow
@@ -311,10 +311,10 @@ export default function ProjeKesfiPage() {
                 )}
 
                 {canEdit && (
-                  <div className="px-5 py-3 border-t border-chrome-border/20">
+                  <div className="px-5 py-3 border-t border-beton-800/20">
                     <button
                       onClick={() => addItem(kat)}
-                      className="text-xs text-accent hover:text-accent/80 transition-colors"
+                      className="text-xs text-emniyet-500 hover:text-emniyet-600 transition-colors"
                     >
                       + {kat} kalemi ekle
                     </button>
@@ -322,7 +322,7 @@ export default function ProjeKesfiPage() {
                 )}
 
                 {katItems.length === 0 && !canEdit && (
-                  <p className="px-5 py-4 text-sm text-chrome-text-3">
+                  <p className="px-5 py-4 text-sm text-beton-500">
                     Bu kategoride henüz kalem yok.
                   </p>
                 )}
@@ -333,9 +333,9 @@ export default function ProjeKesfiPage() {
       })}
 
       {/* Özet tablo */}
-      <div className="rounded-lg border border-chrome-border bg-chrome-2/40 overflow-hidden">
-        <div className="px-5 py-3 border-b border-chrome-border bg-chrome-2/60">
-          <h2 className="text-sm font-semibold text-chrome-text">Keşif Özeti</h2>
+      <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+        <div className="px-5 py-3 border-b border-beton-800 bg-beton-900">
+          <h2 className="text-sm font-semibold text-beton-100">Keşif Özeti</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -345,35 +345,35 @@ export default function ProjeKesfiPage() {
                 const pct = grandTotal > 0 ? (total / grandTotal * 100) : 0;
                 if (total === 0) return null;
                 return (
-                  <tr key={kat} className="border-b border-chrome-border/20">
-                    <td className="px-5 py-2 text-chrome-text">{kat}</td>
+                  <tr key={kat} className="border-b border-beton-800/20">
+                    <td className="px-5 py-2 text-beton-100">{kat}</td>
                     <td className="px-5 py-2 w-1/2">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-beton-800 rounded-full h-1.5 overflow-hidden">
                           <div
-                            className="h-full bg-accent rounded-full transition-all"
+                            className="h-full bg-emniyet-500 rounded-full transition-all"
                             style={{ width: `${pct}%` }}
                           />
                         </div>
-                        <span className="text-chrome-text-3 text-xs w-10 text-right">
+                        <span className="text-beton-500 text-xs w-10 text-right">
                           %{pct.toFixed(1)}
                         </span>
                       </div>
                     </td>
-                    <td className="px-5 py-2 text-right font-mono tabular-nums text-chrome-text-2">
+                    <td className="px-5 py-2 text-right font-mono tabular-nums text-beton-400">
                       {fmt(total)}
                     </td>
-                    <td className="px-5 py-2 text-chrome-text-3 w-12">TRY</td>
+                    <td className="px-5 py-2 text-beton-500 w-12">TRY</td>
                   </tr>
                 );
               })}
-              <tr className="bg-chrome-active/20 font-semibold">
-                <td className="px-5 py-3 text-chrome-text">Genel Toplam</td>
+              <tr className="bg-beton-800/40 font-semibold">
+                <td className="px-5 py-3 text-beton-100">Genel Toplam</td>
                 <td />
-                <td className="px-5 py-3 text-right font-mono tabular-nums text-chrome-text">
+                <td className="px-5 py-3 text-right font-mono tabular-nums text-beton-100">
                   {fmt(grandTotal)}
                 </td>
-                <td className="px-5 py-3 text-chrome-text-2">TRY</td>
+                <td className="px-5 py-3 text-beton-400">TRY</td>
               </tr>
             </tbody>
           </table>
@@ -390,27 +390,27 @@ function ViewRow({ it, canEdit, onEdit, onDelete }: {
 }) {
   return (
     <>
-      <td className="py-2 px-3 text-chrome-text-3 text-xs">{it.poz_no || "—"}</td>
-      <td className="py-2 px-3 text-chrome-text">{it.tanim}</td>
-      <td className="py-2 px-3 text-chrome-text-2">{it.birim}</td>
-      <td className="py-2 px-3 text-right tabular-nums text-chrome-text-2">
+      <td className="py-2 px-3 text-beton-500 text-xs">{it.poz_no || "—"}</td>
+      <td className="py-2 px-3 text-beton-100">{it.tanim}</td>
+      <td className="py-2 px-3 text-beton-400">{it.birim}</td>
+      <td className="py-2 px-3 text-right tabular-nums text-beton-400">
         {it.miktar.toLocaleString("tr-TR", { maximumFractionDigits: 3 })}
       </td>
-      <td className="py-2 px-3 text-right tabular-nums font-mono text-chrome-text-2">
+      <td className="py-2 px-3 text-right tabular-nums font-mono text-beton-400">
         {fmt(it.birim_fiyat)}
       </td>
-      <td className="py-2 px-3 text-right tabular-nums font-mono text-chrome-text font-medium">
+      <td className="py-2 px-3 text-right tabular-nums font-mono text-beton-100 font-medium">
         {fmt(it.miktar * it.birim_fiyat)}
       </td>
       {canEdit && (
         <td className="py-2 px-3">
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
             <button onClick={onEdit}
-                    className="text-chrome-text-3 hover:text-accent transition-colors text-xs px-1.5 py-0.5 rounded">
+                    className="text-beton-500 hover:text-emniyet-500 transition-colors text-xs px-1.5 py-0.5 rounded">
               Düzenle
             </button>
             <button onClick={onDelete}
-                    className="text-chrome-text-3 hover:text-red-400 transition-colors text-xs px-1.5 py-0.5 rounded">
+                    className="text-beton-500 hover:text-red-400 transition-colors text-xs px-1.5 py-0.5 rounded">
               Sil
             </button>
           </div>
@@ -460,18 +460,18 @@ function EditRow({ it, onUpdate, onSave, onCancel, saving, canEdit }: {
                className={`${inpBase} w-32 text-right font-mono tabular-nums`}
                placeholder="0,00" />
       </td>
-      <td className="py-1 px-2 text-right font-mono tabular-nums text-chrome-text-2 text-xs">
+      <td className="py-1 px-2 text-right font-mono tabular-nums text-beton-400 text-xs">
         {fmt(it.miktar * it.birim_fiyat)}
       </td>
       <td className="py-1 px-2">
         <div className="flex gap-1">
           <button onClick={onSave} disabled={saving || !it.tanim}
-                  className="text-xs bg-accent text-white px-2 py-0.5 rounded
-                             hover:bg-accent/90 disabled:opacity-50 transition-colors whitespace-nowrap">
+                  className="text-xs bg-emniyet-500 text-beton-950 px-2 py-0.5 rounded
+                             hover:bg-emniyet-600 disabled:opacity-50 transition-colors whitespace-nowrap">
             {saving ? "…" : "Kaydet"}
           </button>
           <button onClick={onCancel}
-                  className="text-xs text-chrome-text-3 hover:text-chrome-text px-1.5 py-0.5 transition-colors">
+                  className="text-xs text-beton-500 hover:text-beton-100 px-1.5 py-0.5 transition-colors">
             İptal
           </button>
         </div>

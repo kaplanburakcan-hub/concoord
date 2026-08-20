@@ -8,7 +8,7 @@ const inpBase =
   "rounded-md bg-beton-950 border border-beton-800 px-3 py-1.5 text-sm text-beton-200 " +
   "outline-none focus:border-emniyet-500 disabled:opacity-50";
 const inp = `w-full ${inpBase}`;
-const labelSm = "text-xs font-medium text-chrome-text-2";
+const labelSm = "text-xs font-medium text-beton-400";
 
 // ── Tipler ───────────────────────────────────────────────────────────────────
 
@@ -315,15 +315,15 @@ export default function AnaSozlesmePage() {
       {/* Başlık */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-chrome-text">Ana Sözleşme</h1>
-          <p className="text-sm text-chrome-text-2 mt-0.5">{current.name}</p>
+          <h1 className="text-xl font-semibold text-beton-100">Ana Sözleşme</h1>
+          <p className="text-sm text-beton-400 mt-0.5">{current.name}</p>
         </div>
         {canEdit && mode === "edit" && (
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-5 py-2 rounded-md bg-accent text-white text-sm font-medium
-                       hover:bg-accent/90 disabled:opacity-50 transition-colors"
+            className="px-5 py-2 rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium
+                       disabled:opacity-50 transition-colors"
           >
             {saving ? "Kaydediliyor…" : "Kaydet ve Kilitle"}
           </button>
@@ -331,8 +331,8 @@ export default function AnaSozlesmePage() {
         {canEdit && mode === "view" && (
           <button
             onClick={() => setMode("edit")}
-            className="px-5 py-2 rounded-md border border-accent text-accent text-sm font-medium
-                       hover:bg-accent/10 transition-colors"
+            className="px-5 py-2 rounded-md bg-[var(--group-accent)] text-white-solid text-sm font-medium
+                       hover:brightness-95 transition-[filter]"
           >
             Güncelle / Revize Et
           </button>
@@ -368,7 +368,7 @@ export default function AnaSozlesmePage() {
                 onChange={() => set("sozlesme_turu", t)}
                 className="accent-blue-500 w-4 h-4 cursor-pointer"
               />
-              <span className="text-sm text-chrome-text group-hover:text-white transition-colors">
+              <span className="text-sm text-beton-100 group-hover:text-emniyet-500 transition-colors">
                 {TUR_LABEL[t]}
               </span>
             </label>
@@ -390,7 +390,7 @@ export default function AnaSozlesmePage() {
                   onChange={() => set("fiyat_farki_var", v)}
                   className="accent-blue-500 w-4 h-4 cursor-pointer"
                 />
-                <span className="text-sm text-chrome-text">{v ? "Var" : "Yok"}</span>
+                <span className="text-sm text-beton-100">{v ? "Var" : "Yok"}</span>
               </label>
             ))}
           </div>
@@ -448,7 +448,7 @@ export default function AnaSozlesmePage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="text-chrome-text-3 text-left border-b border-chrome-border">
+                <tr className="text-beton-500 text-left border-b border-beton-800">
                   <th className="pb-2 pr-3 font-medium w-1/3">Tanım</th>
                   <th className="pb-2 pr-3 font-medium w-20">Birim</th>
                   <th className="pb-2 pr-3 font-medium w-24 text-right">Miktar</th>
@@ -459,7 +459,7 @@ export default function AnaSozlesmePage() {
               </thead>
               <tbody>
                 {form.birim_fiyat_kalemleri.map((k, i) => (
-                  <tr key={k.id} className="border-b border-chrome-border/40">
+                  <tr key={k.id} className="border-b border-beton-800/40">
                     <td className="py-2 pr-3">
                       <input
                         type="text"
@@ -526,7 +526,7 @@ export default function AnaSozlesmePage() {
                 ))}
                 {form.birim_fiyat_kalemleri.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-4 text-center text-chrome-text-3 text-sm">
+                    <td colSpan={6} className="py-4 text-center text-beton-500 text-sm">
                       Henüz kalem eklenmedi.
                     </td>
                   </tr>
@@ -537,7 +537,7 @@ export default function AnaSozlesmePage() {
           {canEdit && (
             <button
               onClick={addKalem}
-              className="mt-3 text-sm text-accent hover:text-accent/80 transition-colors"
+              className="mt-3 text-sm text-emniyet-500 hover:text-emniyet-600 transition-colors"
             >
               + Kalem Ekle
             </button>
@@ -584,13 +584,13 @@ export default function AnaSozlesmePage() {
                 min={1}
                 className={`${inpBase} w-32`}
               />
-              <span className="text-sm text-chrome-text-2">takvim günü</span>
+              <span className="text-sm text-beton-400">takvim günü</span>
             </div>
           </Field>
 
           <Field label="Kesin Kabul Tarihi" error={fieldErr.gecici_kabul_sonrasi_gun}>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-chrome-text-2">Geçici Kabulden</span>
+              <span className="text-sm text-beton-400">Geçici Kabulden</span>
               <input
                 type="number"
                 value={form.gecici_kabul_sonrasi_gun}
@@ -600,7 +600,7 @@ export default function AnaSozlesmePage() {
                 min={0}
                 className={`${inpBase} w-24`}
               />
-              <span className="text-sm text-chrome-text-2">gün sonra</span>
+              <span className="text-sm text-beton-400">gün sonra</span>
             </div>
           </Field>
 
@@ -612,7 +612,7 @@ export default function AnaSozlesmePage() {
         <div className="flex flex-wrap gap-6">
           <Field label="Azami Artış Oranı" error={fieldErr.max_artis_orani}>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-chrome-text-2 font-medium">+</span>
+              <span className="text-sm text-beton-400 font-medium">+</span>
               <input
                 type="number"
                 value={form.max_artis_orani}
@@ -623,13 +623,13 @@ export default function AnaSozlesmePage() {
                 step={0.01}
                 className={`${inpBase} w-24`}
               />
-              <span className="text-sm text-chrome-text-2">%</span>
+              <span className="text-sm text-beton-400">%</span>
             </div>
           </Field>
 
           <Field label="Azami Ekiliş Oranı" error={fieldErr.max_eksilis_orani}>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-chrome-text-2 font-medium">−</span>
+              <span className="text-sm text-beton-400 font-medium">−</span>
               <input
                 type="number"
                 value={form.max_eksilis_orani}
@@ -640,7 +640,7 @@ export default function AnaSozlesmePage() {
                 step={0.01}
                 className={`${inpBase} w-24`}
               />
-              <span className="text-sm text-chrome-text-2">%</span>
+              <span className="text-sm text-beton-400">%</span>
             </div>
           </Field>
         </div>
@@ -675,8 +675,8 @@ export default function AnaSozlesmePage() {
                   <button
                     type="button"
                     onClick={() => pdfRef.current?.click()}
-                    className="px-4 py-1.5 rounded border border-chrome-border text-sm
-                               text-chrome-text-2 hover:text-chrome-text hover:border-accent/60
+                    className="px-4 py-1.5 rounded border border-beton-700 text-sm
+                               text-beton-400 hover:text-beton-100 hover:border-emniyet-500
                                transition-colors"
                   >
                     PDF Seç…
@@ -684,7 +684,7 @@ export default function AnaSozlesmePage() {
                 </>
               )}
               {form.pdf_dosya_adi && (
-                <span className="text-sm text-chrome-text-2 flex items-center gap-1.5">
+                <span className="text-sm text-beton-400 flex items-center gap-1.5">
                   <span className="text-base">📄</span>
                   {form.pdf_dosya_adi}
                   {form.pdf_dosya_url && (
@@ -692,7 +692,7 @@ export default function AnaSozlesmePage() {
                       href={form.pdf_dosya_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-accent underline ml-1 text-xs"
+                      className="text-emniyet-500 underline ml-1 text-xs"
                     >
                       Görüntüle
                     </a>
@@ -700,7 +700,7 @@ export default function AnaSozlesmePage() {
                 </span>
               )}
               {!form.pdf_dosya_adi && !canEdit && (
-                <span className="text-sm text-chrome-text-3">PDF eklenmemiş.</span>
+                <span className="text-sm text-beton-500">PDF eklenmemiş.</span>
               )}
             </div>
           </Field>
@@ -713,8 +713,8 @@ export default function AnaSozlesmePage() {
           {meta.isLocked && (
             <button
               onClick={() => load()}
-              className="px-6 py-2 rounded-md border border-chrome-border text-sm text-chrome-text-2
-                         hover:text-chrome-text hover:border-chrome-text-2 transition-colors"
+              className="px-6 py-2 rounded-md border border-beton-700 text-sm text-beton-400
+                         hover:text-beton-100 hover:bg-beton-800 transition-colors"
             >
               Vazgeç
             </button>
@@ -722,8 +722,8 @@ export default function AnaSozlesmePage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-2 rounded-md bg-accent text-white text-sm font-medium
-                       hover:bg-accent/90 disabled:opacity-50 transition-colors"
+            className="px-6 py-2 rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium
+                       disabled:opacity-50 transition-colors"
           >
             {saving ? "Kaydediliyor…" : "Sözleşmeyi Kaydet ve Kilitle"}
           </button>
@@ -758,7 +758,7 @@ function ContractSummary({ form, meta }: {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-md bg-beton-800/40 border border-chrome-border px-4 py-2.5 text-xs text-chrome-text-2 flex items-center gap-1.5">
+      <div className="rounded-md bg-beton-800/40 border border-beton-800 px-4 py-2.5 text-xs text-beton-400 flex items-center gap-1.5">
         <span>🔒</span>
         <span>
           Sözleşme kilitli{meta.updatedByName ? ` — son güncelleyen: ${meta.updatedByName}` : ""}
@@ -778,7 +778,7 @@ function ContractSummary({ form, meta }: {
 
       {showLump && (
         <Section title={form.sozlesme_turu === "karma" ? "Götürü Bedel Bölüm Tutarı" : "Sözleşme Bedeli"}>
-          <p className="text-lg font-semibold text-chrome-text tabular-nums">
+          <p className="text-lg font-semibold text-beton-100 tabular-nums">
             {form.sozlesme_bedeli ? `${form.sozlesme_bedeli} ${form.sozlesme_para_birimi}` : "—"}
           </p>
         </Section>
@@ -787,9 +787,9 @@ function ContractSummary({ form, meta }: {
       {showBirim && (
         <Section title={form.sozlesme_turu === "karma" ? "Birim Fiyatlı Bölüm Kalemleri" : "Birim Fiyat Kalemleri"}>
           {form.birim_fiyat_kalemleri.length === 0 ? (
-            <p className="text-sm text-chrome-text-3">Kalem girilmemiş.</p>
+            <p className="text-sm text-beton-500">Kalem girilmemiş.</p>
           ) : (
-            <p className="text-sm text-chrome-text">{form.birim_fiyat_kalemleri.length} kalem tanımlı.</p>
+            <p className="text-sm text-beton-100">{form.birim_fiyat_kalemleri.length} kalem tanımlı.</p>
           )}
         </Section>
       )}
@@ -823,17 +823,17 @@ function ContractSummary({ form, meta }: {
 function SummaryRow({ label, value, full }: { label: string; value: string; full?: boolean }) {
   return (
     <div className={full ? "sm:col-span-2" : undefined}>
-      <p className="text-xs text-chrome-text-3 mb-0.5">{label}</p>
-      <p className="text-chrome-text">{value}</p>
+      <p className="text-xs text-beton-500 mb-0.5">{label}</p>
+      <p className="text-beton-100">{value}</p>
     </div>
   );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-chrome-border bg-chrome-2/40 overflow-hidden">
-      <div className="px-5 py-3 border-b border-chrome-border bg-chrome-2/60">
-        <h2 className="text-sm font-semibold text-chrome-text">{title}</h2>
+    <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+      <div className="px-5 py-3 border-b border-beton-800 bg-beton-900">
+        <h2 className="text-sm font-semibold text-beton-100">{title}</h2>
       </div>
       <div className="px-5 py-4">
         {children}
