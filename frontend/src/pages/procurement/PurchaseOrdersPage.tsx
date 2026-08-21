@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
+import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 
 // Faz 7 — Tedarik durum panosu + sipariş (PO) listesi.
 // Geciken siparişler (beklenen tarih geçti, kapanmadı) kırmızı vurgulanır
@@ -63,6 +64,7 @@ export default function PurchaseOrdersPage() {
   const [expected, setExpected] = useState("");
   const [note, setNote] = useState("");
   const pid = current?.id;
+  const kesinKabul = useKesinKabulTarihi(pid);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -174,7 +176,7 @@ export default function PurchaseOrdersPage() {
           </label>
           <label className="text-xs text-beton-300">
             Beklenen teslim
-            <input type="date" value={expected} onChange={(e) => setExpected(e.target.value)}
+            <input type="date" value={expected} max={kesinKabul} onChange={(e) => setExpected(e.target.value)}
               className="mt-1 block rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
           </label>
           <label className="flex-1 min-w-[160px] text-xs text-beton-300">

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, apiFetchBlob, apiUpload } from "../../api/client";
 import { useProjects } from "../../projects/ProjectContext";
+import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 
 // Saha Tutanakları — önceden tamamen tarayıcı localStorage'ındaydı (hiç
 // kullanıcı/cihaz arasında paylaşılmıyordu, fotoğraflar base64 olarak JSON
@@ -101,6 +102,7 @@ const BOŞ_FORM = {
 export default function SahaTutanaklariPage() {
   const { current } = useProjects();
   const pid = current?.id;
+  const kesinKabul = useKesinKabulTarihi(pid);
 
   const [tutanaklar, setTutanaklar] = useState<Tutanak[]>([]);
   const [subs, setSubs] = useState<Sub[]>([]);
@@ -511,7 +513,7 @@ export default function SahaTutanaklariPage() {
             {/* Tarih */}
             <div>
               <label className="block text-xs text-beton-400 mb-1">Tarih *</label>
-              <input type="date" value={form.tarih} onChange={(e) => setForm({ ...form, tarih: e.target.value })}
+              <input type="date" value={form.tarih} max={kesinKabul} onChange={(e) => setForm({ ...form, tarih: e.target.value })}
                 className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
               />
             </div>

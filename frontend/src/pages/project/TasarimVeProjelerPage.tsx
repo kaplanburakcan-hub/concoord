@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "../../api/client";
+import { api, RequestError } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 
 const DISIPLINLER = [
@@ -339,6 +339,7 @@ export default function TasarimVeProjelerPage() {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const canEdit = true;
 
@@ -372,12 +373,23 @@ export default function TasarimVeProjelerPage() {
 
   async function handleSave(doc: Doc) {
     if (!pid) return;
-    if (doc.id) {
-      await api(`/projects/${pid}/design-docs/${doc.id}`, { method: "PATCH", body: doc, projectId: pid });
-    } else {
-      await api(`/projects/${pid}/design-docs`, { method: "POST", body: doc, projectId: pid });
+    setSaveError(null);
+    try {
+      if (doc.id) {
+        await api(`/projects/${pid}/design-docs/${doc.id}`, { method: "PATCH", body: doc, projectId: pid });
+      } else {
+        await api(`/projects/${pid}/design-docs`, { method: "POST", body: doc, projectId: pid });
+      }
+      await load();
+    } catch (e) {
+      if (e instanceof RequestError && e.api?.details && typeof e.api.details === "object") {
+        const d = e.api.details as Record<string, string>;
+        setSaveError(Object.values(d)[0] ?? e.message);
+      } else {
+        setSaveError(e instanceof RequestError ? e.message : "Kaydedilemedi.");
+      }
+      throw e; // satır düzenleme modunda kalsın (bkz. DisciplineSection onSave sarmalayıcısı)
     }
-    await load();
   }
 
   async function handleDelete(doc: Doc) {
@@ -426,6 +438,9 @@ export default function TasarimVeProjelerPage() {
       )}
       {error && (
         <p className="text-red-400 text-sm">{error}</p>
+      )}
+      {saveError && (
+        <p className="text-red-400 text-sm">{saveError}</p>
       )}
 
       {!loading && !error && (

@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
+import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 
 // ── Tipler ────────────────────────────────────────────────────────────────────
 interface Item {
@@ -57,6 +58,7 @@ function MovementModal({
   onSave: () => void;
   onClose: () => void;
 }) {
+  const kesinKabul = useKesinKabulTarihi(projectId);
   const [itemId, setItemId]   = useState(items[0]?.id ?? "");
   const [turu, setTuru]       = useState<"giris" | "cikis" | "sayim" | "iade">("giris");
   const [miktar, setMiktar]   = useState("");
@@ -123,7 +125,7 @@ function MovementModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-beton-400 mb-1 block">Tarih</label>
-              <input className={inpCls + " w-full"} type="date" value={tarih} onChange={e => setTarih(e.target.value)} />
+              <input className={inpCls + " w-full"} type="date" value={tarih} max={kesinKabul} onChange={e => setTarih(e.target.value)} />
             </div>
             <div>
               <label className="text-xs text-beton-400 mb-1 block">Belge No</label>

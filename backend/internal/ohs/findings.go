@@ -15,6 +15,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/audit"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/notify"
+	"github.com/ipks/ipks/backend/internal/validate"
 )
 
 // ---------------------------------------------------------------------------
@@ -34,8 +35,8 @@ type findingDTO struct {
 	PhotoDocumentID   *uuid.UUID `json:"photo_document_id,omitempty"`
 	DueDate           *string    `json:"due_date,omitempty"`
 	Status            string     `json:"status"`
-	Overdue           bool       `json:"overdue"`   // termini geçmiş, kapanmamış
-	AgeDays           int        `json:"age_days"`  // yaşlandırma (haftalık rapor tüketir)
+	Overdue           bool       `json:"overdue"`  // termini geçmiş, kapanmamış
+	AgeDays           int        `json:"age_days"` // yaşlandırma (haftalık rapor tüketir)
 	ReportedBy        uuid.UUID  `json:"reported_by"`
 	ReportedByName    string     `json:"reported_by_name"`
 	ClosedByName      *string    `json:"closed_by_name,omitempty"`
@@ -144,6 +145,19 @@ func (h *Handler) CreateFinding(w http.ResponseWriter, r *http.Request) {
 	}
 	if strDeref(&req.Description) == "" {
 		errs["description"] = "açıklama zorunludur"
+	}
+	if dueDate := strDeref(req.DueDate); dueDate != "" {
+		t, perr := time.Parse("2006-01-02", dueDate)
+		if perr != nil {
+			errs["due_date"] = "geçersiz tarih biçimi"
+		} else if kerrs, kerr := validate.NotAfterKesinKabul(r.Context(), h.pool, pid, t, "due_date"); kerr != nil {
+			httpx.Internal(w, r)
+			return
+		} else if len(kerrs) > 0 {
+			for k, v := range kerrs {
+				errs[k] = v
+			}
+		}
 	}
 	if len(errs) > 0 {
 		httpx.ValidationFailed(w, r, errs)
@@ -373,9 +387,9 @@ func NotifyOverdueFindings(ctx context.Context, pool *pgxpool.Pool, nt *notify.S
 		return
 	}
 	type row struct {
-		id, pid      uuid.UUID
+		id, pid        uuid.UUID
 		sev, desc, due string
-		reportedBy   uuid.UUID
+		reportedBy     uuid.UUID
 	}
 	var overdue []row
 	for rows.Next() {

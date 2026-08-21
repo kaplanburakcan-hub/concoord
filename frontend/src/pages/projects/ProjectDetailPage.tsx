@@ -4,6 +4,7 @@ import { useParams, Link } from "react-router-dom";
 import { api, apiFetchBlob, apiUpload, RequestError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects, type Project } from "../ProjectContext";
+import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 
 const STATUS_LABEL: Record<string, string> = {
   Planning: "Planlama",
@@ -321,6 +322,7 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
 function MilestoneList({ projectId, milestones, canEdit, onChange }: {
   projectId: string; milestones: Milestone[]; canEdit: boolean; onChange: () => void;
 }) {
+  const kesinKabul = useKesinKabulTarihi(projectId);
   const [adding, setAdding] = useState(false);
   const [nf, setNf] = useState({ name: "", planned_date: "", weight_pct: "", status: "Planned" });
 
@@ -397,7 +399,7 @@ function MilestoneList({ projectId, milestones, canEdit, onChange }: {
           {adding && (
             <tr className="border-t border-beton-800 bg-beton-900/40">
               <td className="px-4 py-2"><input className={inpSm} placeholder="Ad" value={nf.name} onChange={(e) => setNf({ ...nf, name: e.target.value })} /></td>
-              <td className="px-4 py-2"><input type="date" className={inpSm} value={nf.planned_date} onChange={(e) => setNf({ ...nf, planned_date: e.target.value })} /></td>
+              <td className="px-4 py-2"><input type="date" className={inpSm} value={nf.planned_date} max={kesinKabul} onChange={(e) => setNf({ ...nf, planned_date: e.target.value })} /></td>
               <td className="px-4 py-2"><input type="number" className={inpSm} value={nf.weight_pct} onChange={(e) => setNf({ ...nf, weight_pct: e.target.value })} /></td>
               <td className="px-4 py-2">
                 <select className={inpSm} value={nf.status} onChange={(e) => setNf({ ...nf, status: e.target.value })}>

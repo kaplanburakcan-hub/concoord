@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/validate"
 )
 
 type Handler struct{ pool *pgxpool.Pool }
@@ -123,6 +124,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if b.AksiyonMaddeleri != nil {
 		aksiyonJSON = *b.AksiyonMaddeleri
 	}
+	if !checkKesinKabul(w, r, h.pool, pid, b.Tarih, "tarih") {
+		return
+	}
+	if b.SonrakiToplanti != nil && !checkKesinKabul(w, r, h.pool, pid, *b.SonrakiToplanti, "sonraki_toplanti_tarihi") {
+		return
+	}
 
 	var m Meeting
 	err := h.pool.QueryRow(r.Context(),
@@ -180,6 +187,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &b) {
 		return
 	}
+	if b.Tarih != nil && !checkKesinKabul(w, r, h.pool, pid, *b.Tarih, "tarih") {
+		return
+	}
+	if b.SonrakiToplanti != nil && !checkKesinKabul(w, r, h.pool, pid, *b.SonrakiToplanti, "sonraki_toplanti_tarihi") {
+		return
+	}
 	var m Meeting
 	err := h.pool.QueryRow(r.Context(),
 		`UPDATE project_meetings SET
@@ -235,6 +248,28 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// checkKesinKabul — toplantı tarihi ve sonraki toplantı tarihi projenin
+// Kesin Kabul tarihini aşamaz (proje bittikten sonra toplantı planlamak
+// anlamsız). dateStr boşsa (alan gönderilmemiş/temizlenmiş) kontrol atlanır.
+func checkKesinKabul(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, pid uuid.UUID, dateStr, fieldName string) bool {
+	if dateStr == "" {
+		return true
+	}
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		httpx.ValidationFailed(w, r, map[string]string{fieldName: "geçersiz tarih biçimi"})
+		return false
+	}
+	if errs, err := validate.NotAfterKesinKabul(r.Context(), pool, pid, t, fieldName); err != nil {
+		httpx.Internal(w, r)
+		return false
+	} else if len(errs) > 0 {
+		httpx.ValidationFailed(w, r, errs)
+		return false
+	}
+	return true
 }
 
 func nilStr(s *string) any {

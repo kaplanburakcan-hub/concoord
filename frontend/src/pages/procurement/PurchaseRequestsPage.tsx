@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
+import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 
 // Faz 7 — Satınalma talepleri (PR) listesi + yeni talep formu.
 // Gecikenler (ihtiyaç tarihi geçmiş, siparişe dönmemiş) kırmızı vurgulanır
@@ -42,6 +43,7 @@ export default function PurchaseRequestsPage() {
   const [note, setNote] = useState("");
   const [items, setItems] = useState<PRItem[]>([{ ...EMPTY_ITEM }]);
   const pid = current?.id;
+  const kesinKabul = useKesinKabulTarihi(pid);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -132,7 +134,7 @@ export default function PurchaseRequestsPage() {
           <div className="flex flex-wrap gap-3">
             <label className="text-xs text-beton-300">
               İhtiyaç tarihi
-              <input type="date" value={neededBy} onChange={(e) => setNeededBy(e.target.value)}
+              <input type="date" value={neededBy} max={kesinKabul} onChange={(e) => setNeededBy(e.target.value)}
                 className="mt-1 block rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
             </label>
             <label className="flex-1 min-w-[220px] text-xs text-beton-300">

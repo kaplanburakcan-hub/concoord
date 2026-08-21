@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, apiFetchBlob, apiUpload, RequestError } from "../../api/client";
 import { useProjects } from "../ProjectContext";
+import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 
 // Nakit Akış Faz D — İdari Hakedişler: idare (işveren) tarafından ana
 // yükleniciye ödenen hakedişler, nakit akışının tek "in" (giriş) kaynağı.
@@ -134,14 +135,16 @@ function bosForm(donemNo?: number, oncekiToplam?: number): FormState {
 
 // ── Rapor formu (yeni + düzenle ortak) ──────────────────────────────────────
 function HakedisForm({
-  initial, projectName, onSave, onCancel, canEdit,
+  initial, projectName, projectId, onSave, onCancel, canEdit,
 }: {
   initial: FormState;
   projectName: string;
+  projectId: string;
   onSave: (f: FormState) => Promise<void>;
   onCancel: () => void;
   canEdit: boolean;
 }) {
+  const kesinKabul = useKesinKabulTarihi(projectId);
   const [f, setF] = useState<FormState>(initial);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -191,7 +194,7 @@ function HakedisForm({
         </div>
         <div className="sm:col-span-2">
           <label className="block text-xs text-beton-500 mb-1">…Tarihine Kadar Yapılan İşin Hakedişi</label>
-          <input disabled={!canEdit} type="date" value={f.hakedis_tarihi}
+          <input disabled={!canEdit} type="date" value={f.hakedis_tarihi} max={kesinKabul}
             onChange={(e) => set("hakedis_tarihi", e.target.value)} className={`${inpBase} w-full sm:w-56`} />
         </div>
       </div>
@@ -518,6 +521,7 @@ export default function IdariHakedisPage() {
           <HakedisForm
             initial={formInitial}
             projectName={current.name}
+            projectId={pid!}
             canEdit
             onSave={kaydet}
             onCancel={() => setAktifId(null)}

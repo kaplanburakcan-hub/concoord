@@ -3,13 +3,36 @@ package design
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/validate"
 )
+
+// checkTarih — çizim/doküman tarihi projenin Kesin Kabul tarihini aşamaz.
+// Boşsa kontrol atlanır.
+func checkTarih(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, pid uuid.UUID, tarih string) bool {
+	if tarih == "" {
+		return true
+	}
+	t, err := time.Parse("2006-01-02", tarih)
+	if err != nil {
+		httpx.ValidationFailed(w, r, map[string]string{"tarih": "geçersiz tarih biçimi"})
+		return false
+	}
+	if errs, err := validate.NotAfterKesinKabul(r.Context(), db, pid, t, "tarih"); err != nil {
+		httpx.Internal(w, r)
+		return false
+	} else if len(errs) > 0 {
+		httpx.ValidationFailed(w, r, errs)
+		return false
+	}
+	return true
+}
 
 type Handler struct{ db *pgxpool.Pool }
 
@@ -103,6 +126,9 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if body.Durum == "" || !validDurum[body.Durum] {
 		body.Durum = "taslak"
 	}
+	if !checkTarih(w, r, h.db, pid, body.Tarih) {
+		return
+	}
 
 	var id string
 	err = h.db.QueryRow(r.Context(), `
@@ -139,6 +165,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Durum != "" && !validDurum[body.Durum] {
 		httpx.ValidationFailed(w, r, map[string]string{"durum": "Geçersiz durum."})
+		return
+	}
+	if !checkTarih(w, r, h.db, pid, body.Tarih) {
 		return
 	}
 

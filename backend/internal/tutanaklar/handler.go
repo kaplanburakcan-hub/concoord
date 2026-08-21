@@ -23,6 +23,7 @@ import (
 
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/validate"
 )
 
 type Handler struct{ pool *pgxpool.Pool }
@@ -201,11 +202,21 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(req.Aciklama) == "" {
 		f["aciklama"] = "açıklama zorunlu"
 	}
-	if _, err := time.Parse("2006-01-02", req.Tarih); err != nil {
+	var tarih time.Time
+	if t, err := time.Parse("2006-01-02", req.Tarih); err != nil {
 		f["tarih"] = "geçerli bir tarih (YYYY-MM-DD) girin"
+	} else {
+		tarih = t
 	}
 	if len(f) > 0 {
 		httpx.ValidationFailed(w, r, f)
+		return
+	}
+	if errs, err := validate.NotAfterKesinKabul(r.Context(), h.pool, pid, tarih, "tarih"); err != nil {
+		httpx.Internal(w, r)
+		return
+	} else if len(errs) > 0 {
+		httpx.ValidationFailed(w, r, errs)
 		return
 	}
 	var taseronID *uuid.UUID

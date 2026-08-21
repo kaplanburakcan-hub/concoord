@@ -22,6 +22,7 @@ import (
 
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
+	kesinkabul "github.com/ipks/ipks/backend/internal/validate"
 )
 
 type Handler struct{ pool *pgxpool.Pool }
@@ -218,6 +219,28 @@ func strDeref(s *string) string {
 	return *s
 }
 
+// checkKesinKabul — yazışma tarihi ve cevap tarihi projenin Kesin Kabul
+// tarihini aşamaz (proje bittikten sonraki bir tarihe yazışma/cevap termini
+// koymak anlamsız). dateStr boşsa kontrol atlanır.
+func checkKesinKabul(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, pid uuid.UUID, dateStr, fieldName string) bool {
+	if dateStr == "" {
+		return true
+	}
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		httpx.ValidationFailed(w, r, map[string]string{fieldName: "geçersiz tarih biçimi"})
+		return false
+	}
+	if errs, err := kesinkabul.NotAfterKesinKabul(r.Context(), pool, pid, t, fieldName); err != nil {
+		httpx.Internal(w, r)
+		return false
+	} else if len(errs) > 0 {
+		httpx.ValidationFailed(w, r, errs)
+		return false
+	}
+	return true
+}
+
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	pid, ok := parseID(w, r, "projectID")
 	if !ok {
@@ -251,6 +274,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	teslimYontemi := "eposta"
 	if req.TeslimYontemi != nil && *req.TeslimYontemi != "" {
 		teslimYontemi = *req.TeslimYontemi
+	}
+	if !checkKesinKabul(w, r, h.pool, pid, req.Tarih, "tarih") {
+		return
+	}
+	if !checkKesinKabul(w, r, h.pool, pid, strDeref(req.CevapTarihi), "cevap_tarihi") {
+		return
 	}
 
 	tx, err := h.pool.Begin(r.Context())
@@ -339,6 +368,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	teslimYontemi := "eposta"
 	if req.TeslimYontemi != nil && *req.TeslimYontemi != "" {
 		teslimYontemi = *req.TeslimYontemi
+	}
+	if !checkKesinKabul(w, r, h.pool, pid, req.Tarih, "tarih") {
+		return
+	}
+	if !checkKesinKabul(w, r, h.pool, pid, strDeref(req.CevapTarihi), "cevap_tarihi") {
+		return
 	}
 
 	var rowVersion int

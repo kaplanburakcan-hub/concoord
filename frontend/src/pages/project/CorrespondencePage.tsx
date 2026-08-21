@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, apiDownload, apiUpload, RequestError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
+import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 
 // Yazışmalar (Gelen/Giden Evrak) — Türkiye'deki kurumsal evrak defteri
 // geleneği ile inşaat sektöründeki RFI/Transmittal log pratiğinin (evrak no,
@@ -122,6 +123,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
   const { current } = useProjects();
   const { can } = useAuth();
   const pid = current?.id;
+  const kesinKabul = useKesinKabulTarihi(pid);
 
   const [list, setList] = useState<Correspondence[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -529,7 +531,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={label}>Tarih *</label>
-                <input type="date" className={input} value={form.tarih}
+                <input type="date" className={input} value={form.tarih} max={kesinKabul}
                   onChange={(e) => setForm((f) => ({ ...f, tarih: e.target.value }))} />
               </div>
               <div>
@@ -576,7 +578,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
               {form.cevap_gerekli && (
                 <div className="col-span-2">
                   <label className={label}>Cevap Süresi (son tarih) *</label>
-                  <input type="date" className={input} value={form.cevap_tarihi}
+                  <input type="date" className={input} value={form.cevap_tarihi} max={kesinKabul}
                     onChange={(e) => setForm((f) => ({ ...f, cevap_tarihi: e.target.value }))} />
                 </div>
               )}

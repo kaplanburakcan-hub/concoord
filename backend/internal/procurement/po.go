@@ -25,7 +25,27 @@ import (
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/notify"
+	"github.com/ipks/ipks/backend/internal/validate"
 )
+
+// checkPOExpectedDate — beklenen teslim tarihi projenin Kesin Kabul
+// tarihini aşamaz (proje bittikten sonra teslim planlamak anlamsız).
+// expected nil olabilir (tarih belirsiz) — o durumda kontrol atlanır.
+func (h *Handler) checkPOExpectedDate(w http.ResponseWriter, r *http.Request, pid uuid.UUID, expected *time.Time) bool {
+	if expected == nil {
+		return true
+	}
+	errs, err := validate.NotAfterKesinKabul(r.Context(), h.pool, pid, *expected, "expected_date")
+	if err != nil {
+		httpx.Internal(w, r)
+		return false
+	}
+	if len(errs) > 0 {
+		httpx.ValidationFailed(w, r, errs)
+		return false
+	}
+	return true
+}
 
 type deliveryDTO struct {
 	ID             uuid.UUID  `json:"id"`
@@ -36,14 +56,14 @@ type deliveryDTO struct {
 	DocumentID     *uuid.UUID `json:"document_id,omitempty"`
 	Note           *string    `json:"note,omitempty"`
 	// Faz 11 — mal kabul detayı
-	ReceiptType     string             `json:"receipt_type"`
-	LocationNote    *string            `json:"location_note,omitempty"`
-	Condition       string             `json:"condition"`
-	DiscrepancyNote *string            `json:"discrepancy_note,omitempty"`
-	PhotoDocumentID         *uuid.UUID `json:"photo_document_id,omitempty"`
-	MaterialPhotoDocumentID *uuid.UUID `json:"material_photo_document_id,omitempty"`
-	Items           []deliveryItemDTO  `json:"items"`
-	CreatedAt      time.Time  `json:"created_at"`
+	ReceiptType             string            `json:"receipt_type"`
+	LocationNote            *string           `json:"location_note,omitempty"`
+	Condition               string            `json:"condition"`
+	DiscrepancyNote         *string           `json:"discrepancy_note,omitempty"`
+	PhotoDocumentID         *uuid.UUID        `json:"photo_document_id,omitempty"`
+	MaterialPhotoDocumentID *uuid.UUID        `json:"material_photo_document_id,omitempty"`
+	Items                   []deliveryItemDTO `json:"items"`
+	CreatedAt               time.Time         `json:"created_at"`
 }
 
 type deliveryItemDTO struct {
@@ -215,6 +235,9 @@ func (h *Handler) CreatePO(w http.ResponseWriter, r *http.Request) {
 		httpx.ValidationFailed(w, r, errs)
 		return
 	}
+	if !h.checkPOExpectedDate(w, r, pid, expected) {
+		return
+	}
 	uid, _ := auth.UserIDFrom(r.Context())
 
 	tx, err := h.pool.Begin(r.Context())
@@ -307,6 +330,9 @@ func (h *Handler) ConvertPR(w http.ResponseWriter, r *http.Request) {
 		httpx.ValidationFailed(w, r, errs)
 		return
 	}
+	if !h.checkPOExpectedDate(w, r, pid, expected) {
+		return
+	}
 	uid, _ := auth.UserIDFrom(r.Context())
 
 	tx, err := h.pool.Begin(r.Context())
@@ -395,6 +421,9 @@ func (h *Handler) UpdatePO(w http.ResponseWriter, r *http.Request) {
 	expected, errs := validatePO(req)
 	if len(errs) > 0 {
 		httpx.ValidationFailed(w, r, errs)
+		return
+	}
+	if !h.checkPOExpectedDate(w, r, pid, expected) {
 		return
 	}
 	currency := "TRY"
@@ -814,8 +843,8 @@ func NotifyOverduePOs(ctx context.Context, pool *pgxpool.Pool, nt *notify.Servic
 		poID, pid := x.id, x.pid
 		nt.Send(ctx, notify.Input{
 			UserIDs: targets, Type: notify.TypePOOverdue,
-			Title: x.poNo + " — sipariş teslim tarihi geçti",
-			Body:  x.sup + " · beklenen: " + x.expected,
+			Title:      x.poNo + " — sipariş teslim tarihi geçti",
+			Body:       x.sup + " · beklenen: " + x.expected,
 			EntityType: "purchase_orders", EntityID: &poID, ProjectID: &pid,
 		})
 		if _, err := pool.Exec(ctx,

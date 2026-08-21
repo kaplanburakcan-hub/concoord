@@ -52,3 +52,53 @@ func WithinProjectBounds(ctx context.Context, q Querier, projectID uuid.UUID, da
 func truncateToDay(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }
+
+// KesinKabulTarihi — projenin Kesin Kabul tarihini hesaplar: Yer Teslim
+// Tarihi + İşin Süresi (gün, = Geçici Kabul) + Geçici Kabul Sonrası (gün).
+// Ana sözleşme kaydı yoksa ya da bu üç alandan biri eksikse nil döner (henüz
+// hesaplanamaz — çağıran taraf bu durumda sınır kontrolünü ATLAMALI, eksik
+// sözleşme bilgisiyle kullanıcıyı haksız yere engellememek için).
+func KesinKabulTarihi(ctx context.Context, q Querier, projectID uuid.UUID) (*time.Time, error) {
+	var yerTeslim *time.Time
+	var isSuresiGun, geciciKabulSonrasiGun *int
+	err := q.QueryRow(ctx,
+		`SELECT yer_teslim_tarihi, is_suresi_gun, gecici_kabul_sonrasi_gun
+		 FROM project_main_contracts WHERE project_id=$1`, projectID).
+		Scan(&yerTeslim, &isSuresiGun, &geciciKabulSonrasiGun)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if yerTeslim == nil || isSuresiGun == nil || geciciKabulSonrasiGun == nil {
+		return nil, nil
+	}
+	kesinKabul := truncateToDay(*yerTeslim).
+		AddDate(0, 0, *isSuresiGun).
+		AddDate(0, 0, *geciciKabulSonrasiGun)
+	return &kesinKabul, nil
+}
+
+// NotAfterKesinKabul — date, projenin Kesin Kabul tarihini AŞAMAZ (iş/teslimat
+// niteliğindeki kayıtlar için — hakediş, tutanak, toplantı, milestone, görev,
+// puantaj, rapor, depo hareketi, İSG bulgusu, yazışma, satınalma tarihleri).
+// Finansal/kapsam tarihleri (vade, çek keşide, sigorta bitişi, taşeron
+// sözleşme bitişi, sabit gider) BİLİNÇLİ OLARAK bu kontrolün dışındadır —
+// bunlar doğal olarak proje sonrasına uzanabilir. Kesin Kabul henüz
+// hesaplanamıyorsa (ana sözleşme eksik) kontrol sessizce atlanır.
+func NotAfterKesinKabul(ctx context.Context, q Querier, projectID uuid.UUID, date time.Time, fieldName string) (map[string]string, error) {
+	kesinKabul, err := KesinKabulTarihi(ctx, q, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if kesinKabul == nil {
+		return nil, nil
+	}
+	if truncateToDay(date).After(*kesinKabul) {
+		return map[string]string{
+			fieldName: fmt.Sprintf("Proje Kesin Kabul tarihini (%s) geçen bir tarih girilemez.", kesinKabul.Format("02.01.2006")),
+		}, nil
+	}
+	return nil, nil
+}

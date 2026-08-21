@@ -541,6 +541,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.Use(mw.Authenticate)
 			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/main-contract", contractH.Get)
 			pr.With(mw.RequirePermission("projects.edit")).Put("/projects/{projectID}/main-contract", contractH.Upsert)
+			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/kesin-kabul-tarihi", contractH.KesinKabulTarihi)
 		})
 
 		// ---- Sigorta ve Poliçeler ----

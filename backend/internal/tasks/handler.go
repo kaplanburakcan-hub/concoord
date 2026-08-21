@@ -17,6 +17,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/notify"
 	"github.com/ipks/ipks/backend/internal/rbac"
+	"github.com/ipks/ipks/backend/internal/validate"
 )
 
 // Handler — görev uçları. Yazımlar audit'li; statü geçişleri
@@ -284,6 +285,15 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		}
 		due = &d
 	}
+	if due != nil {
+		if errs, err := validate.NotAfterKesinKabul(r.Context(), h.pool, pid, *due, "due_date"); err != nil {
+			httpx.Internal(w, r)
+			return
+		} else if len(errs) > 0 {
+			httpx.ValidationFailed(w, r, errs)
+			return
+		}
+	}
 	if len(req.AssigneeIDs) > 0 && !h.can(r.Context(), uid, pid, "tasks.assign") {
 		httpx.Error(w, r, http.StatusForbidden, httpx.CodeForbidden,
 			"Görev atamak için tasks.assign izni gerekli.", nil)
@@ -404,8 +414,8 @@ func (h *Handler) setAssignees(w http.ResponseWriter, r *http.Request, pid, task
 		}
 		h.nt.Send(r.Context(), notify.Input{
 			UserIDs: recipients, Type: notify.TypeTaskAssigned,
-			Title: "Yeni görev atandı: " + title,
-			Body:  "Size bir görev atandı. Detay için görev panosuna bakın.",
+			Title:      "Yeni görev atandı: " + title,
+			Body:       "Size bir görev atandı. Detay için görev panosuna bakın.",
 			EntityType: "tasks", EntityID: &taskID, ProjectID: &pid,
 		})
 	}
@@ -512,6 +522,15 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 			}
 			due = &d
 			// Termin değişti → hatırlatma sıfırlanır (yeni termine göre tekrar üretilir).
+		}
+	}
+	if due != nil {
+		if errs, kerr := validate.NotAfterKesinKabul(r.Context(), h.pool, pid, *due, "due_date"); kerr != nil {
+			httpx.Internal(w, r)
+			return
+		} else if len(errs) > 0 {
+			httpx.ValidationFailed(w, r, errs)
+			return
 		}
 	}
 

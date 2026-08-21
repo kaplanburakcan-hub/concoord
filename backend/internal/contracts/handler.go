@@ -13,6 +13,7 @@ import (
 
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/validate"
 )
 
 type Handler struct{ db *pgxpool.Pool }
@@ -195,6 +196,31 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.JSON(w, http.StatusOK, map[string]any{"id": id})
+}
+
+// KesinKabulTarihi — projenin Kesin Kabul tarihini döner (Yer Teslim +
+// İşin Süresi + Geçici Kabul Sonrası gün). Ana sözleşme eksikse/yoksa
+// kesin_kabul_tarihi=null döner (400/404 değil — çağıran taraf henüz
+// hesaplanamadığını anlar, formunda sınır uygulamaz). İş/teslimat tarihi
+// giren tüm formlar (hakediş, tutanak, toplantı, milestone, görev, puantaj,
+// rapor, depo, İSG bulgusu, yazışma, satınalma) bu ucu kullanarak date
+// input'larına max koyar — bkz. internal/validate.NotAfterKesinKabul
+// (sunucu tarafı asıl uygulama noktası, bu sadece istemci için ipucu).
+func (h *Handler) KesinKabulTarihi(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	kk, err := validate.KesinKabulTarihi(r.Context(), h.db, pid)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	out := map[string]any{"kesin_kabul_tarihi": nil}
+	if kk != nil {
+		out["kesin_kabul_tarihi"] = kk.Format("2006-01-02")
+	}
+	httpx.JSON(w, http.StatusOK, out)
 }
 
 // ---- yardımcılar ----

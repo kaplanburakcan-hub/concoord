@@ -3,6 +3,7 @@ import { api, apiDownload } from "../../api/client";
 import { apiWithOfflineFallback } from "../../offline/queue";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
+import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 
 // Faz 8 — İSG bulguları: foto (data-URL, offline kuyruk uyumlu) + GPS/lokasyon,
 // yaşam döngüsü Open→InProgress→Closed, termin takibi (gecikenler vurgulu).
@@ -67,6 +68,7 @@ export default function FindingsPage() {
   const { current } = useProjects();
   const { can } = useAuth();
   const pid = current?.id;
+  const kesinKabul = useKesinKabulTarihi(pid);
   const canInspect = can("ohs.perform_inspection");
 
   const [findings, setFindings] = useState<Finding[]>([]);
@@ -307,7 +309,7 @@ export default function FindingsPage() {
             </label>
             <label className="text-xs text-beton-300">
               Termin
-              <input type="date" value={due} onChange={(e) => setDue(e.target.value)}
+              <input type="date" value={due} max={kesinKabul} onChange={(e) => setDue(e.target.value)}
                 className="mt-1 block rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100" />
             </label>
           </div>

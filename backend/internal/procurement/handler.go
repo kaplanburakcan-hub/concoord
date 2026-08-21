@@ -18,6 +18,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/notify"
 	"github.com/ipks/ipks/backend/internal/rbac"
+	"github.com/ipks/ipks/backend/internal/validate"
 )
 
 type Handler struct {
@@ -182,6 +183,13 @@ func (h *Handler) CreatePR(w http.ResponseWriter, r *http.Request) {
 		httpx.ValidationFailed(w, r, errs)
 		return
 	}
+	if kerrs, kerr := validate.NotAfterKesinKabul(r.Context(), h.pool, pid, needed, "needed_by_date"); kerr != nil {
+		httpx.Internal(w, r)
+		return
+	} else if len(kerrs) > 0 {
+		httpx.ValidationFailed(w, r, kerrs)
+		return
+	}
 
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {
@@ -308,6 +316,13 @@ func (h *Handler) UpdatePR(w http.ResponseWriter, r *http.Request) {
 		httpx.ValidationFailed(w, r, errs)
 		return
 	}
+	if kerrs, kerr := validate.NotAfterKesinKabul(r.Context(), h.pool, pid, needed, "needed_by_date"); kerr != nil {
+		httpx.Internal(w, r)
+		return
+	} else if len(kerrs) > 0 {
+		httpx.ValidationFailed(w, r, kerrs)
+		return
+	}
 
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {
@@ -390,9 +405,9 @@ func (h *Handler) SubmitPR(w http.ResponseWriter, r *http.Request) {
 	h.prTransition(w, r, "Draft", "Submitted", func(p *prDTO, actor uuid.UUID) {
 		pid, id := p.ProjectID, p.ID
 		h.notifyByCapability(r.Context(), pid, "procurement.approve_pr", actor, notify.Input{
-			Type:  notify.TypePRSubmitted,
-			Title: p.PRNo + " — satınalma talebi onay bekliyor",
-			Body:  "İhtiyaç tarihi: " + p.NeededByDate,
+			Type:       notify.TypePRSubmitted,
+			Title:      p.PRNo + " — satınalma talebi onay bekliyor",
+			Body:       "İhtiyaç tarihi: " + p.NeededByDate,
 			EntityType: "purchase_requests", EntityID: &id, ProjectID: &pid,
 		})
 	})

@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/validate"
 )
 
 type Handler struct{ pool *pgxpool.Pool }
@@ -257,6 +258,16 @@ func (h *Handler) CreateMovement(w http.ResponseWriter, r *http.Request) {
 	}
 	if b.HareketTuru == "" {
 		b.HareketTuru = "giris"
+	}
+	if t, perr := time.Parse("2006-01-02", b.Tarih); perr != nil {
+		httpx.ValidationFailed(w, r, map[string]string{"tarih": "geçersiz tarih biçimi"})
+		return
+	} else if errs, kerr := validate.NotAfterKesinKabul(r.Context(), h.pool, pid, t, "tarih"); kerr != nil {
+		httpx.Internal(w, r)
+		return
+	} else if len(errs) > 0 {
+		httpx.ValidationFailed(w, r, errs)
+		return
 	}
 
 	tx, err := h.pool.Begin(r.Context())

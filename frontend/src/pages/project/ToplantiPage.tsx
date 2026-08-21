@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
+import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 
 // ── Tipler ────────────────────────────────────────────────────────────────────
 interface Meeting {
@@ -167,6 +168,7 @@ function MeetingDetail({ m, onClose }: { m: Meeting; onClose: () => void }) {
 
 // ── Yeni Toplantı Modalı ─────────────────────────────────────────────────────
 function CreateModal({ projectId, onSave, onClose }: { projectId: string; onSave: () => void; onClose: () => void }) {
+  const kesinKabul = useKesinKabulTarihi(projectId);
   const [baslik, setBaslik]           = useState("");
   const [turu, setTuru]               = useState("ilerleme");
   const [tarih, setTarih]             = useState(new Date().toISOString().slice(0, 10));
@@ -236,7 +238,7 @@ function CreateModal({ projectId, onSave, onClose }: { projectId: string; onSave
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-xs text-beton-400 mb-1 block">Tarih</label>
-              <input className={inpCls + " w-full"} type="date" value={tarih} onChange={e => setTarih(e.target.value)} />
+              <input className={inpCls + " w-full"} type="date" value={tarih} max={kesinKabul} onChange={e => setTarih(e.target.value)} />
             </div>
             <div>
               <label className="text-xs text-beton-400 mb-1 block">Başlangıç</label>

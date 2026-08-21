@@ -34,6 +34,7 @@ import (
 
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
+	kesinkabul "github.com/ipks/ipks/backend/internal/validate"
 )
 
 type Handler struct{ pool *pgxpool.Pool }
@@ -224,6 +225,20 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	gelenTarih := strDeref(req.GelenOdemeTarihi)
 	hakedisTarih := strDeref(req.HakedisTarihi)
+	if hakedisTarih != "" {
+		t, perr := time.Parse("2006-01-02", hakedisTarih)
+		if perr != nil {
+			httpx.ValidationFailed(w, r, map[string]string{"hakedis_tarihi": "geçersiz tarih biçimi"})
+			return
+		}
+		if errs, kerr := kesinkabul.NotAfterKesinKabul(r.Context(), h.pool, pid, t, "hakedis_tarihi"); kerr != nil {
+			httpx.Internal(w, r)
+			return
+		} else if len(errs) > 0 {
+			httpx.ValidationFailed(w, r, errs)
+			return
+		}
+	}
 
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {
@@ -309,6 +324,20 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	gelenTarih := strDeref(req.GelenOdemeTarihi)
 	hakedisTarih := strDeref(req.HakedisTarihi)
+	if hakedisTarih != "" {
+		t, perr := time.Parse("2006-01-02", hakedisTarih)
+		if perr != nil {
+			httpx.ValidationFailed(w, r, map[string]string{"hakedis_tarihi": "geçersiz tarih biçimi"})
+			return
+		}
+		if errs, kerr := kesinkabul.NotAfterKesinKabul(r.Context(), h.pool, pid, t, "hakedis_tarihi"); kerr != nil {
+			httpx.Internal(w, r)
+			return
+		} else if len(errs) > 0 {
+			httpx.ValidationFailed(w, r, errs)
+			return
+		}
+	}
 
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {

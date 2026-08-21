@@ -20,6 +20,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/rbac"
+	"github.com/ipks/ipks/backend/internal/validate"
 )
 
 type Handler struct {
@@ -530,6 +531,20 @@ func (h *Handler) CreateMilestone(w http.ResponseWriter, r *http.Request) {
 		httpx.ValidationFailed(w, r, fields)
 		return
 	}
+	if plannedDate := strDeref(req.PlannedDate); plannedDate != "" {
+		t, perr := time.Parse("2006-01-02", plannedDate)
+		if perr != nil {
+			httpx.ValidationFailed(w, r, map[string]string{"planned_date": "geçersiz tarih biçimi"})
+			return
+		}
+		if errs, kerr := validate.NotAfterKesinKabul(r.Context(), h.pool, pid, t, "planned_date"); kerr != nil {
+			httpx.Internal(w, r)
+			return
+		} else if len(errs) > 0 {
+			httpx.ValidationFailed(w, r, errs)
+			return
+		}
+	}
 	order := 0
 	if req.SortOrder != nil {
 		order = *req.SortOrder
@@ -625,6 +640,20 @@ func (h *Handler) UpdateMilestone(w http.ResponseWriter, r *http.Request) {
 	order := before.SortOrder
 	if req.SortOrder != nil {
 		order = *req.SortOrder
+	}
+	if plannedDate := strDeref(req.PlannedDate); plannedDate != "" {
+		t, perr := time.Parse("2006-01-02", plannedDate)
+		if perr != nil {
+			httpx.ValidationFailed(w, r, map[string]string{"planned_date": "geçersiz tarih biçimi"})
+			return
+		}
+		if errs, kerr := validate.NotAfterKesinKabul(r.Context(), h.pool, pid, t, "planned_date"); kerr != nil {
+			httpx.Internal(w, r)
+			return
+		} else if len(errs) > 0 {
+			httpx.ValidationFailed(w, r, errs)
+			return
+		}
 	}
 
 	var after milestoneDTO

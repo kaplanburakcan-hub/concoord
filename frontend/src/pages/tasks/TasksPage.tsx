@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../../projects/ProjectContext";
+import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 
 // Faz 4 — Kanban görev panosu: HTML5 sürükle-bırak (ek bağımlılık yok),
 // görev detayı çekmecesi, atama, yorum + @mention.
@@ -212,6 +213,7 @@ function TaskModal({ projectId, members, canAssign, onClose, onSaved }: {
   projectId: string; members: Assignee[]; canAssign: boolean;
   onClose: () => void; onSaved: () => void;
 }) {
+  const kesinKabul = useKesinKabulTarihi(projectId);
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [priority, setPriority] = useState("Normal");
@@ -257,7 +259,7 @@ function TaskModal({ projectId, members, canAssign, onClose, onSaved }: {
         </div>
         <div>
           <label className="block text-xs text-beton-400">Termin</label>
-          <input type="date" value={due} onChange={(e) => setDue(e.target.value)} className={inputCls} />
+          <input type="date" value={due} max={kesinKabul} onChange={(e) => setDue(e.target.value)} className={inputCls} />
         </div>
       </div>
       {canAssign && (
@@ -405,6 +407,7 @@ function TaskEditForm({ projectId, task, members, canAssign, onCancel, onSaved }
   projectId: string; task: Task; members: Assignee[]; canAssign: boolean;
   onCancel: () => void; onSaved: () => void;
 }) {
+  const kesinKabul = useKesinKabulTarihi(projectId);
   const [title, setTitle] = useState(task.title);
   const [desc, setDesc] = useState(task.description ?? "");
   const [priority, setPriority] = useState(task.priority);
@@ -449,7 +452,7 @@ function TaskEditForm({ projectId, task, members, canAssign, onCancel, onSaved }
         </div>
         <div>
           <label className="block text-xs text-beton-400">Termin</label>
-          <input type="date" value={due} onChange={(e) => setDue(e.target.value)} className={inputCls} />
+          <input type="date" value={due} max={kesinKabul} onChange={(e) => setDue(e.target.value)} className={inputCls} />
         </div>
       </div>
       {canAssign && (
