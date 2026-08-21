@@ -9,7 +9,16 @@ import SCurve from "./dashboard/SCurve";
 import type { SCurvePoint } from "./dashboard/SCurve";
 import MultiDonut from "./dashboard/MultiDonut";
 import RadialRing from "./dashboard/RadialRing";
+import type { ColorStop } from "./dashboard/RadialRing";
 import Gauge from "./dashboard/Gauge";
+
+// İlerleme halkalarının segment gradyanları — her metriğin kendi renk
+// ailesi korunur (Fiziksel=mavi, Zamansal=amber, Parasal=yeşil), sadece
+// düz tek renk yerine o aile içinde bir geçiş uygulanır (onaylanan
+// referans görsele göre).
+const FIZIKSEL_STOPS: ColorStop[] = [{ t: 0, hex: "#22d3ee" }, { t: 0.5, hex: "#2f6fed" }, { t: 1, hex: "#6d5ef8" }];
+const ZAMANSAL_STOPS: ColorStop[] = [{ t: 0, hex: "#facc15" }, { t: 0.5, hex: "#f59e0b" }, { t: 1, hex: "#fb7185" }];
+const PARASAL_STOPS: ColorStop[] = [{ t: 0, hex: "#4ade80" }, { t: 0.5, hex: "#22c55e" }, { t: 1, hex: "#2dd4bf" }];
 
 // Faz 9 — rol duyarlı proje dashboard'u. Finansal blok (EVM) backend'de izinle
 // süzülür: reports.view_financial_reports yoksa `evm` alanı hiç gelmez; taşeron
@@ -169,21 +178,21 @@ export default function Dashboard() {
               EVM verisinden (PV/BAC, "planlanan % tamamlanma") türetilir. */}
           <div className="rounded-xl border border-beton-800 bg-beton-900 p-5" style={{ boxShadow: "var(--shadow)" }}>
             <div className="grid grid-cols-3 gap-3">
-              <ProgressRing label="Fiziksel İlerleme" pct={dash.progress_pct} color="#2f6fed" />
+              <ProgressRing label="Fiziksel İlerleme" pct={dash.progress_pct} colorStops={FIZIKSEL_STOPS} />
               {dash.evm ? (
                 <ProgressRing
                   label="Zamansal İlerleme"
                   pct={dash.evm.bac > 0 ? (dash.evm.pv / dash.evm.bac) * 100 : 0}
-                  color="#f59e0b"
+                  colorStops={ZAMANSAL_STOPS}
                   sub="PV/BAC"
                 />
               ) : (
-                <ProgressRing label="Zamansal İlerleme" pct={0} color="#f59e0b" empty />
+                <ProgressRing label="Zamansal İlerleme" pct={0} colorStops={ZAMANSAL_STOPS} empty />
               )}
               {dash.evm?.contract_amount ? (
-                <ProgressRing label="Parasal İlerleme" pct={dash.evm.financial_progress_pct} color="#22c55e" />
+                <ProgressRing label="Parasal İlerleme" pct={dash.evm.financial_progress_pct} colorStops={PARASAL_STOPS} />
               ) : (
-                <ProgressRing label="Parasal İlerleme" pct={0} color="#22c55e" empty />
+                <ProgressRing label="Parasal İlerleme" pct={0} colorStops={PARASAL_STOPS} empty />
               )}
             </div>
             {dash.evm && (
@@ -686,12 +695,12 @@ function Card({ title, action, children }: { title: string; action?: ReactNode; 
 // ProgressRing — İlerleme Göstergeleri kartındaki tek bir yüzde halkası +
 // etiket. `empty` (ör. ana sözleşme bedeli girilmemiş) iken halka soluk
 // gösterilir ve "Veri yok" yazar — Kpi bileşenindeki "—" deseniyle tutarlı.
-function ProgressRing({ label, pct, color, sub, empty }: {
-  label: string; pct: number; color: string; sub?: string; empty?: boolean;
+function ProgressRing({ label, pct, colorStops, sub, empty }: {
+  label: string; pct: number; colorStops: ColorStop[]; sub?: string; empty?: boolean;
 }) {
   return (
     <div className="flex flex-col items-center gap-1.5 text-center">
-      <RadialRing pct={pct} color={empty ? "rgb(var(--beton-700))" : color} />
+      <RadialRing pct={pct} colorStops={colorStops} empty={empty} />
       <p className="text-[11px] font-semibold uppercase tracking-wide text-beton-400">{label}</p>
       {empty ? (
         <p className="text-[10.5px] text-beton-500">Veri yok</p>
