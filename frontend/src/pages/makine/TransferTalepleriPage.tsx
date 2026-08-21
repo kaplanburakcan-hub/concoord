@@ -6,6 +6,14 @@ import { useProjects } from "../ProjectContext";
 // Bir başka proje sizin projenizdeki bir makine/ekipman/aracı talep
 // ettiğinde burada bekleyen bir talep olarak listelenir.
 
+type Decision = {
+  step_order: number;
+  role_name: string;
+  decided_by_name: string;
+  decision: string;
+  note?: string;
+  decided_at: string;
+};
 type Transfer = {
   id: string;
   company_equipment_id: string;
@@ -15,6 +23,14 @@ type Transfer = {
   requested_by_name: string;
   status: string;
   created_at: string;
+  // Çok kademeli onay hiyerarşisi (bkz. internal/approvals) — SiteManager ->
+  // ProjectManager -> Admin. can_decide=false ise sıra bu kullanıcıda değil,
+  // Onayla/Reddet butonları gizlenir ama talep yine de (şeffaflık için) görünür.
+  current_step: number;
+  total_steps: number;
+  current_step_role_name: string;
+  can_decide: boolean;
+  decisions: Decision[];
 };
 
 const TIP_LABEL: Record<string, string> = {
@@ -135,6 +151,27 @@ export default function TransferTalepleriPage() {
                 <div className="text-sm font-semibold text-amber-400">{t.to_project_name}</div>
               </div>
             </div>
+
+            {/* Onay hiyerarşisi ilerlemesi — bkz. internal/approvals, SiteManager -> ProjectManager -> Admin */}
+            <div className="mt-2.5 flex items-center gap-2">
+              <span className="rounded-full border border-blue-500/40 bg-blue-500/15 text-blue-300 text-xs font-medium px-2.5 py-0.5">
+                Kademe {t.current_step}/{t.total_steps} — {t.current_step_role_name} onayı bekliyor
+              </span>
+            </div>
+            {t.decisions.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {t.decisions.map((d) => (
+                  <li key={d.step_order} className="text-xs text-beton-400">
+                    <span className={d.decision === "approved" ? "text-green-400" : "text-red-400"}>
+                      {d.decision === "approved" ? "✓ Onayladı" : "✕ Reddetti"}
+                    </span>{" "}
+                    — {d.role_name} ({d.decided_by_name}), {new Date(d.decided_at).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" })}
+                    {d.note && <span className="text-beton-500"> · "{d.note}"</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+
             <div className="mt-3 border-t border-beton-800 pt-2.5">
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-xs text-beton-400 uppercase tracking-wide">
@@ -162,6 +199,7 @@ export default function TransferTalepleriPage() {
                 <p className="text-xs text-beton-500">Henüz irsaliye yüklenmedi (araçlar için gerekmeyebilir).</p>
               )}
             </div>
+            {t.can_decide ? (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <input
                 value={notes[t.id] ?? ""}
@@ -182,6 +220,11 @@ export default function TransferTalepleriPage() {
                 Reddet
               </button>
             </div>
+            ) : (
+              <p className="mt-3 text-xs text-beton-500">
+                Bu kademede karar yetkisi sizde değil — sırada <b className="text-beton-300">{t.current_step_role_name}</b> onayı var.
+              </p>
+            )}
           </div>
         ))}
         {!transfers.length && !err && (

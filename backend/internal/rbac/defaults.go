@@ -224,3 +224,15 @@ func RoleHasDefault(roleCode, permCode string) bool {
 	}
 	return false
 }
+
+// RoleName — rol koduna karşılık gelen Türkçe görünen ad (bulunamazsa kodu
+// olduğu gibi döner). Onay hiyerarşisi gibi rol kodunu kullanıcıya
+// göstermesi gereken yerler için.
+func RoleName(code string) string {
+	for _, r := range Roles {
+		if r.Code == code {
+			return r.Name
+		}
+	}
+	return code
+}
