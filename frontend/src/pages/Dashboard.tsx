@@ -7,22 +7,32 @@ import { Can } from "../auth/guards";
 import { useProjects } from "../projects/ProjectContext";
 import SCurve from "./dashboard/SCurve";
 import type { SCurvePoint } from "./dashboard/SCurve";
-import MultiDonut from "./dashboard/MultiDonut";
+import SegmentedDonut from "./dashboard/SegmentedDonut";
+import type { DonutSegment } from "./dashboard/SegmentedDonut";
 import RadialRing from "./dashboard/RadialRing";
 import type { ColorStop } from "./dashboard/RadialRing";
-import Gauge from "./dashboard/Gauge";
-
-// İlerleme halkalarının segment gradyanları — her metriğin kendi renk
-// ailesi korunur (Fiziksel=mavi, Zamansal=amber, Parasal=yeşil), sadece
-// düz tek renk yerine o aile içinde bir geçiş uygulanır (onaylanan
-// referans görsele göre).
-const FIZIKSEL_STOPS: ColorStop[] = [{ t: 0, hex: "#22d3ee" }, { t: 0.5, hex: "#2f6fed" }, { t: 1, hex: "#6d5ef8" }];
-const ZAMANSAL_STOPS: ColorStop[] = [{ t: 0, hex: "#facc15" }, { t: 0.5, hex: "#f59e0b" }, { t: 1, hex: "#fb7185" }];
-const PARASAL_STOPS: ColorStop[] = [{ t: 0, hex: "#4ade80" }, { t: 0.5, hex: "#22c55e" }, { t: 1, hex: "#2dd4bf" }];
 
 // Faz 9 — rol duyarlı proje dashboard'u. Finansal blok (EVM) backend'de izinle
 // süzülür: reports.view_financial_reports yoksa `evm` alanı hiç gelmez; taşeron
 // temsilcisi yalnızca kendi firmasının sayaçlarını görür (satır seviyesi güvenlik).
+//
+// Panel v3 — kullanıcının paylaştığı modern referans görsele göre tam
+// yeniden tasarım: ayrı "kart" ızgarası yerine TEK bir koyu levha, bölümler
+// arasında sadece ince ayraç (hairline) çizgileri var — gölge, gradyan,
+// parlama yok ("dolu dolu ve kesintisiz" geri bildirimi). Bu levha kasıtlı
+// olarak HER ZAMAN koyu render olur (bkz. index.css --panel-* token'ları,
+// [data-theme] bloklarının dışında tanımlı) — açık temada bile Panel koyu
+// bir çerçeve içinde kalır. Tüm halka/donut grafikler segmentli/gradyanlı
+// tick stilinde (RadialRing/SegmentedDonut), referanstaki düz donut'ların
+// yerini alıyor.
+
+const FIZIKSEL_STOPS: ColorStop[] = [{ t: 0, hex: "#22d3ee" }, { t: 0.5, hex: "#2f6fed" }, { t: 1, hex: "#6d5ef8" }];
+const TASERON_STOPS: ColorStop[] = [{ t: 0, hex: "#60a5fa" }, { t: 1, hex: "#2f6fed" }];
+const MALZEME_STOPS: ColorStop[] = [{ t: 0, hex: "#fbbf24" }, { t: 1, hex: "#f59e0b" }];
+const DIGER_STOPS: ColorStop[] = [{ t: 0, hex: "#9ca3af" }, { t: 1, hex: "#6b7280" }];
+const ONAYLI_STOPS: ColorStop[] = [{ t: 0, hex: "#60a5fa" }, { t: 1, hex: "#3b82f6" }];
+const TAMAMLANAN_STOPS: ColorStop[] = [{ t: 0, hex: "#4ade80" }, { t: 1, hex: "#22c55e" }];
+const DEVAM_STOPS: ColorStop[] = [{ t: 0, hex: "#fbbf24" }, { t: 1, hex: "#f5a800" }];
 
 type Milestone = {
   id: string;
@@ -138,102 +148,129 @@ export default function Dashboard() {
 
   const cur = dash?.project.currency ?? current.currency;
   const money = (v: number) => v.toLocaleString("tr-TR", { maximumFractionDigits: 2 }) + " " + cur;
+  const moneyShort = (v: number) =>
+    (v >= 1_000_000 ? (v / 1_000_000).toFixed(2) + "M" : v.toLocaleString("tr-TR", { maximumFractionDigits: 0 })) + " " + cur;
 
   return (
     <div>
-      <div className="flex items-baseline justify-between flex-wrap gap-2">
-        <div>
-          <p className="flex items-center gap-2 text-xs font-medium text-emniyet-500">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emniyet-500" />
-            Proje kontrol paneli
-          </p>
-          <h1 className="font-display text-3xl font-medium text-beton-100 mt-2 tracking-tight">
-            {current.code} — {current.name}
-          </h1>
-          {dash && (
-            <p className="mt-1 text-sm text-beton-400">
-              Durum: {dash.project.status} · Fiziki ilerleme %{dash.progress_pct.toFixed(1)}
-              {dash.subcontractor_scoped && " · yalnızca kendi firmanızın verisi"}
-            </p>
-          )}
-        </div>
-        <button
-          onClick={load}
-          className="rounded-md bg-[var(--group-accent)] hover:brightness-110 px-3 py-1 text-sm text-white-solid font-medium transition"
-        >
-          Yenile
-        </button>
-      </div>
-
-      {err && <p className="mt-4 text-sm text-red-400">{err}</p>}
-      {!dash && !err && <p className="mt-4 text-sm text-beton-400">Yükleniyor…</p>}
+      {err && <p className="text-sm text-red-400">{err}</p>}
+      {!dash && !err && <p className="text-sm text-beton-400">Yükleniyor…</p>}
 
       {dash && (
-        <div className="mt-6 grid gap-4">
-          {/* İlerleme göstergeleri: Fiziksel/Zamansal/Parasal İlerleme yüzde
-              halkaları + altlarında SPI (fiziksel+zamansal ile aynı grupta,
-              ikisinin karşılaştırması olduğu için) ve CPI (parasal ile aynı
-              grupta, maliyetle ilgili olduğu için) ibre göstergeleri.
-              Zamansal İlerleme yeni bir backend alanı GEREKTİRMEZ — mevcut
-              EVM verisinden (PV/BAC, "planlanan % tamamlanma") türetilir. */}
-          <div className="rounded-xl border border-beton-800 bg-beton-900 p-5" style={{ boxShadow: "var(--shadow)" }}>
-            <div className="grid grid-cols-3 gap-3">
-              <ProgressRing label="Fiziksel İlerleme" pct={dash.progress_pct} colorStops={FIZIKSEL_STOPS} />
-              {dash.evm ? (
-                <ProgressRing
-                  label="Zamansal İlerleme"
-                  pct={dash.evm.bac > 0 ? (dash.evm.pv / dash.evm.bac) * 100 : 0}
-                  colorStops={ZAMANSAL_STOPS}
-                  sub="PV/BAC"
-                />
-              ) : (
-                <ProgressRing label="Zamansal İlerleme" pct={0} colorStops={ZAMANSAL_STOPS} empty />
-              )}
-              {dash.evm?.contract_amount ? (
-                <ProgressRing label="Parasal İlerleme" pct={dash.evm.financial_progress_pct} colorStops={PARASAL_STOPS} />
-              ) : (
-                <ProgressRing label="Parasal İlerleme" pct={0} colorStops={PARASAL_STOPS} empty />
-              )}
+        <div
+          className="rounded-xl overflow-hidden border"
+          style={{ background: "rgb(var(--panel-bg))", borderColor: "rgb(var(--panel-hairline))" }}
+        >
+          {/* ── Head ── */}
+          <div
+            className="flex items-start justify-between gap-4 flex-wrap px-5 py-4 border-b"
+            style={{ borderColor: "rgb(var(--panel-hairline))" }}
+          >
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[.1em]" style={{ color: "var(--group-accent)" }}>
+                Proje kontrol paneli
+              </p>
+              <h1 className="font-display text-xl font-extrabold mt-1.5" style={{ color: "rgb(var(--panel-ink))" }}>
+                {current.code} — {current.name}
+              </h1>
+              <p className="mt-1 text-xs" style={{ color: "rgb(var(--panel-ink2))" }}>
+                Durum: {dash.project.status} · Üstyapı Projesi
+                {dash.subcontractor_scoped && " · yalnızca kendi firmanızın verisi"}
+              </p>
             </div>
-            {dash.evm && (
-              <div className="mt-3 grid grid-cols-3 gap-3">
-                <div className="col-span-2 flex flex-col items-center gap-1 pt-2 border-t border-beton-800">
-                  <Gauge value={dash.evm.spi} />
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-beton-400">SPI — Zamansal Performans</p>
-                  <p className="text-[10.5px] text-beton-500">{spiHint(dash.evm.spi)}</p>
-                </div>
-                <div className="flex flex-col items-center gap-1 pt-2 border-t border-beton-800">
-                  <Gauge value={dash.evm.cpi} />
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-beton-400">CPI — Maliyet Performansı</p>
-                  <p className="text-[10.5px] text-beton-500">{cpiHint(dash.evm.cpi)}</p>
-                </div>
-              </div>
-            )}
-            {dash.evm && !dash.evm.contract_amount && (
-              <p className="mt-3 text-xs text-beton-500">Ana sözleşme bedeli girilmemiş — parasal ilerleme için Ana Sözleşme sayfasından ekleyin.</p>
-            )}
+            <div className="text-right">
+              <p className="text-[10.5px] mb-1.5" style={{ color: "rgb(var(--panel-ink3))" }}>
+                Son güncelleme: {new Date().toLocaleString("tr-TR")}
+              </p>
+              <button
+                onClick={load}
+                className="rounded-md px-3.5 py-1.5 text-xs font-bold transition hover:brightness-110"
+                style={{ background: "var(--group-accent)", color: "#141414" }}
+              >
+                Yenile
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Kpi
+          {/* ── KPI şeridi ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" style={{ borderBottom: "1px solid rgb(var(--panel-hairline))" }}>
+            <PanelKpiRing
+              label="Fiziksel İlerleme"
+              pct={dash.progress_pct}
+              colorStops={FIZIKSEL_STOPS}
+              hint={dash.evm && dash.evm.bac > 0
+                ? `${dash.progress_pct >= (dash.evm.pv / dash.evm.bac) * 100 ? "▲" : "▼"} Plan %${((dash.evm.pv / dash.evm.bac) * 100).toFixed(1)}`
+                : undefined}
+              bad={!!dash.evm && dash.evm.bac > 0 && dash.progress_pct < (dash.evm.pv / dash.evm.bac) * 100}
+            />
+            {dash.evm ? (
+              <PanelKpi
+                label="Zaman Performansı"
+                value={idx(dash.evm.spi)}
+                hint={spiHint(dash.evm.spi)}
+                bad={dash.evm.spi > 0 && dash.evm.spi < 0.9}
+                good={dash.evm.spi >= 1.1}
+                icon={<IconTrend />}
+              />
+            ) : (
+              <PanelKpi label="Zaman Performansı" value="—" icon={<IconTrend />} />
+            )}
+            {dash.evm ? (
+              <PanelKpi
+                label="Maliyet Performansı"
+                value={idx(dash.evm.cpi)}
+                hint={cpiHint(dash.evm.cpi)}
+                bad={dash.evm.cpi > 0 && dash.evm.cpi < 0.9}
+                good={dash.evm.cpi >= 1.1}
+                icon={<IconCheck />}
+              />
+            ) : (
+              <PanelKpi label="Maliyet Performansı" value="—" icon={<IconCheck />} />
+            )}
+            <PanelKpi
               label="Kazasız Gün"
               value={dash.accident_free_days.has_reference ? String(dash.accident_free_days.days) : "—"}
+              icon={<IconShield />}
+              hint={can("ohs.perform_inspection") ? undefined : "Son kazadan bu yana"}
               action={can("ohs.perform_inspection") && (
-                <button onClick={() => setAddingAccident((v) => !v)} className="mt-1 text-[10px] text-emniyet-500 hover:underline">
+                <button
+                  onClick={() => setAddingAccident((v) => !v)}
+                  className="text-[10px] hover:underline"
+                  style={{ color: "var(--group-accent)" }}
+                >
                   {addingAccident ? "vazgeç" : "+ kaza kaydı ekle"}
                 </button>
               )}
             />
-            <Kpi label="Açık İSG" value={String(dash.open_findings.total)} bad={dash.open_findings.critical > 0} />
+            <PanelKpi
+              label="Açık İSG Bulgusu"
+              value={String(dash.open_findings.total)}
+              icon={<IconWarning />}
+              bad={dash.open_findings.critical > 0}
+              hint={dash.open_findings.critical > 0 ? `${dash.open_findings.critical} kritik` : undefined}
+            />
+            {dash.evm ? (
+              <PanelKpi
+                label="Toplam Harcama"
+                value={moneyShort(dash.evm.ac)}
+                hint={`Bütçe ${moneyShort(dash.evm.bac)}`}
+                icon={<IconReceipt />}
+              />
+            ) : (
+              <PanelKpi label="Toplam Harcama" value="—" icon={<IconReceipt />} />
+            )}
           </div>
+
           {addingAccident && (
-            <div className="-mt-2 rounded-xl border border-beton-800 bg-beton-900 p-4" style={{ boxShadow: "var(--shadow)" }}>
+            <div className="px-5 py-3 border-b" style={{ borderColor: "rgb(var(--panel-hairline))" }}>
               <div className="flex flex-wrap items-end gap-2">
                 <input type="date" value={accidentDate} onChange={(e) => setAccidentDate(e.target.value)}
                   max={new Date().toISOString().slice(0, 10)}
-                  className="rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100" />
+                  className="rounded-md px-2 py-1.5 text-sm outline-none"
+                  style={panelInputStyle} />
                 <input value={accidentDesc} onChange={(e) => setAccidentDesc(e.target.value)} placeholder="Kısa açıklama"
-                  className="flex-1 min-w-[160px] rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100" />
+                  className="flex-1 min-w-[160px] rounded-md px-2 py-1.5 text-sm outline-none"
+                  style={panelInputStyle} />
                 <button onClick={saveAccident} disabled={accidentBusy || !accidentDesc.trim()}
                   className="rounded-md bg-red-500/90 hover:bg-red-500 disabled:opacity-50 text-white-solid text-xs font-semibold px-3 py-1.5">
                   {accidentBusy ? "Kaydediliyor…" : "Kaza kaydını gir"}
@@ -242,142 +279,107 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Row A: EVM trendi (geniş) + proje görseli (dar sütun, büyütülmüş) */}
-          <div className={dash.evm ? "grid gap-4 lg:grid-cols-3" : "grid gap-4"}>
+          {/* ── Row A: S-eğrisi + Proje Görseli ── */}
+          <PanelRow cols={dash.evm ? "1.9fr 1fr" : "1fr"}>
             {dash.evm && (
-              <div className="lg:col-span-2">
-                <Card
-                  title={`EVM (kümülatif · ${dash.evm.as_of_month})`}
-                  action={
-                    <Can perm="projects.edit">
-                      <button
-                        onClick={() => setShowPV((s) => !s)}
-                        className="text-xs text-emniyet-500 hover:underline"
-                      >
-                        {showPV ? "PV planını gizle" : "PV planını düzenle"}
-                      </button>
-                    </Can>
-                  }
-                >
-                  <div className="grid grid-cols-2 gap-3">
-                    <Kpi label="EAC" value={money(dash.evm.eac)} />
-                    <Kpi label="ETC" value={money(dash.evm.etc)} />
+              <PanelCell
+                title={`Fiziksel İlerleme Trendi (S-Eğrisi · ${dash.evm.as_of_month})`}
+                action={
+                  <Can perm="projects.edit">
+                    <button onClick={() => setShowPV((s) => !s)} className="text-[11px] font-semibold hover:underline" style={{ color: "var(--group-accent)" }}>
+                      {showPV ? "PV planını gizle" : "PV planını düzenle"}
+                    </button>
+                  </Can>
+                }
+              >
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <PanelStat label="EAC" value={money(dash.evm.eac)} />
+                  <PanelStat label="ETC" value={money(dash.evm.etc)} />
+                </div>
+                {dash.evm.s_curve.length >= 2 ? (
+                  <SCurve points={dash.evm.s_curve} currency={cur} asOf={dash.evm.as_of_month} />
+                ) : (
+                  <div className="rounded-lg border border-dashed px-4 py-8 text-center" style={{ borderColor: "rgb(var(--panel-hairline))" }}>
+                    <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>S-eğrisi için henüz yeterli veri yok.</p>
+                    <p className="mt-1 text-xs" style={{ color: "rgb(var(--panel-ink3))" }}>
+                      Grafik, en az iki dönem hakediş/ilerleme kaydı girildiğinde görünür.
+                    </p>
                   </div>
-                  <div
-                    className="mt-3 grid grid-cols-3 gap-3 text-xs text-beton-400"
-                    style={{ fontVariantNumeric: "tabular-nums" }}
-                  >
-                    <span>PV <span className="text-beton-200">{money(dash.evm.pv)}</span></span>
-                    <span>EV <span className="text-beton-200">{money(dash.evm.ev)}</span></span>
-                    <span>AC <span className="text-beton-200">{money(dash.evm.ac)}</span></span>
-                  </div>
-                  <div className="mt-4">
-                    {dash.evm.s_curve.length >= 2 ? (
-                      <SCurve points={dash.evm.s_curve} currency={cur} asOf={dash.evm.as_of_month} />
-                    ) : (
-                      <div className="rounded-lg border border-dashed border-beton-700 bg-beton-950 px-4 py-8 text-center">
-                        <p className="text-sm text-beton-400">S-eğrisi için henüz yeterli veri yok.</p>
-                        <p className="mt-1 text-xs text-beton-500">
-                          Grafik, en az iki dönem hakediş/ilerleme kaydı girildiğinde görünür.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  <p className="mt-1 text-[11px] text-beton-500">
-                    PV kaynağı: {planSourceTR(dash.evm.plan_source)} · BAC {money(dash.evm.bac)}
-                  </p>
-                  {showPV && <PVEditor projectId={current.id} onSaved={load} />}
-                </Card>
-              </div>
+                )}
+                <p className="mt-2 text-[11px]" style={{ color: "rgb(var(--panel-ink3))" }}>
+                  PV kaynağı: {planSourceTR(dash.evm.plan_source)} · BAC {money(dash.evm.bac)}
+                </p>
+                {showPV && <PVEditor projectId={current.id} onSaved={load} />}
+              </PanelCell>
             )}
-            <CoverImageCard projectId={current.id} coverImage={dash.cover_image} canUpload={can("documents.upload")} onChanged={load} />
-          </div>
+            <PanelCell title="Proje Görseli" noPad>
+              <CoverImageCard projectId={current.id} coverImage={dash.cover_image} canUpload={can("documents.upload")} onChanged={load} />
+            </PanelCell>
+          </PanelRow>
 
-          {/* Row B: Satınalma özeti (solda liste, sağda tamamlanan/devam eden donut'u)
-              + Maliyet Durumu — Row A ile aynı 2:1 grid ritmi (bütünleşik yerleşim). */}
+          {/* ── Row B: Satınalma Özeti + Maliyet Durumu ── */}
           {!dash.subcontractor_scoped && (
-            <div className={dash.cost_breakdown ? "grid gap-4 lg:grid-cols-3" : "grid gap-4"}>
-              <div className={dash.cost_breakdown ? "lg:col-span-2" : ""}>
-                <Card
-                  title="Satınalma Özeti"
-                  action={<Link to="/satinalma" className="text-xs text-emniyet-500 hover:underline">Detaylı gör →</Link>}
-                >
-                  <div className="grid grid-cols-2 gap-4 items-center">
-                    <div className="space-y-2.5 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "rgb(var(--emniyet-500))" }} />
-                        <span className="text-beton-300 flex-1">Açık Talep (PR)</span>
-                        <span className="font-mono font-semibold text-beton-100">{dash.pending.prs}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "#f59e0b" }} />
-                        <span className="text-beton-300 flex-1">Açık Sipariş (PO)</span>
-                        <span className="font-mono font-semibold text-beton-100">{dash.pending.open_pos}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full shrink-0 bg-red-500" />
-                        <span className="text-beton-300 flex-1">Geciken Sipariş</span>
-                        <span className={"font-mono font-semibold " + (dash.pending.overdue_pos ? "text-red-400" : "text-beton-100")}>
-                          {dash.pending.overdue_pos}
-                        </span>
-                      </div>
-                    </div>
-                    <MultiDonut
-                      layout="row"
-                      size={64}
-                      segments={[
-                        { label: "Tamamlanan", value: dash.pending.delivered_pos, color: "#22c55e" },
-                        { label: "Devam Eden", value: dash.pending.open_pos, color: "rgb(var(--emniyet-500))" },
-                      ]}
-                    />
-                  </div>
-                </Card>
-              </div>
-              {dash.cost_breakdown && (
-                <Card title="Maliyet Durumu">
-                  <MultiDonut
-                    layout="row"
-                    size={54}
-                    formatValue={(v) => v.toLocaleString("tr-TR")}
+            <PanelRow cols={dash.cost_breakdown ? "1fr 1fr" : "1fr"}>
+              <PanelCell
+                title="Satınalma Özeti"
+                action={<Link to="/satinalma" className="text-[11px] font-semibold hover:underline" style={{ color: "var(--group-accent)" }}>Detaylı gör →</Link>}
+              >
+                <div className="flex items-center gap-5">
+                  <SegmentedDonut
+                    size={92}
+                    centerLabel="AÇIK PO"
                     segments={[
-                      { label: "Taşeron", value: dash.cost_breakdown.tasaron, color: "rgb(var(--emniyet-500))" },
-                      { label: "Malzeme", value: dash.cost_breakdown.malzeme, color: "#f59e0b" },
-                      { label: "Diğer", value: dash.cost_breakdown.diger, color: "rgb(var(--beton-500))" },
+                      { label: "Tamamlanan", value: dash.pending.delivered_pos, colorStops: TAMAMLANAN_STOPS, swatch: "#22c55e" },
+                      { label: "Devam Eden", value: dash.pending.open_pos, colorStops: DEVAM_STOPS, swatch: "#f5a800" },
                     ]}
                   />
-                </Card>
+                  <div className="space-y-2 text-[12.5px] flex-1">
+                    <PanelLine label="Açık Talep (PR)" value={dash.pending.prs} />
+                    <PanelLine label="Açık Sipariş (PO)" value={dash.pending.open_pos} />
+                    <PanelLine label="Geciken Sipariş" value={dash.pending.overdue_pos} bad={dash.pending.overdue_pos > 0} />
+                  </div>
+                </div>
+              </PanelCell>
+              {dash.cost_breakdown && (
+                <PanelCell title="Maliyet Durumu">
+                  <SegmentedDonut
+                    size={92}
+                    formatValue={(v) => v.toLocaleString("tr-TR")}
+                    centerLabel="TOPLAM"
+                    segments={[
+                      { label: "Taşeron", value: dash.cost_breakdown.tasaron, colorStops: TASERON_STOPS, swatch: "#2f6fed" },
+                      { label: "Malzeme", value: dash.cost_breakdown.malzeme, colorStops: MALZEME_STOPS, swatch: "#f59e0b" },
+                      { label: "Diğer", value: dash.cost_breakdown.diger, colorStops: DIGER_STOPS, swatch: "#8b93a3" },
+                    ] as DonutSegment[]}
+                  />
+                </PanelCell>
               )}
-            </div>
+            </PanelRow>
           )}
 
-          <div className={dash.document_status ? "grid gap-4 md:grid-cols-3" : "grid gap-4 md:grid-cols-2"}>
-            {/* Açık İSG bulguları */}
-            <Card title="Açık İSG bulguları">
+          {/* ── Row C: Açık İSG + Doküman Durumu + Bekleyen İşler ── */}
+          <PanelRow cols={dash.document_status ? "1fr 1fr 1fr" : "1fr 1fr"}>
+            <PanelCell title="Açık İSG Bulguları">
               <div className="flex flex-wrap gap-2">
-                <Badge label={`Toplam ${dash.open_findings.total}`} tone="muted" />
-                <Badge label={`Kritik ${dash.open_findings.critical}`} tone={dash.open_findings.critical ? "red" : "muted"} />
-                <Badge label={`Majör ${dash.open_findings.major}`} tone={dash.open_findings.major ? "amber" : "muted"} />
-                <Badge label={`Minör ${dash.open_findings.minor}`} tone="muted" />
-                <Badge label={`Gözlem ${dash.open_findings.observation}`} tone="muted" />
-                <Badge label={`Termini geçen ${dash.open_findings.overdue}`} tone={dash.open_findings.overdue ? "red" : "muted"} />
+                <PanelBadge label={`Toplam ${dash.open_findings.total}`} tone="muted" />
+                <PanelBadge label={`Kritik ${dash.open_findings.critical}`} tone={dash.open_findings.critical ? "red" : "muted"} />
+                <PanelBadge label={`Majör ${dash.open_findings.major}`} tone={dash.open_findings.major ? "amber" : "muted"} />
+                <PanelBadge label={`Minör ${dash.open_findings.minor}`} tone="muted" />
+                <PanelBadge label={`Gözlem ${dash.open_findings.observation}`} tone="muted" />
+                <PanelBadge label={`Termini geçen ${dash.open_findings.overdue}`} tone={dash.open_findings.overdue ? "red" : "muted"} />
               </div>
-            </Card>
-
-            {/* Doküman durumu (Dashboard v2) — rozet listesi, donut değil
-                (Panel v2 önizlemesinde İSG bulguları ile aynı dile getirildi). */}
+            </PanelCell>
             {dash.document_status && (
-              <Card title="Doküman Durumu">
+              <PanelCell title="Doküman Durumu">
                 <div className="flex flex-wrap gap-2">
-                  <Badge label={`Onaylı ${dash.document_status.onayli}`} tone="blue" />
-                  <Badge label={`Revizyon ${dash.document_status.revizyon}`} tone={dash.document_status.revizyon ? "amber" : "muted"} />
-                  <Badge label={`Taslak ${dash.document_status.taslak}`} tone="muted" />
+                  <PanelBadge label={`Onaylı ${dash.document_status.onayli}`} tone="blue" />
+                  <PanelBadge label={`Revizyon ${dash.document_status.revizyon}`} tone={dash.document_status.revizyon ? "amber" : "muted"} />
+                  <PanelBadge label={`Taslak ${dash.document_status.taslak}`} tone="muted" />
                 </div>
-              </Card>
+              </PanelCell>
             )}
-
-            {/* Bekleyen onaylar */}
-            <Card title="Bekleyen işler">
-              <ul className="text-sm text-beton-200 space-y-1">
+            <PanelCell title="Bekleyen İşler">
+              <ul className="text-[13px] space-y-1.5" style={{ color: "rgb(var(--panel-ink))" }}>
                 <li>Bekleyen hakediş: <b>{dash.pending.payments}</b></li>
                 {!dash.subcontractor_scoped && (
                   <>
@@ -386,72 +388,73 @@ export default function Dashboard() {
                   </>
                 )}
               </ul>
-            </Card>
-          </div>
+            </PanelCell>
+          </PanelRow>
 
-          {/* Nakit akış + milestone — Row A/B ile aynı 2:1 grid ritmi (bütünleşik yerleşim) */}
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Can perm="reports.view_financial_reports">
-              <div className="lg:col-span-2">
-                <NakitAkisCard projectId={current.id} currency={cur} />
-              </div>
+          {/* ── Row D: Nakit Akışı + Milestone ── */}
+          <PanelRow cols="1.9fr 1fr">
+            <Can perm="reports.view_financial_reports" fallback={<div />}>
+              <NakitAkisCard projectId={current.id} currency={cur} />
             </Can>
-            <Card title="Milestone zaman çizelgesi">
+            <PanelCell title="Yaklaşan Milestone'lar">
               {dash.milestones.length === 0 ? (
-                <p className="text-sm text-beton-400">Tanımlı milestone yok.</p>
+                <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>Tanımlı milestone yok.</p>
               ) : (
-                <ul className="space-y-2">
-                  {dash.milestones.map((m) => (
-                    <li key={m.id} className="flex items-center gap-3 text-sm">
+                <ul className="flex flex-col">
+                  {dash.milestones.map((m, i) => (
+                    <li
+                      key={m.id}
+                      className="flex items-center gap-3 text-[12.5px] py-2"
+                      style={i < dash.milestones.length - 1 ? { borderBottom: "1px solid rgb(var(--panel-hairline))" } : undefined}
+                    >
                       <span
-                        className={
-                          "inline-block w-2.5 h-2.5 rounded-full " +
-                          (m.status === "Completed"
-                            ? "bg-emniyet-500"
-                            : m.late
-                              ? "bg-red-500"
-                              : "bg-beton-600")
-                        }
+                        className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ background: m.status === "Completed" ? "var(--group-accent)" : m.late ? "#f87171" : "rgb(var(--panel-hairline))" }}
                       />
-                      <span className="text-beton-100 flex-1">{m.name}</span>
-                      <span className="font-mono text-xs text-beton-400">
-                        plan {m.planned_date ?? "—"} · gerçek {m.actual_date ?? "—"}
-                      </span>
-                      <span className={"font-mono text-xs " + (m.late ? "text-red-400" : "text-beton-300")}>
-                        {m.late ? "GECİKMİŞ" : m.status}
+                      <span className="flex-1" style={{ color: "rgb(var(--panel-ink))" }}>{m.name}</span>
+                      <span className={"font-mono text-[10.5px] " + (m.late ? "" : "")} style={{ color: m.late ? "#f87171" : "rgb(var(--panel-ink3))" }}>
+                        {m.late ? "GECİKMİŞ" : (m.actual_date ?? m.planned_date ?? "—")}
                       </span>
                     </li>
                   ))}
                 </ul>
               )}
-            </Card>
-          </div>
+            </PanelCell>
+          </PanelRow>
 
-          {/* Aktivite akışı — taşerona dönmez */}
+          {/* ── Aktivite akışı — taşerona dönmez ── */}
           {dash.activity && (
-            <Card title="Son aktivite (iş akışı geçişleri)">
-              {dash.activity.length === 0 ? (
-                <p className="text-sm text-beton-400">Henüz aktivite yok.</p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {dash.activity.map((a, i) => (
-                    <li key={i} className="text-xs text-beton-300 font-mono">
-                      <span className="text-beton-500">{new Date(a.at).toLocaleString("tr-TR")}</span>{" "}
-                      <span className="text-beton-100">{entityTR(a.entity)}</span>{" "}
-                      {a.from_status ? `${a.from_status} → ` : ""}
-                      <span className="text-emniyet-500">{a.to_status}</span>
-                      {a.actor && <span className="text-beton-400"> · {a.actor}</span>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
+            <PanelRow cols="1fr">
+              <PanelCell title="Son Aktivite (İş Akışı Geçişleri)">
+                {dash.activity.length === 0 ? (
+                  <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>Henüz aktivite yok.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {dash.activity.map((a, i) => (
+                      <li key={i} className="text-xs font-mono" style={{ color: "rgb(var(--panel-ink2))" }}>
+                        <span style={{ color: "rgb(var(--panel-ink3))" }}>{new Date(a.at).toLocaleString("tr-TR")}</span>{" "}
+                        <span style={{ color: "rgb(var(--panel-ink))" }}>{entityTR(a.entity)}</span>{" "}
+                        {a.from_status ? `${a.from_status} → ` : ""}
+                        <span style={{ color: "var(--group-accent)" }}>{a.to_status}</span>
+                        {a.actor && <span style={{ color: "rgb(var(--panel-ink3))" }}> · {a.actor}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </PanelCell>
+            </PanelRow>
           )}
         </div>
       )}
     </div>
   );
 }
+
+const panelInputStyle: React.CSSProperties = {
+  background: "rgb(var(--panel-hairline) / .4)",
+  border: "1px solid rgb(var(--panel-hairline))",
+  color: "rgb(var(--panel-ink))",
+};
 
 // PV aylık dağılım editörü (projects.edit) — toplam 100 olmalı.
 function PVEditor({ projectId, onSaved }: { projectId: string; onSaved: () => void }) {
@@ -481,8 +484,8 @@ function PVEditor({ projectId, onSaved }: { projectId: string; onSaved: () => vo
   }
 
   return (
-    <div className="mt-4 border-t border-beton-800 pt-3">
-      <p className="text-xs text-beton-400 mb-2">
+    <div className="mt-4 border-t pt-3" style={{ borderColor: "rgb(var(--panel-hairline))" }}>
+      <p className="text-xs mb-2" style={{ color: "rgb(var(--panel-ink2))" }}>
         PV aylık dağılımı (dönemsel %). Boş bırakılırsa S-eğrisi milestone
         ağırlıklarından, o da yoksa doğrusal dağılımdan türetilir.
       </p>
@@ -493,7 +496,8 @@ function PVEditor({ projectId, onSaved }: { projectId: string; onSaved: () => vo
               value={e.month}
               onChange={(ev) => setEntries(entries.map((x, j) => (j === i ? { ...x, month: ev.target.value } : x)))}
               placeholder="YYYY-MM"
-              className="w-28 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-xs text-beton-100 font-mono"
+              className="w-28 rounded px-2 py-1 text-xs font-mono"
+              style={panelInputStyle}
             />
             <input
               type="number"
@@ -502,9 +506,10 @@ function PVEditor({ projectId, onSaved }: { projectId: string; onSaved: () => vo
               onChange={(ev) =>
                 setEntries(entries.map((x, j) => (j === i ? { ...x, planned_pct: Number(ev.target.value) } : x)))
               }
-              className="w-24 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-xs text-beton-100 font-mono"
+              className="w-24 rounded px-2 py-1 text-xs font-mono"
+              style={panelInputStyle}
             />
-            <span className="text-xs text-beton-500">%</span>
+            <span className="text-xs" style={{ color: "rgb(var(--panel-ink3))" }}>%</span>
             <button
               onClick={() => setEntries(entries.filter((_, j) => j !== i))}
               className="text-xs text-red-400 hover:underline"
@@ -517,21 +522,24 @@ function PVEditor({ projectId, onSaved }: { projectId: string; onSaved: () => vo
       <div className="mt-2 flex items-center gap-3">
         <button
           onClick={() => setEntries([...entries, { month: "", planned_pct: 0 }])}
-          className="text-xs text-emniyet-500 hover:underline"
+          className="text-xs hover:underline"
+          style={{ color: "var(--group-accent)" }}
         >
           + ay ekle
         </button>
-        <span className={"font-mono text-xs " + (Math.abs(sum - 100) <= 0.5 || entries.length === 0 ? "text-beton-400" : "text-red-400")}>
+        <span className={"font-mono text-xs " + (Math.abs(sum - 100) <= 0.5 || entries.length === 0 ? "" : "text-red-400")}
+          style={Math.abs(sum - 100) <= 0.5 || entries.length === 0 ? { color: "rgb(var(--panel-ink2))" } : undefined}>
           toplam %{sum.toFixed(3)}
         </span>
         <button
           onClick={save}
-          className="ml-auto rounded-md bg-emniyet-500 px-3 py-1 text-xs font-semibold text-beton-950 hover:brightness-110 transition"
+          className="ml-auto rounded-md px-3 py-1 text-xs font-semibold transition hover:brightness-110"
+          style={{ background: "var(--group-accent)", color: "#141414" }}
         >
           Kaydet
         </button>
       </div>
-      {msg && <p className="mt-1 text-xs text-beton-300">{msg}</p>}
+      {msg && <p className="mt-1 text-xs" style={{ color: "rgb(var(--panel-ink2))" }}>{msg}</p>}
     </div>
   );
 }
@@ -556,35 +564,38 @@ function NakitAkisCard({ projectId, currency }: { projectId: string; currency: s
   const money = (v: number) => v.toLocaleString("tr-TR", { maximumFractionDigits: 0 }) + " " + currency;
 
   return (
-    <Card
-      title="Nakit Akış (son 30 gün + gelecek 30 gün)"
-      action={<Link to="/nakit-akis" className="text-xs text-emniyet-500 hover:underline">Detaylı gör →</Link>}
+    <PanelCell
+      title="Nakit Akışı (son 30 gün + gelecek 30 gün)"
+      action={<Link to="/nakit-akis" className="text-[11px] font-semibold hover:underline" style={{ color: "var(--group-accent)" }}>Detaylı gör →</Link>}
     >
-      {err && <p className="text-sm text-beton-400">Nakit akış verisi yüklenemedi.</p>}
-      {!err && !summary && <p className="text-sm text-beton-400">Yükleniyor…</p>}
+      {err && <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>Nakit akış verisi yüklenemedi.</p>}
+      {!err && !summary && <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>Yükleniyor…</p>}
       {summary && (
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <p className="text-[11px] uppercase tracking-wider text-beton-500">Giriş</p>
-            <p className="mt-1 font-display text-lg font-medium text-emniyet-500" style={{ fontVariantNumeric: "tabular-nums" }}>
+            <p className="text-[10.5px] uppercase tracking-wider" style={{ color: "rgb(var(--panel-ink3))" }}>Giriş</p>
+            <p className="mt-1 font-display text-lg font-bold" style={{ fontVariantNumeric: "tabular-nums", color: "var(--group-accent)" }}>
               {money(summary.total_in)}
             </p>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-wider text-beton-500">Çıkış</p>
-            <p className="mt-1 font-display text-lg font-medium text-red-400" style={{ fontVariantNumeric: "tabular-nums" }}>
+            <p className="text-[10.5px] uppercase tracking-wider" style={{ color: "rgb(var(--panel-ink3))" }}>Çıkış</p>
+            <p className="mt-1 font-display text-lg font-bold text-red-400" style={{ fontVariantNumeric: "tabular-nums" }}>
               {money(summary.total_out)}
             </p>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-wider text-beton-500">Net</p>
-            <p className={"mt-1 font-display text-lg font-medium " + (summary.net >= 0 ? "text-beton-100" : "text-red-400")} style={{ fontVariantNumeric: "tabular-nums" }}>
+            <p className="text-[10.5px] uppercase tracking-wider" style={{ color: "rgb(var(--panel-ink3))" }}>Net</p>
+            <p
+              className={"mt-1 font-display text-lg font-bold " + (summary.net >= 0 ? "" : "text-red-400")}
+              style={{ fontVariantNumeric: "tabular-nums", color: summary.net >= 0 ? "rgb(var(--panel-ink))" : undefined }}
+            >
               {money(summary.net)}
             </p>
           </div>
         </div>
       )}
-    </Card>
+    </PanelCell>
   );
 }
 
@@ -628,32 +639,28 @@ function CoverImageCard({ projectId, coverImage, canUpload, onChanged }: {
   }
 
   return (
-    <Card
-      title="Proje Görseli"
-      action={canUpload && (
+    <div className="relative h-full min-h-[220px]">
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => upload(e.target.files)} />
+      {url ? (
+        <img src={url} alt="Proje görseli" className="w-full h-full min-h-[220px] object-cover" />
+      ) : (
+        <div className="h-full min-h-[220px] flex items-center justify-center" style={{ background: "rgb(var(--panel-hairline) / .3)" }}>
+          <p className="text-sm" style={{ color: "rgb(var(--panel-ink3))" }}>Henüz proje görseli eklenmedi.</p>
+        </div>
+      )}
+      {canUpload && (
         <button onClick={() => fileRef.current?.click()} disabled={busy}
-          className="text-xs text-emniyet-500 hover:underline disabled:opacity-50">
+          className="absolute top-2 right-2 rounded-md bg-black/50 px-2.5 py-1 text-[11px] font-semibold text-white-solid hover:bg-black/70 disabled:opacity-50 backdrop-blur-sm">
           {busy ? "Yükleniyor…" : url ? "Değiştir" : "Yükle"}
         </button>
       )}
-    >
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => upload(e.target.files)} />
-      {url ? (
-        <img src={url} alt="Proje görseli" className="w-full h-full min-h-[280px] object-cover rounded-lg" />
-      ) : (
-        <div className="h-full min-h-[280px] rounded-lg border border-dashed border-beton-700 bg-beton-950 flex items-center justify-center">
-          <p className="text-sm text-beton-500">Henüz proje görseli eklenmedi.</p>
-        </div>
-      )}
-    </Card>
+    </div>
   );
 }
 
 function idx(v: number) {
   return v === 0 ? "—" : v.toFixed(3);
 }
-// spiHint/cpiHint — Gauge bileşeninin kendi renk bantlarıyla (<0.9 kırmızı,
-// 0.9-1.1 amber, >1.1 yeşil) aynı eşikte, ibrenin altına anlamını yazan kısa metin.
 function spiHint(v: number): string {
   if (v >= 1.1) return "Planlanandan önde";
   if (v >= 0.9) return "Planda";
@@ -681,73 +688,128 @@ function entityTR(e: string) {
   return map[e] ?? e;
 }
 
-function Card({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="h-full flex flex-col rounded-xl border border-beton-800 bg-beton-900 p-5" style={{ boxShadow: "var(--shadow)" }}>
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-beton-100">{title}</h2>
-        {action}
-      </div>
-      <div className="mt-3 flex-1 min-h-0">{children}</div>
-    </div>
-  );
-}
-// ProgressRing — İlerleme Göstergeleri kartındaki tek bir yüzde halkası +
-// etiket. `empty` (ör. ana sözleşme bedeli girilmemiş) iken halka soluk
-// gösterilir ve "Veri yok" yazar — Kpi bileşenindeki "—" deseniyle tutarlı.
-function ProgressRing({ label, pct, colorStops, sub, empty }: {
-  label: string; pct: number; colorStops: ColorStop[]; sub?: string; empty?: boolean;
-}) {
-  return (
-    <div className="flex flex-col items-center gap-1.5 text-center">
-      <RadialRing pct={pct} colorStops={colorStops} empty={empty} />
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-beton-400">{label}</p>
-      {empty ? (
-        <p className="text-[10.5px] text-beton-500">Veri yok</p>
-      ) : sub ? (
-        <p className="text-[10.5px] text-beton-500">{sub}</p>
-      ) : null}
-    </div>
-  );
-}
-function Kpi({ label, value, bad, action }: { label: string; value: string; bad?: boolean; action?: ReactNode }) {
-  // "—" değeri (henüz hesaplanamayan endeks) soluk ve küçük gösterilir ki
-  // gerçek rakamlarla görsel olarak karışmasın.
-  const empty = value === "—" || value.trim() === "";
+// ── Yerleşim ilkelleri (kesintisiz levha: gölge/gradyan yok, sadece hairline) ──
+
+function PanelRow({ cols, children }: { cols: string; children: ReactNode }) {
   return (
     <div
-      className="rounded-xl bg-beton-900 border border-beton-800 px-4 py-3"
-      style={{ boxShadow: "var(--shadow)" }}
+      className="grid border-b last:border-b-0"
+      style={{ gridTemplateColumns: cols, borderColor: "rgb(var(--panel-hairline))" }}
     >
-      <p className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-beton-500">
-        <span
-          className="inline-block w-1.5 h-1.5 rounded-full"
-          style={{ background: empty ? "rgb(var(--beton-600))" : bad ? "#ef4444" : "var(--accent)" }}
-        />
-        {label}
-      </p>
-      {empty ? (
-        <p className="mt-1.5 text-sm text-beton-500">Veri yok</p>
-      ) : (
-        <p
-          className={"mt-1.5 font-display text-xl font-medium " + (bad ? "text-red-400" : "text-beton-100")}
-          style={{ fontVariantNumeric: "tabular-nums" }}
-        >
-          {value}
-        </p>
-      )}
-      {action}
+      {children}
     </div>
   );
 }
-function Badge({ label, tone }: { label: string; tone: "red" | "amber" | "blue" | "muted" }) {
-  const cls =
-    tone === "red"
-      ? "bg-red-500/15 text-red-400"
-      : tone === "amber"
-        ? "bg-emniyet-500/15 text-emniyet-500"
-        : tone === "blue"
-          ? "bg-blue-500/15 text-blue-400"
-          : "bg-beton-800 text-beton-300";
-  return <span className={"font-mono text-xs px-2 py-1 rounded " + cls}>{label}</span>;
+
+function PanelCell({ title, action, children, noPad }: { title: string; action?: ReactNode; children: ReactNode; noPad?: boolean }) {
+  return (
+    <div
+      className={"flex flex-col border-r last:border-r-0 " + (noPad ? "" : "p-4")}
+      style={{ borderColor: "rgb(var(--panel-hairline))" }}
+    >
+      <div className={"flex items-center justify-between mb-3" + (noPad ? " px-4 pt-4" : "")}>
+        <h2 className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: "rgb(var(--panel-ink2))" }}>{title}</h2>
+        {action}
+      </div>
+      <div className="flex-1 min-h-0">{children}</div>
+    </div>
+  );
+}
+
+function PanelStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wider" style={{ color: "rgb(var(--panel-ink3))" }}>{label}</p>
+      <p className="mt-0.5 font-display text-base font-bold" style={{ color: "rgb(var(--panel-ink))", fontVariantNumeric: "tabular-nums" }}>{value}</p>
+    </div>
+  );
+}
+
+function PanelLine({ label, value, bad }: { label: string; value: number; bad?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="flex-1" style={{ color: "rgb(var(--panel-ink2))" }}>{label}</span>
+      <span className="font-mono font-bold" style={{ color: bad ? "#f87171" : "rgb(var(--panel-ink))" }}>{value}</span>
+    </div>
+  );
+}
+
+function PanelBadge({ label, tone }: { label: string; tone: "red" | "amber" | "blue" | "muted" }) {
+  const style =
+    tone === "red" ? { background: "rgba(248,113,113,.15)", color: "#f87171" }
+    : tone === "amber" ? { background: "rgba(245,168,0,.15)", color: "var(--group-accent)" }
+    : tone === "blue" ? { background: "rgba(96,165,250,.15)", color: "#60a5fa" }
+    : { background: "rgb(var(--panel-hairline) / .6)", color: "rgb(var(--panel-ink2))" };
+  return <span className="font-mono text-xs px-2 py-1 rounded" style={style}>{label}</span>;
+}
+
+function PanelKpi({ label, value, hint, bad, good, icon, action }: {
+  label: string; value: string; hint?: string; bad?: boolean; good?: boolean; icon: ReactNode; action?: ReactNode;
+}) {
+  const iconTone = bad ? "#f87171" : good ? "#4ade80" : "rgb(180,186,196)";
+  return (
+    <div className="flex items-center gap-3 p-3.5 border-r last:border-r-0" style={{ borderColor: "rgb(var(--panel-hairline))" }}>
+      <div className="w-9 h-9 rounded-lg grid place-items-center shrink-0" style={{ background: `${iconTone}24` }}>
+        <span style={{ color: iconTone, width: 17, height: 17, display: "block" }}>{icon}</span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[9px] uppercase tracking-wide font-bold truncate" style={{ color: "rgb(var(--panel-ink3))" }}>{label}</p>
+        <p className="text-[17px] font-extrabold leading-tight" style={{ color: "rgb(var(--panel-ink))", fontVariantNumeric: "tabular-nums" }}>{value}</p>
+        {hint && <p className="text-[10px] mt-0.5" style={{ color: bad ? "#f87171" : good ? "#4ade80" : "rgb(var(--panel-ink2))" }}>{hint}</p>}
+        {action}
+      </div>
+    </div>
+  );
+}
+
+function PanelKpiRing({ label, pct, colorStops, hint, bad }: {
+  label: string; pct: number; colorStops: ColorStop[]; hint?: string; bad?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3 p-3.5 border-r last:border-r-0" style={{ borderColor: "rgb(var(--panel-hairline))" }}>
+      <RadialRing pct={pct} colorStops={colorStops} size={44} />
+      <div className="min-w-0 flex-1">
+        <p className="text-[9px] uppercase tracking-wide font-bold truncate" style={{ color: "rgb(var(--panel-ink3))" }}>{label}</p>
+        <p className="text-[16px] font-extrabold leading-tight" style={{ color: "rgb(var(--panel-ink))", fontVariantNumeric: "tabular-nums" }}>%{pct.toFixed(1)}</p>
+        {hint && <p className="text-[10px] mt-0.5" style={{ color: bad ? "#f87171" : "rgb(var(--panel-ink2))" }}>{hint}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ── İkonlar (satır ikonları, emoji değil) ──
+function IconTrend() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="100%" height="100%">
+      <path d="M3 17l6-6 4 4 8-9" /><path d="M15 6h6v6" />
+    </svg>
+  );
+}
+function IconCheck() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="100%" height="100%">
+      <circle cx="12" cy="12" r="9" /><path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}
+function IconShield() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="100%" height="100%">
+      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+    </svg>
+  );
+}
+function IconWarning() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="100%" height="100%">
+      <path d="M12 3L2 20h20L12 3z" /><path d="M12 10v4" /><circle cx="12" cy="17" r=".6" fill="currentColor" />
+    </svg>
+  );
+}
+function IconReceipt() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="100%" height="100%">
+      <rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
+    </svg>
+  );
 }

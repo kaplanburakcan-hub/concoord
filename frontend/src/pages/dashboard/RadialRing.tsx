@@ -61,15 +61,15 @@ export default function RadialRing({
               marginLeft: -tickW / 2,
               transformOrigin: "50% 0",
               transform: `rotate(${deg}deg) translateY(-${radius}px)`,
-              background: active ? colorAt(colorStops, t) : "rgb(var(--beton-800))",
+              background: active ? colorAt(colorStops, t) : "rgb(var(--panel-hairline))",
             }}
           />
         );
       })}
       <div className="absolute inset-0 flex items-center justify-center">
         <span
-          className="font-display font-extrabold text-beton-100"
-          style={{ fontSize: size * 0.167, fontVariantNumeric: "tabular-nums" }}
+          className="font-display font-extrabold"
+          style={{ fontSize: size * 0.167, fontVariantNumeric: "tabular-nums", color: "rgb(var(--panel-ink))" }}
         >
           {empty ? "—" : `%${pct.toFixed(1)}`}
         </span>

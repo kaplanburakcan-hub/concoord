@@ -1,7 +1,7 @@
 // S-eğrisi (PV/EV/AC) — bağımlılıksız satır içi SVG çizim.
 //
-// Faz 10 arayüz yenileme: renkler token sınıfları + currentColor ile verilir,
-// böylece light/dark ve palet değişimine otomatik uyum sağlar.
+// Panel her zaman koyu bir çerçevede render olduğundan (bkz. Dashboard.tsx),
+// renkler --panel-* sabit token'larına bağlıdır — temadan bağımsız.
 //
 // ÖNEMLİ (gerçekleşen çizgilerin bitişi): backend kümülatif EV/AC değerlerini
 // proje takviminin TÜM aylarına taşır (veri olmayan gelecek aylar dahil). Bunu
@@ -9,6 +9,9 @@
 // EV/AC yalnızca `asOf` ayına kadar çizilir; PV (plan) sona kadar devam eder.
 
 export type SCurvePoint = { month: string; pv: number; ev: number; ac: number };
+
+const ACCENT = "#f5a800";
+const AC_COLOR = "#f87171";
 
 export default function SCurve({
   points,
@@ -20,7 +23,7 @@ export default function SCurve({
   asOf?: string;
 }) {
   if (!points || points.length === 0) {
-    return <p className="text-sm text-beton-400">S-eğrisi için veri yok.</p>;
+    return <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>S-eğrisi için veri yok.</p>;
   }
 
   // Geniş viewBox oranı: tam genişlikte render edildiğinde grafik dikeyde
@@ -69,19 +72,18 @@ export default function SCurve({
             x2={W - PAD.r}
             y1={y(t)}
             y2={y(t)}
-            className="text-beton-800"
-            stroke="currentColor"
+            stroke="rgb(var(--panel-hairline))"
             strokeWidth={1}
           />
         ))}
         {ticks.map((t, i) => (
-          <text key={"tl" + i} x={PAD.l - 8} y={y(t) + 3.5} textAnchor="end" fontSize={10} className="fill-beton-500">
+          <text key={"tl" + i} x={PAD.l - 8} y={y(t) + 3.5} textAnchor="end" fontSize={10} fill="rgb(var(--panel-ink3))">
             {fmt(t)}
           </text>
         ))}
         {points.map((p, i) =>
           i % step === 0 || i === points.length - 1 ? (
-            <text key={p.month} x={x(i)} y={H - 8} textAnchor="middle" fontSize={10} className="fill-beton-500">
+            <text key={p.month} x={x(i)} y={H - 8} textAnchor="middle" fontSize={10} fill="rgb(var(--panel-ink3))">
               {p.month}
             </text>
           ) : null
@@ -94,24 +96,20 @@ export default function SCurve({
             x2={x(asOfIdx)}
             y1={PAD.t}
             y2={H - PAD.b}
-            className="text-beton-700"
-            stroke="currentColor"
+            stroke="rgb(var(--panel-hairline))"
             strokeWidth={1}
             strokeDasharray="3 3"
           />
         )}
 
         {/* EV altı dolgu (yalnızca gerçekleşen aralık) */}
-        {areaEV && (
-          <path d={areaEV} className="text-emniyet-500" fill="currentColor" fillOpacity={0.12} stroke="none" />
-        )}
+        {areaEV && <path d={areaEV} fill={ACCENT} fillOpacity={0.12} stroke="none" />}
 
         {/* PV — plan, sona kadar */}
         <path
           d={line(points, "pv")}
-          className="text-beton-500"
           fill="none"
-          stroke="currentColor"
+          stroke="rgb(var(--panel-ink3))"
           strokeWidth={2}
           strokeDasharray="5 4"
           strokeLinecap="round"
@@ -119,9 +117,8 @@ export default function SCurve({
         {/* AC — yalnızca gerçekleşen aralık */}
         <path
           d={line(actual, "ac")}
-          className="text-red-400"
           fill="none"
-          stroke="currentColor"
+          stroke={AC_COLOR}
           strokeWidth={2.2}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -129,47 +126,38 @@ export default function SCurve({
         {/* EV — yalnızca gerçekleşen aralık */}
         <path
           d={line(actual, "ev")}
-          className="text-emniyet-500"
           fill="none"
-          stroke="currentColor"
+          stroke={ACCENT}
           strokeWidth={2.8}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
 
         {actual.map((p, i) => (
-          <circle key={"ev" + p.month} cx={x(i)} cy={y(p.ev)} r={2.8} className="text-emniyet-500" fill="currentColor">
+          <circle key={"ev" + p.month} cx={x(i)} cy={y(p.ev)} r={2.8} fill={ACCENT}>
             <title>{`${p.month} · EV: ${p.ev.toLocaleString("tr-TR")} ${currency}`}</title>
           </circle>
         ))}
         {/* Son gerçekleşen nokta vurgusu */}
         {lastActual && (
-          <circle
-            cx={x(asOfIdx)}
-            cy={y(lastActual.ev)}
-            r={5}
-            className="text-emniyet-500"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-          />
+          <circle cx={x(asOfIdx)} cy={y(lastActual.ev)} r={5} fill="none" stroke={ACCENT} strokeWidth={2} />
         )}
       </svg>
 
-      <div className="mt-2 flex gap-5 text-xs flex-wrap text-beton-400">
+      <div className="mt-2 flex gap-5 text-xs flex-wrap" style={{ color: "rgb(var(--panel-ink2))" }}>
         <span className="flex items-center gap-2">
-          <span className="inline-block w-3.5 h-0.5 rounded text-beton-500" style={{ background: "currentColor" }} />
+          <span className="inline-block w-3.5 h-0.5 rounded" style={{ background: "rgb(var(--panel-ink3))" }} />
           PV · planlanan
         </span>
         <span className="flex items-center gap-2">
-          <span className="inline-block w-3.5 h-0.5 rounded text-emniyet-500" style={{ background: "currentColor" }} />
+          <span className="inline-block w-3.5 h-0.5 rounded" style={{ background: ACCENT }} />
           EV · kazanılan
         </span>
         <span className="flex items-center gap-2">
-          <span className="inline-block w-3.5 h-0.5 rounded text-red-400" style={{ background: "currentColor" }} />
+          <span className="inline-block w-3.5 h-0.5 rounded" style={{ background: AC_COLOR }} />
           AC · gerçekleşen
         </span>
-        {asOf && <span className="text-beton-500">· gerçekleşen seriler {asOf} itibarıyladır</span>}
+        {asOf && <span style={{ color: "rgb(var(--panel-ink3))" }}>· gerçekleşen seriler {asOf} itibarıyladır</span>}
       </div>
     </div>
   );
