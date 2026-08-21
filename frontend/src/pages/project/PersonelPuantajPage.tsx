@@ -374,6 +374,7 @@ export default function PersonelPuantajPage() {
                 <thead>
                   <tr className="bg-beton-900 border-b border-beton-800">
                     <th className="py-2 px-3 text-left text-xs text-beton-400 font-medium min-w-[160px]">Ad Soyad</th>
+                    <th className="py-2 px-3 text-left text-xs text-beton-500 font-medium w-28">Firma</th>
                     <th className="py-2 px-3 text-left text-xs text-beton-500 font-medium w-20">Görev</th>
                     {days.map((d, i) => (
                       <th key={i} className="py-2 px-2 text-center text-xs font-medium w-16">
@@ -389,6 +390,7 @@ export default function PersonelPuantajPage() {
                   {aktifPersonel.map((p) => (
                     <tr key={p.id} className="border-b border-beton-800/50 hover:bg-beton-900/30">
                       <td className="py-2 px-3 text-beton-200 text-xs font-medium">{p.ad_soyad}</td>
+                      <td className="py-2 px-3 text-beton-500 text-xs">{p.firma || "—"}</td>
                       <td className="py-2 px-3 text-beton-500 text-xs">{p.gorev}</td>
                       {days.map((d, i) => {
                         const iso = toISO(d);

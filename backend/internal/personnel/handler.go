@@ -2,11 +2,13 @@
 package personnel
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ipks/ipks/backend/internal/httpx"
@@ -260,6 +262,26 @@ func (h *Handler) UpsertPuantaj(w http.ResponseWriter, r *http.Request) {
 	if submitted {
 		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
 			"İlgili günlük rapor basıldı, geçmişe dönük veri değişikliği yapmak için yöneticinize başvurun.", nil)
+		return
+	}
+
+	// Personel Yönetimi'nde pasife alınmış personele puantaj girişi
+	// yapılamaz — frontend zaten bu satırları gizler, burası son savunma
+	// hattı (doğrudan API çağrısıyla da atlatılamasın diye).
+	var isAktif bool
+	if err := h.db.QueryRow(r.Context(), `
+		SELECT is_aktif FROM project_personnel WHERE id=$1 AND project_id=$2`,
+		personelID, pid).Scan(&isAktif); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Personel bulunamadı.", nil)
+			return
+		}
+		httpx.Internal(w, r)
+		return
+	}
+	if !isAktif {
+		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
+			"Bu personel pasif durumda, puantaj girişi yapılamaz.", nil)
 		return
 	}
 
