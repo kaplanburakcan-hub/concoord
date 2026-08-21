@@ -41,6 +41,7 @@ var docCategories = map[string]bool{
 	"IdariHakedisFatura":  true,
 	"IdariHakedisBelgesi": true,
 	"ProjeGorseli":        true,
+	"KonumGorseli":        true,
 	"NakliyeIrsaliyesi":   true,
 	"KiralamaSozlesmesi":  true,
 }

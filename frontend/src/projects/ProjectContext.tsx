@@ -19,6 +19,9 @@ export type Project = {
   site_handover_date?: string;
   client_rep_name?: string;
   site_manager_name?: string;
+  proje_turu?: string;
+  toplam_insaat_alani_m2?: number;
+  kat_blok_bilgisi?: string;
   row_version: number;
   created_at: string;
 };

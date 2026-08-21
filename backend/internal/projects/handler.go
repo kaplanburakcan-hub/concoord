@@ -53,18 +53,24 @@ type projectDTO struct {
 	SiteHandoverDate *time.Time `json:"site_handover_date,omitempty"`
 	ClientRepName    *string    `json:"client_rep_name,omitempty"`
 	SiteManagerName  *string    `json:"site_manager_name,omitempty"`
-	RowVersion       int        `json:"row_version"`
-	CreatedAt        time.Time  `json:"created_at"`
+	// Künye çeşitlendirmesi (Plan: Proje Künyesi genişletme) — üçü de opsiyonel.
+	ProjeTuru           *string   `json:"proje_turu,omitempty"`
+	ToplamInsaatAlaniM2 *float64  `json:"toplam_insaat_alani_m2,omitempty"`
+	KatBlokBilgisi      *string   `json:"kat_blok_bilgisi,omitempty"`
+	RowVersion          int       `json:"row_version"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 const projectCols = `id, code, name, location, client_name, budget_total::float8, contract_amount::float8,
 	currency, start_date, end_date, status, accent_color,
-	site_handover_date, client_rep_name, site_manager_name, row_version, created_at`
+	site_handover_date, client_rep_name, site_manager_name,
+	proje_turu, toplam_insaat_alani_m2::float8, kat_blok_bilgisi, row_version, created_at`
 
 func scanProject(row pgx.Row, p *projectDTO) error {
 	return row.Scan(&p.ID, &p.Code, &p.Name, &p.Location, &p.ClientName, &p.BudgetTotal, &p.ContractAmount,
 		&p.Currency, &p.StartDate, &p.EndDate, &p.Status, &p.AccentColor,
-		&p.SiteHandoverDate, &p.ClientRepName, &p.SiteManagerName, &p.RowVersion, &p.CreatedAt)
+		&p.SiteHandoverDate, &p.ClientRepName, &p.SiteManagerName,
+		&p.ProjeTuru, &p.ToplamInsaatAlaniM2, &p.KatBlokBilgisi, &p.RowVersion, &p.CreatedAt)
 }
 
 var hexColorRe = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
@@ -109,20 +115,23 @@ func (h *Handler) ListProjects(w http.ResponseWriter, r *http.Request) {
 }
 
 type createProjectReq struct {
-	Code             string   `json:"code"`
-	Name             string   `json:"name"`
-	Location         *string  `json:"location"`
-	ClientName       *string  `json:"client_name"`
-	BudgetTotal      *float64 `json:"budget_total"`
-	ContractAmount   *float64 `json:"contract_amount"`
-	Currency         *string  `json:"currency"`
-	StartDate        *string  `json:"start_date"` // YYYY-MM-DD
-	EndDate          *string  `json:"end_date"`
-	Status           *string  `json:"status"`
-	AccentColor      *string  `json:"accent_color"`
-	SiteHandoverDate *string  `json:"site_handover_date"`
-	ClientRepName    *string  `json:"client_rep_name"`
-	SiteManagerName  *string  `json:"site_manager_name"`
+	Code                string   `json:"code"`
+	Name                string   `json:"name"`
+	Location            *string  `json:"location"`
+	ClientName          *string  `json:"client_name"`
+	BudgetTotal         *float64 `json:"budget_total"`
+	ContractAmount      *float64 `json:"contract_amount"`
+	Currency            *string  `json:"currency"`
+	StartDate           *string  `json:"start_date"` // YYYY-MM-DD
+	EndDate             *string  `json:"end_date"`
+	Status              *string  `json:"status"`
+	AccentColor         *string  `json:"accent_color"`
+	SiteHandoverDate    *string  `json:"site_handover_date"`
+	ClientRepName       *string  `json:"client_rep_name"`
+	SiteManagerName     *string  `json:"site_manager_name"`
+	ProjeTuru           *string  `json:"proje_turu"`
+	ToplamInsaatAlaniM2 *float64 `json:"toplam_insaat_alani_m2"`
+	KatBlokBilgisi      *string  `json:"kat_blok_bilgisi"`
 }
 
 func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
@@ -165,13 +174,15 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	var p projectDTO
 	err = scanProject(tx.QueryRow(r.Context(), `
 		INSERT INTO projects (code, name, location, client_name, budget_total, contract_amount, currency,
-			start_date, end_date, status, accent_color, site_handover_date, client_rep_name, site_manager_name)
+			start_date, end_date, status, accent_color, site_handover_date, client_rep_name, site_manager_name,
+			proje_turu, toplam_insaat_alani_m2, kat_blok_bilgisi)
 		VALUES ($1,$2,$3,$4,$5,$6,$7, NULLIF($8,'')::date, NULLIF($9,'')::date, $10, NULLIF($11,''),
-			NULLIF($12,'')::date, NULLIF($13,''), NULLIF($14,''))
+			NULLIF($12,'')::date, NULLIF($13,''), NULLIF($14,''), NULLIF($15,''), $16, NULLIF($17,''))
 		RETURNING `+projectCols,
 		req.Code, req.Name, req.Location, req.ClientName, req.BudgetTotal, req.ContractAmount, currency,
 		strDeref(req.StartDate), strDeref(req.EndDate), status, strDeref(req.AccentColor),
-		strDeref(req.SiteHandoverDate), strDeref(req.ClientRepName), strDeref(req.SiteManagerName)), &p)
+		strDeref(req.SiteHandoverDate), strDeref(req.ClientRepName), strDeref(req.SiteManagerName),
+		strDeref(req.ProjeTuru), req.ToplamInsaatAlaniM2, strDeref(req.KatBlokBilgisi)), &p)
 	if err != nil {
 		if isUniqueViolation(err) {
 			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "Bu proje kodu zaten kullanımda.", nil)
@@ -229,20 +240,23 @@ func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateProjectReq struct {
-	Name             *string  `json:"name"`
-	Location         *string  `json:"location"`
-	ClientName       *string  `json:"client_name"`
-	BudgetTotal      *float64 `json:"budget_total"`
-	ContractAmount   *float64 `json:"contract_amount"`
-	Currency         *string  `json:"currency"`
-	StartDate        *string  `json:"start_date"`
-	EndDate          *string  `json:"end_date"`
-	Status           *string  `json:"status"`
-	AccentColor      *string  `json:"accent_color"`
-	SiteHandoverDate *string  `json:"site_handover_date"`
-	ClientRepName    *string  `json:"client_rep_name"`
-	SiteManagerName  *string  `json:"site_manager_name"`
-	RowVersion       int      `json:"row_version"`
+	Name                *string  `json:"name"`
+	Location            *string  `json:"location"`
+	ClientName          *string  `json:"client_name"`
+	BudgetTotal         *float64 `json:"budget_total"`
+	ContractAmount      *float64 `json:"contract_amount"`
+	Currency            *string  `json:"currency"`
+	StartDate           *string  `json:"start_date"`
+	EndDate             *string  `json:"end_date"`
+	Status              *string  `json:"status"`
+	AccentColor         *string  `json:"accent_color"`
+	SiteHandoverDate    *string  `json:"site_handover_date"`
+	ClientRepName       *string  `json:"client_rep_name"`
+	SiteManagerName     *string  `json:"site_manager_name"`
+	ProjeTuru           *string  `json:"proje_turu"`
+	ToplamInsaatAlaniM2 *float64 `json:"toplam_insaat_alani_m2"`
+	KatBlokBilgisi      *string  `json:"kat_blok_bilgisi"`
+	RowVersion          int      `json:"row_version"`
 }
 
 func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
@@ -341,6 +355,28 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 			accentColor = &trimmed
 		}
 	}
+	projeTuru := before.ProjeTuru
+	if req.ProjeTuru != nil {
+		trimmed := strings.TrimSpace(*req.ProjeTuru)
+		if trimmed == "" {
+			projeTuru = nil
+		} else {
+			projeTuru = &trimmed
+		}
+	}
+	toplamAlan := before.ToplamInsaatAlaniM2
+	if req.ToplamInsaatAlaniM2 != nil {
+		toplamAlan = req.ToplamInsaatAlaniM2
+	}
+	katBlok := before.KatBlokBilgisi
+	if req.KatBlokBilgisi != nil {
+		trimmed := strings.TrimSpace(*req.KatBlokBilgisi)
+		if trimmed == "" {
+			katBlok = nil
+		} else {
+			katBlok = &trimmed
+		}
+	}
 
 	var after projectDTO
 	err = scanProject(tx.QueryRow(r.Context(), `
@@ -350,12 +386,14 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 			end_date=COALESCE(NULLIF($9,'')::date, end_date),
 			status=$10, accent_color=$11,
 			site_handover_date=NULLIF($12,'')::date, client_rep_name=NULLIF($13,''), site_manager_name=NULLIF($14,''),
+			proje_turu=$15, toplam_insaat_alani_m2=$16, kat_blok_bilgisi=$17,
 			row_version=row_version+1
 		WHERE id=$1
 		RETURNING `+projectCols,
 		pid, name, location, clientName, budget, contractAmount, currency,
 		strDeref(req.StartDate), strDeref(req.EndDate), status, accentColor,
-		siteHandoverDate, clientRepName, siteManagerName), &after)
+		siteHandoverDate, clientRepName, siteManagerName,
+		projeTuru, toplamAlan, katBlok), &after)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
