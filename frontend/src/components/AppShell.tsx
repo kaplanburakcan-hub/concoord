@@ -5,6 +5,7 @@ import { Can } from "../auth/guards";
 import { useProjects } from "../projects/ProjectContext";
 import { useTheme } from "../theme/ThemeContext";
 import NotificationBell from "./NotificationBell";
+import HeaderClock from "./HeaderClock";
 
 type AltKirilim = { to: string; label: string; end?: boolean };
 type NavDef = {
@@ -294,6 +295,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
               </select>
             </label>
           )}
+
+          <HeaderClock />
 
           <div className="ml-auto flex items-center gap-2.5">
             <NotificationBell />
