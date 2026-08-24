@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
-import type { ColorStop } from "../dashboard/RadialRing";
+import RadialRing, { type ColorStop } from "../dashboard/RadialRing";
 import SegmentedDonut, { type DonutSegment } from "../dashboard/SegmentedDonut";
 import {
-  PanelRow, PanelCell, PanelKpi, PanelKpiRing,
+  PanelRow, PanelCell, PanelKpi,
   IconTrend, IconCheck, IconFlag,
 } from "../dashboard/PanelKit";
 
@@ -53,10 +53,18 @@ const MS_META: Record<string, { label: string; dot: string }> = {
 };
 
 const ZAMAN_STOPS: ColorStop[] = [{ t: 0, hex: "#22d3ee" }, { t: 0.5, hex: "#2f6fed" }, { t: 1, hex: "#6d5ef8" }];
+const ADAMSAAT_STOPS: ColorStop[] = [{ t: 0, hex: "#f5a800" }, { t: 1, hex: "#fb923c" }];
 const SATINALMA_STOPS: ColorStop[] = [{ t: 0, hex: "#60a5fa" }, { t: 1, hex: "#2f6fed" }];
 const KASA_STOPS: ColorStop[] = [{ t: 0, hex: "#fbbf24" }, { t: 1, hex: "#f59e0b" }];
 const TASERON_STOPS: ColorStop[] = [{ t: 0, hex: "#34d399" }, { t: 1, hex: "#10b981" }];
 const SABIT_STOPS: ColorStop[] = [{ t: 0, hex: "#a78bfa" }, { t: 1, hex: "#8b5cf6" }];
+
+// Adam-Saat Takip — proje genelinde adam-saat verimlilik takibi için henüz
+// bir backend/veri kaynağı yok (bkz. manhour database notu). Gerçek veri
+// bağlanana kadar temsili sabit değerler kullanılır; hesap mantığı
+// (kullanılan/planlanan oranı) gerçek veriyle birebir aynı kalacak.
+const ADAM_SAAT_KULLANILAN = 64200;
+const ADAM_SAAT_PLANLANAN = 121500;
 
 function fmt(n?: number, cur = "TRY") {
   if (n == null) return "—";
@@ -151,11 +159,33 @@ export default function ProjectSummaryPage() {
   ] : [];
   const giderTotal = giderler ? giderler.satinalma + giderler.kasa_harcamalari + giderler.tasaron_hakedis + giderler.sabit_giderler : 0;
 
+  const adamSaatPct = Math.round((ADAM_SAAT_KULLANILAN / ADAM_SAAT_PLANLANAN) * 100);
+
   return (
-    <div
-      className="rounded-xl overflow-hidden border"
-      style={{ background: "rgb(var(--panel-bg))", borderColor: "rgb(var(--panel-hairline))" }}
-    >
+    <div className="relative">
+      {/* Bulanık mor/eflatun ambiyans — yalnızca panelin ARKASINDA/ÇEVRESİNDE
+          (bu wrapper'ın kendisi kadar geniş, hafifçe taşan). Panel'in kendisi
+          aşağıda tamamen opak (--panel-bg) olduğundan üzerindeki hiçbir
+          yazı/tablo bu katmandan etkilenmez — okunabilirlik yapısal olarak
+          garanti. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -z-10"
+        style={{
+          inset: "-70px -48px",
+          background: `
+            radial-gradient(ellipse 640px 480px at 6% 0%, rgba(168,85,247,.30), transparent 60%),
+            radial-gradient(ellipse 560px 460px at 96% 6%, rgba(217,70,239,.24), transparent 62%),
+            radial-gradient(ellipse 520px 560px at 100% 100%, rgba(99,60,224,.26), transparent 60%),
+            radial-gradient(ellipse 440px 380px at 2% 100%, rgba(190,50,180,.2), transparent 60%)
+          `,
+          filter: "blur(70px)",
+        }}
+      />
+      <div
+        className="relative rounded-xl overflow-hidden border"
+        style={{ background: "rgb(var(--panel-bg))", borderColor: "rgb(var(--panel-hairline))" }}
+      >
       {/* ── Head ── */}
       <div
         className="flex items-start justify-between gap-4 flex-wrap px-5 py-4 border-b"
@@ -193,14 +223,63 @@ export default function ProjectSummaryPage() {
         </div>
       </div>
 
-      {/* ── KPI şeridi ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" style={{ borderBottom: "1px solid rgb(var(--panel-hairline))" }}>
-        <PanelKpiRing
-          label="Zaman İlerlemesi"
-          pct={timePct}
-          colorStops={ZAMAN_STOPS}
-          hint={`${fmtDate(project.start_date?.slice(0, 10))} → ${fmtDate(project.end_date?.slice(0, 10))}`}
-        />
+      {/* ── Hero satırı: Zaman İlerlemesi + Adam-Saat Takip + Giderler ── */}
+      <PanelRow cols="1fr 1fr 1.3fr">
+        <PanelCell title="Zaman İlerlemesi">
+          <div className="flex items-center gap-5">
+            <RadialRing pct={timePct} colorStops={ZAMAN_STOPS} size={116} />
+            <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+              <MetaRow label="Başlangıç" value={fmtDate(project.start_date?.slice(0, 10))} />
+              <MetaRow label="Bitiş" value={fmtDate(project.end_date?.slice(0, 10))} />
+              {daysRemain != null && (
+                <MetaRow
+                  label="Kalan"
+                  value={daysRemain < 0 ? `${Math.abs(daysRemain)} gün geçti` : `${daysRemain} gün`}
+                  bad={daysRemain < 0}
+                />
+              )}
+              {spiNum != null && (
+                <p
+                  className="text-[11px] mt-1 font-medium"
+                  style={{ color: spiNum < 0.8 ? "#f87171" : spiNum >= 0.95 ? "#4ade80" : "var(--group-accent)" }}
+                >
+                  SPI {spiNum.toFixed(2)} — {spiNum >= 0.95 ? "Plana uygun" : spiNum >= 0.8 ? "Hafif gecikme" : "Ciddi gecikme"}
+                </p>
+              )}
+            </div>
+          </div>
+        </PanelCell>
+        <PanelCell title="Adam-Saat Takip" action={
+          <span className="text-[10.5px]" style={{ color: "rgb(var(--panel-ink3))" }}>kullanılan / planlanan</span>
+        }>
+          <div className="flex items-center gap-5">
+            <RadialRing pct={adamSaatPct} colorStops={ADAMSAAT_STOPS} size={116} />
+            <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+              <MetaRow label="Kullanılan" value={`${ADAM_SAAT_KULLANILAN.toLocaleString("tr-TR")} sa.`} />
+              <MetaRow label="Planlanan" value={`${ADAM_SAAT_PLANLANAN.toLocaleString("tr-TR")} sa.`} />
+              <MetaRow label="Kalan" value={`${(ADAM_SAAT_PLANLANAN - ADAM_SAAT_KULLANILAN).toLocaleString("tr-TR")} sa.`} />
+              <p
+                className="text-[11px] mt-1 font-medium"
+                style={{ color: adamSaatPct < timePct ? "var(--group-accent)" : "#4ade80" }}
+              >
+                {adamSaatPct < timePct ? "Zaman ilerlemesinin gerisinde" : "Zaman ilerlemesiyle uyumlu"}
+              </p>
+            </div>
+          </div>
+        </PanelCell>
+        <PanelCell title="Giderler" action={
+          giderTotal > 0 ? <span className="text-[10.5px]" style={{ color: "rgb(var(--panel-ink3))" }}>toplam</span> : undefined
+        }>
+          {giderTotal > 0 ? (
+            <SegmentedDonut size={132} centerLabel="TOPLAM" formatValue={(v) => fmt(v, project.currency)} segments={giderSegments} />
+          ) : (
+            <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>Henüz gider kaydı yok.</p>
+          )}
+        </PanelCell>
+      </PanelRow>
+
+      {/* ── İkincil KPI şeridi ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4" style={{ borderBottom: "1px solid rgb(var(--panel-hairline))" }}>
         <PanelKpi
           label="SPI (Tahmini)"
           value={spiNum != null ? spiNum.toFixed(2) : "—"}
@@ -232,17 +311,8 @@ export default function ProjectSummaryPage() {
         />
       </div>
 
-      {/* ── Row: Giderler + Kalan İşler ── */}
-      <PanelRow cols="1fr 1.3fr">
-        <PanelCell title="Giderler">
-          {giderTotal > 0 ? (
-            <>
-              <SegmentedDonut size={92} centerLabel="TOPLAM" formatValue={(v) => fmt(v, project.currency)} segments={giderSegments} />
-            </>
-          ) : (
-            <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>Henüz gider kaydı yok.</p>
-          )}
-        </PanelCell>
+      {/* ── Row: Kalan İşler ── */}
+      <PanelRow cols="1fr">
         <PanelCell title="Kalan İşler — Anlaşılacak İmalatlar" action={
           kalanIsler.length > 0
             ? <span className="text-[11px]" style={{ color: "rgb(var(--panel-ink3))" }}>{kalanIsler.length} kalem</span>
@@ -377,6 +447,16 @@ export default function ProjectSummaryPage() {
           )}
         </PanelCell>
       </PanelRow>
+      </div>
+    </div>
+  );
+}
+
+function MetaRow({ label, value, bad }: { label: string; value: string; bad?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-[11.5px]">
+      <span style={{ color: "rgb(var(--panel-ink3))" }}>{label}</span>
+      <span className="font-bold tabular-nums" style={{ color: bad ? "#f87171" : "rgb(var(--panel-ink))" }}>{value}</span>
     </div>
   );
 }
