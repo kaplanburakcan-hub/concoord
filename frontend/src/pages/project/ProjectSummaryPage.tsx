@@ -271,7 +271,9 @@ export default function ProjectSummaryPage() {
           giderTotal > 0 ? <span className="text-[10.5px]" style={{ color: "rgb(var(--panel-ink3))" }}>toplam</span> : undefined
         }>
           {giderTotal > 0 ? (
-            <SegmentedDonut size={132} centerLabel="TOPLAM" formatValue={(v) => fmt(v, project.currency)} segments={giderSegments} />
+            <div className="h-full flex items-center">
+              <SegmentedDonut size={132} centerLabel="TOPLAM" formatValue={(v) => fmt(v, project.currency)} segments={giderSegments} />
+            </div>
           ) : (
             <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>Henüz gider kaydı yok.</p>
           )}
