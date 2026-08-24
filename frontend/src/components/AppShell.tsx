@@ -325,7 +325,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         <main className="flex-1 app-canvas">
-          <div className="max-w-6xl w-full mx-auto px-6 py-8">{children}</div>
+          {/* Panel ("/") artık geniş, kesintisiz bir levha (bkz. Dashboard.tsx) —
+              diğer tüm sayfalardaki max-w-6xl okunabilirlik sınırı burada
+              gereksiz yere boşluk bırakıyordu, bu yüzden Panel'de kaldırıldı. */}
+          <div className={(pathname === "/" ? "max-w-[1600px]" : "max-w-6xl") + " w-full mx-auto px-6 py-8"}>
+            {children}
+          </div>
         </main>
       </div>
     </div>
