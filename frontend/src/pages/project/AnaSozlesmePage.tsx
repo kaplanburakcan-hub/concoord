@@ -25,6 +25,7 @@ type BirimFiyatKalem = {
 
 type ContractForm = {
   isveren_adi: string;
+  yuklenici_adi: string;
   yuklenici_proje_sorumlusu: string;
   sozlesme_turu: SozlesmeTuru;
   fiyat_farki_var: boolean;
@@ -123,6 +124,7 @@ export default function AnaSozlesmePage() {
 
   const empty = (): ContractForm => ({
     isveren_adi: "",
+    yuklenici_adi: "",
     yuklenici_proje_sorumlusu: "",
     sozlesme_turu: "goturu_bedel",
     fiyat_farki_var: false,
@@ -154,6 +156,7 @@ export default function AnaSozlesmePage() {
       setMode(c.is_locked ? "view" : "edit");
       setForm({
         isveren_adi: c.isveren_adi ?? "",
+        yuklenici_adi: c.yuklenici_adi ?? "",
         yuklenici_proje_sorumlusu: c.yuklenici_proje_sorumlusu ?? "",
         sozlesme_turu: c.sozlesme_turu ?? "goturu_bedel",
         fiyat_farki_var: c.fiyat_farki_var ?? false,
@@ -227,6 +230,8 @@ export default function AnaSozlesmePage() {
     const errs: Record<string, string> = {};
     if (!form.isveren_adi.trim())
       errs.isveren_adi = "İşveren bilgisi zorunludur";
+    if (!form.yuklenici_adi.trim())
+      errs.yuklenici_adi = "Yüklenici bilgisi zorunludur";
     if (!form.yuklenici_proje_sorumlusu.trim())
       errs.yuklenici_proje_sorumlusu = "Yüklenici Proje Sorumlusu zorunludur";
     if (form.sozlesme_tarihi && !displayToISO(form.sozlesme_tarihi))
@@ -253,6 +258,7 @@ export default function AnaSozlesmePage() {
 
     const body: any = {
       isveren_adi: form.isveren_adi.trim(),
+      yuklenici_adi: form.yuklenici_adi.trim(),
       yuklenici_proje_sorumlusu: form.yuklenici_proje_sorumlusu.trim(),
       sozlesme_turu: form.sozlesme_turu,
       fiyat_farki_var: form.fiyat_farki_var,
@@ -376,6 +382,16 @@ export default function AnaSozlesmePage() {
               disabled={!canEdit}
               onChange={e => set("isveren_adi", e.target.value)}
               placeholder="Örn: T.C. Sağlık Bakanlığı"
+              className={inp}
+            />
+          </Field>
+          <Field label="Yüklenici *" error={fieldErr.yuklenici_adi}>
+            <input
+              type="text"
+              value={form.yuklenici_adi}
+              disabled={!canEdit}
+              onChange={e => set("yuklenici_adi", e.target.value)}
+              placeholder="Örn: ABC İnşaat Taahhüt A.Ş."
               className={inp}
             />
           </Field>
@@ -807,6 +823,7 @@ function ContractSummary({ form, meta }: {
       <Section title="Taraflar">
         <div className="flex flex-col gap-3 text-sm">
           <SummaryRow label="İşveren" value={form.isveren_adi || "—"} />
+          <SummaryRow label="Yüklenici" value={form.yuklenici_adi || "—"} />
           <SummaryRow label="Yüklenici Proje Sorumlusu" value={form.yuklenici_proje_sorumlusu || "—"} />
         </div>
       </Section>

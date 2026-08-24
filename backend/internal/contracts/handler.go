@@ -34,6 +34,7 @@ type Contract struct {
 	ID                      string            `json:"id,omitempty"`
 	ProjectID               string            `json:"project_id"`
 	IsverenAdi              string            `json:"isveren_adi"`
+	YukleniciAdi            string            `json:"yuklenici_adi"`
 	YukleniciProjeSorumlusu string            `json:"yuklenici_proje_sorumlusu"`
 	SozlesmeTuru            string            `json:"sozlesme_turu"`
 	FiyatFarkiVar           bool              `json:"fiyat_farki_var"`
@@ -66,7 +67,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	var kalemleriJSON []byte
 	err := h.db.QueryRow(r.Context(), `
 		SELECT c.id, c.project_id,
-		       COALESCE(c.isveren_adi,''), COALESCE(c.yuklenici_proje_sorumlusu,''),
+		       COALESCE(c.isveren_adi,''), COALESCE(c.yuklenici_adi,''), COALESCE(c.yuklenici_proje_sorumlusu,''),
 		       c.sozlesme_turu, c.fiyat_farki_var, COALESCE(c.fiyat_farki_formulu,''),
 		       c.sozlesme_bedeli, COALESCE(c.sozlesme_para_birimi,'TRY'),
 		       c.birim_fiyat_kalemleri,
@@ -82,7 +83,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN users u ON u.id = c.updated_by
 		WHERE c.project_id=$1`, pid).
 		Scan(&c.ID, &c.ProjectID,
-			&c.IsverenAdi, &c.YukleniciProjeSorumlusu,
+			&c.IsverenAdi, &c.YukleniciAdi, &c.YukleniciProjeSorumlusu,
 			&c.SozlesmeTuru, &c.FiyatFarkiVar, &c.FiyatFarkiFormulu,
 			&c.SozlesmeBedeli, &c.SozlesmeParaBirimi,
 			&kalemleriJSON,
@@ -140,6 +141,9 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 	if body.IsverenAdi == "" {
 		valid["isveren_adi"] = "İşveren bilgisi zorunludur."
 	}
+	if body.YukleniciAdi == "" {
+		valid["yuklenici_adi"] = "Yüklenici bilgisi zorunludur."
+	}
 	if body.YukleniciProjeSorumlusu == "" {
 		valid["yuklenici_proje_sorumlusu"] = "Yüklenici Proje Sorumlusu zorunludur."
 	}
@@ -157,7 +161,7 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 	var id string
 	err = h.db.QueryRow(r.Context(), `
 		INSERT INTO project_main_contracts (
-		    project_id, isveren_adi, yuklenici_proje_sorumlusu,
+		    project_id, isveren_adi, yuklenici_adi, yuklenici_proje_sorumlusu,
 		    sozlesme_turu, fiyat_farki_var, fiyat_farki_formulu,
 		    sozlesme_bedeli, sozlesme_para_birimi, birim_fiyat_kalemleri,
 		    sozlesme_tarihi, yer_teslim_tarihi,
@@ -166,13 +170,14 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		    sgk_is_yeri_no, pdf_dosya_url, pdf_dosya_adi,
 		    created_by, updated_by, is_locked, updated_at
 		) VALUES (
-		    $1,$2,$3,$4,$5,$6,$7,$8,$9,
-		    $10::date,$11::date,
-		    $12,$13,$14,$15,$16,$17,$18,
-		    $19,$19,TRUE,NOW()
+		    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+		    $11::date,$12::date,
+		    $13,$14,$15,$16,$17,$18,$19,
+		    $20,$20,TRUE,NOW()
 		)
 		ON CONFLICT (project_id) DO UPDATE SET
 		    isveren_adi              = EXCLUDED.isveren_adi,
+		    yuklenici_adi            = EXCLUDED.yuklenici_adi,
 		    yuklenici_proje_sorumlusu = EXCLUDED.yuklenici_proje_sorumlusu,
 		    sozlesme_turu            = EXCLUDED.sozlesme_turu,
 		    fiyat_farki_var          = EXCLUDED.fiyat_farki_var,
@@ -193,7 +198,7 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		    is_locked                = TRUE,
 		    updated_at               = NOW()
 		RETURNING id`,
-		pid, body.IsverenAdi, body.YukleniciProjeSorumlusu,
+		pid, body.IsverenAdi, body.YukleniciAdi, body.YukleniciProjeSorumlusu,
 		body.SozlesmeTuru, body.FiyatFarkiVar, nilStr(body.FiyatFarkiFormulu),
 		body.SozlesmeBedeli, coalesce(body.SozlesmeParaBirimi, "TRY"), kalemleriJSON,
 		nilStr(derefStr(body.SozlesmeTarihi)), nilStr(derefStr(body.YerTeslimTarihi)),
