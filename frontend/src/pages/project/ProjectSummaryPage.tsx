@@ -1,6 +1,17 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
+import type { ColorStop } from "../dashboard/RadialRing";
+import SegmentedDonut, { type DonutSegment } from "../dashboard/SegmentedDonut";
+import {
+  PanelRow, PanelCell, PanelKpi, PanelKpiRing,
+  IconTrend, IconCheck, IconFlag,
+} from "../dashboard/PanelKit";
+
+// Proje Özet — Panel Dashboard'la (bkz. ../Dashboard.tsx) aynı görsel dil:
+// kesintisiz koyu levha, hairline ayraçlar, gradyanlı/segmentli halkalar.
+// --panel-* token'ları temadan bağımsız (index.css'te bare :root'ta tanımlı),
+// bu yüzden bu sayfa da Panel gibi her zaman koyu render olur.
 
 // ── Tipler ────────────────────────────────────────────────────────────────────
 interface Project {
@@ -34,19 +45,18 @@ const STATUS_LABEL: Record<string, string> = {
   Planning: "Planlama", Active: "Aktif", OnHold: "Beklemede",
   Closed: "Tamamlandı", Archived: "Arşiv",
 };
-const STATUS_CLS: Record<string, string> = {
-  Planning: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  Active: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
-  OnHold: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
-  Closed: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
-  Archived: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
+const MS_META: Record<string, { label: string; dot: string }> = {
+  Planned:    { label: "Bekliyor",     dot: "rgb(var(--panel-hairline))" },
+  InProgress: { label: "Devam Ediyor", dot: "#60a5fa" },
+  Completed:  { label: "Tamamlandı",   dot: "var(--group-accent)" },
+  Delayed:    { label: "Gecikmiş",     dot: "#f87171" },
 };
-const MS_STATUS: Record<string, { label: string; dot: string }> = {
-  Planned:    { label: "Bekliyor",     dot: "bg-gray-400" },
-  InProgress: { label: "Devam Ediyor", dot: "bg-blue-500" },
-  Completed:  { label: "Tamamlandı",   dot: "bg-green-500" },
-  Delayed:    { label: "Gecikmiş",     dot: "bg-red-500" },
-};
+
+const ZAMAN_STOPS: ColorStop[] = [{ t: 0, hex: "#22d3ee" }, { t: 0.5, hex: "#2f6fed" }, { t: 1, hex: "#6d5ef8" }];
+const SATINALMA_STOPS: ColorStop[] = [{ t: 0, hex: "#60a5fa" }, { t: 1, hex: "#2f6fed" }];
+const KASA_STOPS: ColorStop[] = [{ t: 0, hex: "#fbbf24" }, { t: 1, hex: "#f59e0b" }];
+const TASERON_STOPS: ColorStop[] = [{ t: 0, hex: "#34d399" }, { t: 1, hex: "#10b981" }];
+const SABIT_STOPS: ColorStop[] = [{ t: 0, hex: "#a78bfa" }, { t: 1, hex: "#8b5cf6" }];
 
 function fmt(n?: number, cur = "TRY") {
   if (n == null) return "—";
@@ -55,6 +65,12 @@ function fmt(n?: number, cur = "TRY") {
 function fmtDate(s?: string) {
   if (!s) return "—";
   return new Date(s).toLocaleDateString("tr-TR", { day: "2-digit", month: "short", year: "numeric" });
+}
+function fmtShort(s?: string | null) {
+  if (!s) return "—";
+  const [y, m, d] = s.slice(0, 10).split("-");
+  if (!y || !m || !d) return "—";
+  return `${d}.${m}.${y}`;
 }
 function diffDays(a: string, b: string) {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
@@ -65,35 +81,6 @@ function progressPct(start?: string, end?: string): number {
   if (total <= 0) return 100;
   const elapsed = diffDays(start, new Date().toISOString().slice(0, 10));
   return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
-}
-
-function KPICard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
-  return (
-    <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 flex flex-col gap-1">
-      <span className="text-xs font-medium text-beton-400 uppercase tracking-wide">{label}</span>
-      <span className={`text-2xl font-bold ${accent ?? "text-beton-100"}`}>{value}</span>
-      {sub && <span className="text-xs text-beton-400">{sub}</span>}
-    </div>
-  );
-}
-
-function MilestoneRow({ ms }: { ms: Milestone }) {
-  const meta = MS_STATUS[ms.status] ?? MS_STATUS["Planned"];
-  return (
-    <div className="flex items-center gap-3 py-2 border-b border-beton-800 last:border-0">
-      <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${meta.dot}`} />
-      <span className="flex-1 text-sm text-beton-100 truncate">{ms.name}</span>
-      <span className="text-xs text-beton-400 w-28 text-right shrink-0">
-        {ms.planned_date ? fmtDate(ms.planned_date) : "—"}
-      </span>
-      <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
-        ms.status === "Completed"  ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" :
-        ms.status === "Delayed"    ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" :
-        ms.status === "InProgress" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" :
-        "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
-      }`}>{meta.label}</span>
-    </div>
-  );
 }
 
 export default function ProjectSummaryPage() {
@@ -148,253 +135,256 @@ export default function ProjectSummaryPage() {
     new Date(t.due_date) < new Date()
   ).length;
   const msDelayed = milestones.filter(m => m.status === "Delayed").length;
+  const openTasks = (taskByStatus["Todo"] ?? 0) + (taskByStatus["InProgress"] ?? 0);
 
   const spiNum = timePct > 0 ? msPct / timePct : null;
-  const spi    = spiNum != null ? spiNum.toFixed(2) : "—";
 
   const daysRemain = project.end_date
     ? diffDays(new Date().toISOString().slice(0, 10), project.end_date.slice(0, 10))
     : null;
 
+  const giderSegments: DonutSegment[] = giderler ? [
+    { label: "Satınalmalar", value: giderler.satinalma, colorStops: SATINALMA_STOPS, swatch: "#60a5fa" },
+    { label: "Kasa Harcamaları", value: giderler.kasa_harcamalari, colorStops: KASA_STOPS, swatch: "#f59e0b" },
+    { label: "Taşeron Hakedişler", value: giderler.tasaron_hakedis, colorStops: TASERON_STOPS, swatch: "#10b981" },
+    { label: "Sabit Giderler", value: giderler.sabit_giderler, colorStops: SABIT_STOPS, swatch: "#8b5cf6" },
+  ] : [];
+  const giderTotal = giderler ? giderler.satinalma + giderler.kasa_harcamalari + giderler.tasaron_hakedis + giderler.sabit_giderler : 0;
+
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      {/* Başlık */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div
+      className="rounded-xl overflow-hidden border"
+      style={{ background: "rgb(var(--panel-bg))", borderColor: "rgb(var(--panel-hairline))" }}
+    >
+      {/* ── Head ── */}
+      <div
+        className="flex items-start justify-between gap-4 flex-wrap px-5 py-4 border-b"
+        style={{ borderColor: "rgb(var(--panel-hairline))" }}
+      >
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-mono bg-[var(--bg-hover)] text-beton-400 px-2 py-0.5 rounded">
-              {project.code}
-            </span>
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_CLS[project.status] ?? ""}`}>
+          <p className="text-[10px] font-bold uppercase tracking-[.1em]" style={{ color: "var(--group-accent)" }}>
+            Proje özeti
+          </p>
+          <h1 className="font-display text-xl font-extrabold mt-1.5 flex items-center gap-2 flex-wrap" style={{ color: "rgb(var(--panel-ink))" }}>
+            {project.code} — {project.name}
+            <span
+              className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: "rgba(74,222,128,.14)", color: "#4ade80", border: "1px solid rgba(74,222,128,.3)" }}
+            >
               {STATUS_LABEL[project.status] ?? project.status}
             </span>
-          </div>
-          <h1 className="text-xl font-bold text-beton-100">{project.name}</h1>
-          {project.client_name && (
-            <p className="text-sm text-beton-400 mt-0.5">{project.client_name}</p>
-          )}
-          {project.location && (
-            <p className="text-xs text-beton-400">📍 {project.location}</p>
-          )}
+          </h1>
+          <p className="mt-1 text-xs" style={{ color: "rgb(var(--panel-ink2))" }}>
+            {project.client_name}
+            {project.location && <> · 📍 {project.location}</>}
+          </p>
         </div>
-        <div className="text-right text-sm text-beton-400">
-          <div>{fmtDate(project.start_date?.slice(0, 10))} – {fmtDate(project.end_date?.slice(0, 10))}</div>
+        <div className="text-right text-xs" style={{ color: "rgb(var(--panel-ink2))" }}>
+          <div>
+            <b style={{ color: "rgb(var(--panel-ink))" }}>{fmtDate(project.start_date?.slice(0, 10))}</b>
+            {" – "}
+            <b style={{ color: "rgb(var(--panel-ink))" }}>{fmtDate(project.end_date?.slice(0, 10))}</b>
+          </div>
           {daysRemain != null && (
-            <div className={`font-medium mt-0.5 ${
-              daysRemain < 0 ? "text-red-500" :
-              daysRemain < 30 ? "text-yellow-600" :
-              "text-beton-100"
-            }`}>
+            <div className="mt-1 font-medium" style={{ color: daysRemain < 0 ? "#f87171" : "rgb(var(--panel-ink2))" }}>
               {daysRemain < 0 ? `${Math.abs(daysRemain)} gün geçti` : `${daysRemain} gün kaldı`}
             </div>
           )}
         </div>
       </div>
 
-      {/* Zaman İlerlemesi */}
-      <div className="rounded-xl border border-beton-800 bg-beton-900 p-4 space-y-2">
-        <div className="flex justify-between text-xs text-beton-400">
-          <span>Proje Zaman İlerlemesi</span>
-          <span className="font-medium">{timePct}%</span>
-        </div>
-        <div className="h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${timePct}%` }} />
-        </div>
-        <div className="flex justify-between text-[10px] text-beton-400">
-          <span>{fmtDate(project.start_date?.slice(0, 10))}</span>
-          <span>{fmtDate(project.end_date?.slice(0, 10))}</span>
-        </div>
-      </div>
-
-      {/* KPI Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KPICard
-          label="SPI (Tahmini)"
-          value={spi}
-          sub="Takvim Performans İndeksi"
-          accent={
-            spiNum == null ? undefined :
-            spiNum >= 0.95 ? "text-green-600" :
-            spiNum >= 0.80 ? "text-yellow-600" :
-            "text-red-600"
-          }
+      {/* ── KPI şeridi ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" style={{ borderBottom: "1px solid rgb(var(--panel-hairline))" }}>
+        <PanelKpiRing
+          label="Zaman İlerlemesi"
+          pct={timePct}
+          colorStops={ZAMAN_STOPS}
+          hint={`${fmtDate(project.start_date?.slice(0, 10))} → ${fmtDate(project.end_date?.slice(0, 10))}`}
         />
-        <KPICard
+        <PanelKpi
+          label="SPI (Tahmini)"
+          value={spiNum != null ? spiNum.toFixed(2) : "—"}
+          hint={spiNum == null ? undefined : spiNum >= 0.95 ? "Plana uygun" : spiNum >= 0.8 ? "Hafif gecikme" : "Ciddi gecikme"}
+          bad={spiNum != null && spiNum < 0.8}
+          good={spiNum != null && spiNum >= 0.95}
+          icon={<IconTrend />}
+        />
+        <PanelKpi
           label="Toplam Bütçe"
           value={fmt(project.budget_total, project.currency)}
-          sub={project.currency}
+          hint={project.currency}
+          icon={<IconReceiptMini />}
         />
-        <KPICard
+        <PanelKpi
           label="Kilometre Taşı"
-          value={`${msCompleted}/${msTotal}`}
-          sub={`${msPct}% tamamlandı`}
-          accent={msDelayed > 0 ? "text-red-600" : "text-beton-100"}
+          value={`${msCompleted} / ${msTotal}`}
+          hint={`%${msPct} tamamlandı`}
+          bad={msDelayed > 0}
+          icon={<IconFlag />}
         />
-        <KPICard
+        <PanelKpi
           label="Açık Görevler"
-          value={String((taskByStatus["Todo"] ?? 0) + (taskByStatus["InProgress"] ?? 0))}
-          sub={taskOverdue > 0 ? `${taskOverdue} gecikmiş` : "Gecikme yok"}
-          accent={taskOverdue > 0 ? "text-red-600" : "text-beton-100"}
+          value={String(openTasks)}
+          hint={taskOverdue > 0 ? `${taskOverdue} gecikmiş` : "Gecikme yok"}
+          bad={taskOverdue > 0}
+          good={taskOverdue === 0}
+          icon={<IconCheck />}
         />
       </div>
 
-      {/* Giderler kırılımı */}
-      {giderler && (() => {
-        const rows: { label: string; value: number; cls: string }[] = [
-          { label: "Satınalmalar", value: giderler.satinalma, cls: "bg-blue-500" },
-          { label: "Kasa Harcamaları", value: giderler.kasa_harcamalari, cls: "bg-amber-500" },
-          { label: "Taşeron Hakedişler", value: giderler.tasaron_hakedis, cls: "bg-emerald-500" },
-          { label: "Sabit Giderler", value: giderler.sabit_giderler, cls: "bg-violet-500" },
-        ];
-        const total = rows.reduce((s, r) => s + r.value, 0);
-        return (
-          <div className="rounded-xl border border-beton-800 bg-beton-900 p-4">
-            <h2 className="text-sm font-semibold text-beton-100 mb-3 flex items-center justify-between">
-              Giderler
-              <span className="text-xs font-normal text-beton-400">{fmt(total, project.currency)}</span>
-            </h2>
-            {total === 0 ? (
-              <p className="text-sm text-beton-400">Henüz gider kaydı yok.</p>
-            ) : (
-              <div className="space-y-2">
-                {rows.filter(r => r.value > 0).map(r => {
-                  const pct = total > 0 ? Math.round((r.value / total) * 100) : 0;
-                  return (
-                    <div key={r.label} className="flex items-center gap-2">
-                      <span className="text-xs text-beton-400 w-36 shrink-0">{r.label}</span>
-                      <div className="flex-1 h-1.5 bg-[var(--bg-hover)] rounded-full">
-                        <div className={`h-full rounded-full ${r.cls}`} style={{ width: `${pct}%` }} />
-                      </div>
-                      <span className="text-xs font-medium text-beton-100 w-28 text-right tabular-nums">
-                        {fmt(r.value, project.currency)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* Kalan İşler — Anlaşılacak İmalatlar */}
-      {kalanIsler.length > 0 && (
-        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4">
-          <h2 className="text-sm font-semibold text-beton-100 mb-3 flex items-center justify-between">
-            Kalan İşler — Anlaşılacak İmalatlar
-            <span className="text-xs font-normal text-beton-400">{kalanIsler.length} kalem</span>
-          </h2>
-          <p className="text-xs text-beton-400 mb-3">
-            Proje keşfinde tanımlı ama henüz hiçbir taşeron sözleşmesiyle (poz no eşleşmesi) ilişkilendirilmemiş imalat kalemleri.
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-beton-500 text-xs border-b border-beton-800/40">
-                  <th className="py-1.5 pr-3 text-left font-medium w-20">Poz No</th>
-                  <th className="py-1.5 pr-3 text-left font-medium">Tanım</th>
-                  <th className="py-1.5 pr-3 text-left font-medium w-28">Kategori</th>
-                  <th className="py-1.5 pr-3 text-right font-medium w-24">Miktar</th>
-                </tr>
-              </thead>
-              <tbody>
-                {kalanIsler.slice(0, 12).map(it => (
-                  <tr key={it.id} className="border-b border-beton-800/20">
-                    <td className="py-1.5 pr-3 text-beton-500 text-xs font-mono">{it.poz_no || "—"}</td>
-                    <td className="py-1.5 pr-3 text-beton-100">{it.tanim}</td>
-                    <td className="py-1.5 pr-3 text-beton-400 text-xs">{it.kategori}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums text-beton-400">
-                      {it.miktar.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} {it.birim}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {kalanIsler.length > 12 && (
-              <p className="text-xs text-beton-500 mt-2">
-                + {kalanIsler.length - 12} kalem daha — tümü için Sözleşme Takip sayfasına bakın.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Kilometre Taşları */}
-        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4">
-          <h2 className="text-sm font-semibold text-beton-100 mb-3 flex items-center justify-between">
-            Kilometre Taşları
-            <span className="text-xs font-normal text-beton-400">{msCompleted}/{msTotal} tamamlandı</span>
-          </h2>
-          {milestones.length === 0 ? (
-            <p className="text-sm text-beton-400">Henüz kilometre taşı tanımlanmamış.</p>
+      {/* ── Row: Giderler + Kalan İşler ── */}
+      <PanelRow cols="1fr 1.3fr">
+        <PanelCell title="Giderler">
+          {giderTotal > 0 ? (
+            <>
+              <SegmentedDonut size={92} centerLabel="TOPLAM" formatValue={(v) => fmt(v, project.currency)} segments={giderSegments} />
+            </>
           ) : (
-            <div>
-              {milestones.slice(0, 8).map(ms => <MilestoneRow key={ms.id} ms={ms} />)}
-            </div>
+            <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>Henüz gider kaydı yok.</p>
           )}
-        </div>
-
-        <div className="space-y-4">
-          {/* Görev Dağılımı */}
-          <div className="rounded-xl border border-beton-800 bg-beton-900 p-4">
-            <h2 className="text-sm font-semibold text-beton-100 mb-3">Görev Dağılımı</h2>
-            {tasks.length === 0 ? (
-              <p className="text-sm text-beton-400">Görev bulunamadı.</p>
-            ) : (
-              <div className="space-y-2">
-                {[
-                  { key: "Todo",       label: "Yapılacak",  cls: "bg-gray-400" },
-                  { key: "InProgress", label: "Devam Eden", cls: "bg-blue-500" },
-                  { key: "Review",     label: "İncelemede", cls: "bg-yellow-500" },
-                  { key: "Done",       label: "Tamamlandı", cls: "bg-green-500" },
-                ].map(({ key, label, cls }) => {
-                  const count = taskByStatus[key] ?? 0;
-                  const pct   = Math.round((count / tasks.length) * 100);
-                  return (
-                    <div key={key} className="flex items-center gap-2">
-                      <span className="text-xs text-beton-400 w-24 shrink-0">{label}</span>
-                      <div className="flex-1 h-1.5 bg-[var(--bg-hover)] rounded-full">
-                        <div className={`h-full rounded-full ${cls}`} style={{ width: `${pct}%` }} />
-                      </div>
-                      <span className="text-xs font-medium text-beton-100 w-6 text-right">{count}</span>
-                    </div>
-                  );
-                })}
-                {taskOverdue > 0 && (
-                  <div className="mt-2 text-xs text-red-500 font-medium">
-                    ⚠ {taskOverdue} görev vadesi geçmiş
-                  </div>
+        </PanelCell>
+        <PanelCell title="Kalan İşler — Anlaşılacak İmalatlar" action={
+          kalanIsler.length > 0
+            ? <span className="text-[11px]" style={{ color: "rgb(var(--panel-ink3))" }}>{kalanIsler.length} kalem</span>
+            : undefined
+        }>
+          {kalanIsler.length === 0 ? (
+            <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>Tüm imalat kalemleri bir taşeron sözleşmesiyle ilişkilendirilmiş.</p>
+          ) : (
+            <>
+              <p className="text-[11px] mb-2" style={{ color: "rgb(var(--panel-ink3))" }}>
+                Proje keşfinde tanımlı, henüz taşeron sözleşmesiyle (poz no) eşleşmemiş kalemler.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[12px]">
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgb(var(--panel-hairline))" }}>
+                      <th className="py-1.5 pr-3 text-left font-semibold" style={{ color: "rgb(var(--panel-ink3))" }}>Poz No</th>
+                      <th className="py-1.5 pr-3 text-left font-semibold" style={{ color: "rgb(var(--panel-ink3))" }}>Tanım</th>
+                      <th className="py-1.5 pr-3 text-left font-semibold" style={{ color: "rgb(var(--panel-ink3))" }}>Kategori</th>
+                      <th className="py-1.5 pr-3 text-right font-semibold" style={{ color: "rgb(var(--panel-ink3))" }}>Miktar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {kalanIsler.slice(0, 6).map(it => (
+                      <tr key={it.id} style={{ borderBottom: "1px solid rgb(var(--panel-hairline) / .5)" }}>
+                        <td className="py-1.5 pr-3 font-mono text-[11px]" style={{ color: "rgb(var(--panel-ink3))" }}>{it.poz_no || "—"}</td>
+                        <td className="py-1.5 pr-3" style={{ color: "rgb(var(--panel-ink))" }}>{it.tanim}</td>
+                        <td className="py-1.5 pr-3 text-[11px]" style={{ color: "rgb(var(--panel-ink2))" }}>{it.kategori}</td>
+                        <td className="py-1.5 pr-3 text-right tabular-nums" style={{ color: "rgb(var(--panel-ink2))" }}>
+                          {it.miktar.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} {it.birim}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {kalanIsler.length > 6 && (
+                  <p className="text-[10.5px] mt-2" style={{ color: "rgb(var(--panel-ink3))" }}>
+                    + {kalanIsler.length - 6} kalem daha — tümü için Sözleşme Takip sayfasına bakın.
+                  </p>
                 )}
               </div>
-            )}
-          </div>
+            </>
+          )}
+        </PanelCell>
+      </PanelRow>
 
-          {/* Son Saha Raporları */}
-          <div className="rounded-xl border border-beton-800 bg-beton-900 p-4">
-            <h2 className="text-sm font-semibold text-beton-100 mb-3">Son Saha Raporları</h2>
-            {reports.length === 0 ? (
-              <p className="text-sm text-beton-400">Rapor bulunamadı.</p>
-            ) : (
-              <div className="space-y-2">
-                {reports.map(rp => (
-                  <div key={rp.id} className="flex items-center justify-between text-sm">
-                    <span className="text-beton-100">{fmtDate(rp.report_date)}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      rp.status === "submitted" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" :
-                      rp.status === "draft"     ? "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400" :
-                      "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
-                    }`}>
-                      {rp.status === "submitted" ? "Onaylandı" :
-                       rp.status === "draft"     ? "Taslak" : rp.status}
+      {/* ── Row: Kilometre Taşları + Görev Dağılımı ── */}
+      <PanelRow cols="1fr 1fr">
+        <PanelCell title="Kilometre Taşları" action={
+          <span className="text-[11px]" style={{ color: "rgb(var(--panel-ink3))" }}>{msCompleted}/{msTotal} tamamlandı</span>
+        }>
+          {milestones.length === 0 ? (
+            <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>Henüz kilometre taşı tanımlanmamış.</p>
+          ) : (
+            <ul className="flex flex-col">
+              {milestones.slice(0, 8).map((ms, i) => {
+                const meta = MS_META[ms.status] ?? MS_META.Planned;
+                return (
+                  <li
+                    key={ms.id}
+                    className="flex items-center gap-3 text-[12.5px] py-2"
+                    style={i < Math.min(milestones.length, 8) - 1 ? { borderBottom: "1px solid rgb(var(--panel-hairline))" } : undefined}
+                  >
+                    <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ background: meta.dot }} />
+                    <span className="flex-1 truncate" style={{ color: "rgb(var(--panel-ink))" }}>{ms.name}</span>
+                    <span
+                      className="font-mono text-[10.5px] shrink-0"
+                      style={{ color: ms.status === "Delayed" ? "#f87171" : "rgb(var(--panel-ink3))" }}
+                    >
+                      {ms.status === "Delayed" ? "GECİKMİŞ" : fmtShort(ms.actual_date ?? ms.planned_date)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </PanelCell>
+        <PanelCell title="Görev Dağılımı">
+          {tasks.length === 0 ? (
+            <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>Görev bulunamadı.</p>
+          ) : (
+            <>
+              {[
+                { key: "Todo",       label: "Yapılacak",  color: "#8b93a3" },
+                { key: "InProgress", label: "Devam Eden", color: "#2f6fed" },
+                { key: "Review",     label: "İncelemede", color: "var(--group-accent)" },
+                { key: "Done",       label: "Tamamlandı", color: "#22c55e" },
+              ].map(({ key, label, color }) => {
+                const count = taskByStatus[key] ?? 0;
+                const pct   = Math.round((count / tasks.length) * 100);
+                return (
+                  <div key={key} className="flex items-center gap-2 mb-2 last:mb-0">
+                    <span className="text-[11px] w-20 shrink-0" style={{ color: "rgb(var(--panel-ink3))" }}>{label}</span>
+                    <div className="flex-1 h-1.5 rounded-full" style={{ background: "rgb(var(--panel-hairline))" }}>
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+                    </div>
+                    <span className="text-[11.5px] font-bold w-5 text-right tabular-nums" style={{ color: "rgb(var(--panel-ink))" }}>{count}</span>
+                  </div>
+                );
+              })}
+              {taskOverdue > 0 && (
+                <div className="mt-2 text-[11px] font-medium" style={{ color: "#f87171" }}>
+                  ⚠ {taskOverdue} görev vadesi geçmiş
+                </div>
+              )}
+            </>
+          )}
+        </PanelCell>
+      </PanelRow>
+
+      {/* ── Row: Son Saha Raporları ── */}
+      <PanelRow cols="1fr">
+        <PanelCell title="Son Saha Raporları">
+          {reports.length === 0 ? (
+            <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>Rapor bulunamadı.</p>
+          ) : (
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              {reports.map(rp => {
+                const tone = rp.status === "submitted" ? { bg: "rgba(74,222,128,.14)", fg: "#4ade80" }
+                  : rp.status === "draft" ? { bg: "rgb(var(--panel-hairline) / .6)", fg: "rgb(var(--panel-ink2))" }
+                  : { bg: "rgba(96,165,250,.15)", fg: "#60a5fa" };
+                return (
+                  <div key={rp.id} className="flex items-center gap-2 text-[12.5px]">
+                    <span style={{ color: "rgb(var(--panel-ink))" }}>{fmtDate(rp.report_date)}</span>
+                    <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full" style={{ background: tone.bg, color: tone.fg }}>
+                      {rp.status === "submitted" ? "Onaylandı" : rp.status === "draft" ? "Taslak" : rp.status}
                     </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+                );
+              })}
+            </div>
+          )}
+        </PanelCell>
+      </PanelRow>
     </div>
+  );
+}
+
+function IconReceiptMini() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="100%" height="100%">
+      <rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
+    </svg>
   );
 }
