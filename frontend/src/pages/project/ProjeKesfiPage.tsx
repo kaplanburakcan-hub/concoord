@@ -14,6 +14,22 @@ const KATEGORILER = [
   "Diğer",
 ];
 
+// Disiplin/kategori bazlı ayırt edici renkler — her kategori kendi dolgu
+// tonunu taşır, başlık gövdeden biraz daha koyu (daha yüksek opak) olur.
+const KATEGORI_RENK: Record<string, { wrap: string; header: string; accent: string }> = {
+  "Mimari":    { wrap: "border-blue-500/20 bg-blue-500/[0.06]",    header: "bg-blue-500/[0.14] border-blue-500/25",    accent: "bg-blue-500" },
+  "Betonarme": { wrap: "border-orange-500/20 bg-orange-500/[0.06]", header: "bg-orange-500/[0.14] border-orange-500/25", accent: "bg-orange-500" },
+  "Cephe":     { wrap: "border-cyan-500/20 bg-cyan-500/[0.06]",    header: "bg-cyan-500/[0.14] border-cyan-500/25",    accent: "bg-cyan-500" },
+  "Çatı":      { wrap: "border-rose-500/20 bg-rose-500/[0.06]",    header: "bg-rose-500/[0.14] border-rose-500/25",    accent: "bg-rose-500" },
+  "Mekanik":   { wrap: "border-emerald-500/20 bg-emerald-500/[0.06]", header: "bg-emerald-500/[0.14] border-emerald-500/25", accent: "bg-emerald-500" },
+  "Elektrik":  { wrap: "border-yellow-500/20 bg-yellow-500/[0.06]", header: "bg-yellow-500/[0.14] border-yellow-500/25", accent: "bg-yellow-500" },
+  "Peyzaj":    { wrap: "border-green-500/20 bg-green-500/[0.06]",  header: "bg-green-500/[0.14] border-green-500/25",  accent: "bg-green-500" },
+  "Diğer":     { wrap: "border-violet-500/20 bg-violet-500/[0.06]", header: "bg-violet-500/[0.14] border-violet-500/25", accent: "bg-violet-500" },
+};
+function katRenk(kat: string) {
+  return KATEGORI_RENK[kat] ?? { wrap: "border-beton-800 bg-beton-900", header: "bg-beton-900 border-beton-800", accent: "bg-emniyet-500" };
+}
+
 const inpBase =
   "rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-200 " +
   "outline-none focus:border-emniyet-500 disabled:opacity-50";
@@ -238,15 +254,15 @@ export default function ProjeKesfiPage() {
         const katItems = grouped.get(kat) ?? [];
         const total = katTotal.get(kat) ?? 0;
         const isOpen = openKats.has(kat);
+        const renk = katRenk(kat);
 
         return (
-          <div key={kat} className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <div key={kat} className={`rounded-lg border overflow-hidden ${renk.wrap}`}>
             {/* Kategori başlığı */}
             <button
               onClick={() => toggleKat(kat)}
-              className="w-full flex items-center justify-between px-5 py-3
-                         border-b border-beton-800 bg-beton-900
-                         hover:bg-beton-800/60 transition-colors"
+              className={`w-full flex items-center justify-between px-5 py-3
+                         border-b transition-colors hover:brightness-110 ${renk.header}`}
             >
               <div className="flex items-center gap-3">
                 <span className="text-beton-400 text-xs transition-transform"
@@ -344,6 +360,7 @@ export default function ProjeKesfiPage() {
                 const total = katTotal.get(kat) ?? 0;
                 const pct = grandTotal > 0 ? (total / grandTotal * 100) : 0;
                 if (total === 0) return null;
+                const renk = katRenk(kat);
                 return (
                   <tr key={kat} className="border-b border-beton-800/20">
                     <td className="px-5 py-2 text-beton-100">{kat}</td>
@@ -351,7 +368,7 @@ export default function ProjeKesfiPage() {
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-beton-800 rounded-full h-1.5 overflow-hidden">
                           <div
-                            className="h-full bg-emniyet-500 rounded-full transition-all"
+                            className={`h-full rounded-full transition-all ${renk.accent}`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>

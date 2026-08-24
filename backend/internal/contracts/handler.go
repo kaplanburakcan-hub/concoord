@@ -31,26 +31,28 @@ type BirimFiyatKalem struct {
 }
 
 type Contract struct {
-	ID                    string            `json:"id,omitempty"`
-	ProjectID             string            `json:"project_id"`
-	SozlesmeTuru          string            `json:"sozlesme_turu"`
-	FiyatFarkiVar         bool              `json:"fiyat_farki_var"`
-	FiyatFarkiFormulu     string            `json:"fiyat_farki_formulu"`
-	SozlesmeBedeli        *float64          `json:"sozlesme_bedeli"`
-	SozlesmeParaBirimi    string            `json:"sozlesme_para_birimi"`
-	BirimFiyatKalemleri   []BirimFiyatKalem `json:"birim_fiyat_kalemleri"`
-	SozlesmeTarihi        *string           `json:"sozlesme_tarihi"`
-	YerTeslimTarihi       *string           `json:"yer_teslim_tarihi"`
-	IsSuresiGun           *int              `json:"is_suresi_gun"`
-	GeciciKabulSonrasiGun *int              `json:"gecici_kabul_sonrasi_gun"`
-	MaxArtisOrani         *float64          `json:"max_artis_orani"`
-	MaxEksilisOrani       *float64          `json:"max_eksilis_orani"`
-	SgkIsYeriNo           string            `json:"sgk_is_yeri_no"`
-	PdfDosyaURL           string            `json:"pdf_dosya_url"`
-	PdfDosyaAdi           string            `json:"pdf_dosya_adi"`
-	UpdatedAt             *string           `json:"updated_at,omitempty"`
-	IsLocked              bool              `json:"is_locked"`
-	UpdatedByName         string            `json:"updated_by_name,omitempty"`
+	ID                      string            `json:"id,omitempty"`
+	ProjectID               string            `json:"project_id"`
+	IsverenAdi              string            `json:"isveren_adi"`
+	YukleniciProjeSorumlusu string            `json:"yuklenici_proje_sorumlusu"`
+	SozlesmeTuru            string            `json:"sozlesme_turu"`
+	FiyatFarkiVar           bool              `json:"fiyat_farki_var"`
+	FiyatFarkiFormulu       string            `json:"fiyat_farki_formulu"`
+	SozlesmeBedeli          *float64          `json:"sozlesme_bedeli"`
+	SozlesmeParaBirimi      string            `json:"sozlesme_para_birimi"`
+	BirimFiyatKalemleri     []BirimFiyatKalem `json:"birim_fiyat_kalemleri"`
+	SozlesmeTarihi          *string           `json:"sozlesme_tarihi"`
+	YerTeslimTarihi         *string           `json:"yer_teslim_tarihi"`
+	IsSuresiGun             *int              `json:"is_suresi_gun"`
+	GeciciKabulSonrasiGun   *int              `json:"gecici_kabul_sonrasi_gun"`
+	MaxArtisOrani           *float64          `json:"max_artis_orani"`
+	MaxEksilisOrani         *float64          `json:"max_eksilis_orani"`
+	SgkIsYeriNo             string            `json:"sgk_is_yeri_no"`
+	PdfDosyaURL             string            `json:"pdf_dosya_url"`
+	PdfDosyaAdi             string            `json:"pdf_dosya_adi"`
+	UpdatedAt               *string           `json:"updated_at,omitempty"`
+	IsLocked                bool              `json:"is_locked"`
+	UpdatedByName           string            `json:"updated_by_name,omitempty"`
 }
 
 // Get — proje ana sözleşmesini döner. Henüz kaydedilmemişse 404.
@@ -64,6 +66,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	var kalemleriJSON []byte
 	err := h.db.QueryRow(r.Context(), `
 		SELECT c.id, c.project_id,
+		       COALESCE(c.isveren_adi,''), COALESCE(c.yuklenici_proje_sorumlusu,''),
 		       c.sozlesme_turu, c.fiyat_farki_var, COALESCE(c.fiyat_farki_formulu,''),
 		       c.sozlesme_bedeli, COALESCE(c.sozlesme_para_birimi,'TRY'),
 		       c.birim_fiyat_kalemleri,
@@ -79,6 +82,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN users u ON u.id = c.updated_by
 		WHERE c.project_id=$1`, pid).
 		Scan(&c.ID, &c.ProjectID,
+			&c.IsverenAdi, &c.YukleniciProjeSorumlusu,
 			&c.SozlesmeTuru, &c.FiyatFarkiVar, &c.FiyatFarkiFormulu,
 			&c.SozlesmeBedeli, &c.SozlesmeParaBirimi,
 			&kalemleriJSON,
@@ -133,6 +137,12 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 	if body.SozlesmeTuru != "birim_fiyat" && body.SozlesmeTuru != "goturu_bedel" && body.SozlesmeTuru != "karma" {
 		valid["sozlesme_turu"] = "Geçerli değer: birim_fiyat, goturu_bedel, karma"
 	}
+	if body.IsverenAdi == "" {
+		valid["isveren_adi"] = "İşveren bilgisi zorunludur."
+	}
+	if body.YukleniciProjeSorumlusu == "" {
+		valid["yuklenici_proje_sorumlusu"] = "Yüklenici Proje Sorumlusu zorunludur."
+	}
 	if len(valid) > 0 {
 		httpx.ValidationFailed(w, r, valid)
 		return
@@ -147,7 +157,8 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 	var id string
 	err = h.db.QueryRow(r.Context(), `
 		INSERT INTO project_main_contracts (
-		    project_id, sozlesme_turu, fiyat_farki_var, fiyat_farki_formulu,
+		    project_id, isveren_adi, yuklenici_proje_sorumlusu,
+		    sozlesme_turu, fiyat_farki_var, fiyat_farki_formulu,
 		    sozlesme_bedeli, sozlesme_para_birimi, birim_fiyat_kalemleri,
 		    sozlesme_tarihi, yer_teslim_tarihi,
 		    is_suresi_gun, gecici_kabul_sonrasi_gun,
@@ -155,12 +166,14 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		    sgk_is_yeri_no, pdf_dosya_url, pdf_dosya_adi,
 		    created_by, updated_by, is_locked, updated_at
 		) VALUES (
-		    $1,$2,$3,$4,$5,$6,$7,
-		    $8::date,$9::date,
-		    $10,$11,$12,$13,$14,$15,$16,
-		    $17,$17,TRUE,NOW()
+		    $1,$2,$3,$4,$5,$6,$7,$8,$9,
+		    $10::date,$11::date,
+		    $12,$13,$14,$15,$16,$17,$18,
+		    $19,$19,TRUE,NOW()
 		)
 		ON CONFLICT (project_id) DO UPDATE SET
+		    isveren_adi              = EXCLUDED.isveren_adi,
+		    yuklenici_proje_sorumlusu = EXCLUDED.yuklenici_proje_sorumlusu,
 		    sozlesme_turu            = EXCLUDED.sozlesme_turu,
 		    fiyat_farki_var          = EXCLUDED.fiyat_farki_var,
 		    fiyat_farki_formulu      = EXCLUDED.fiyat_farki_formulu,
@@ -180,7 +193,7 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		    is_locked                = TRUE,
 		    updated_at               = NOW()
 		RETURNING id`,
-		pid,
+		pid, body.IsverenAdi, body.YukleniciProjeSorumlusu,
 		body.SozlesmeTuru, body.FiyatFarkiVar, nilStr(body.FiyatFarkiFormulu),
 		body.SozlesmeBedeli, coalesce(body.SozlesmeParaBirimi, "TRY"), kalemleriJSON,
 		nilStr(derefStr(body.SozlesmeTarihi)), nilStr(derefStr(body.YerTeslimTarihi)),

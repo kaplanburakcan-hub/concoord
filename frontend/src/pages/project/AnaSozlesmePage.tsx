@@ -24,6 +24,8 @@ type BirimFiyatKalem = {
 };
 
 type ContractForm = {
+  isveren_adi: string;
+  yuklenici_proje_sorumlusu: string;
   sozlesme_turu: SozlesmeTuru;
   fiyat_farki_var: boolean;
   fiyat_farki_formulu: string;
@@ -120,6 +122,8 @@ export default function AnaSozlesmePage() {
   const [meta, setMeta] = useState<{ isLocked: boolean; updatedAt?: string; updatedByName?: string }>({ isLocked: false });
 
   const empty = (): ContractForm => ({
+    isveren_adi: "",
+    yuklenici_proje_sorumlusu: "",
     sozlesme_turu: "goturu_bedel",
     fiyat_farki_var: false,
     fiyat_farki_formulu: "",
@@ -149,6 +153,8 @@ export default function AnaSozlesmePage() {
       setMeta({ isLocked: !!c.is_locked, updatedAt: c.updated_at, updatedByName: c.updated_by_name });
       setMode(c.is_locked ? "view" : "edit");
       setForm({
+        isveren_adi: c.isveren_adi ?? "",
+        yuklenici_proje_sorumlusu: c.yuklenici_proje_sorumlusu ?? "",
         sozlesme_turu: c.sozlesme_turu ?? "goturu_bedel",
         fiyat_farki_var: c.fiyat_farki_var ?? false,
         fiyat_farki_formulu: c.fiyat_farki_formulu ?? "",
@@ -219,6 +225,10 @@ export default function AnaSozlesmePage() {
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
+    if (!form.isveren_adi.trim())
+      errs.isveren_adi = "İşveren bilgisi zorunludur";
+    if (!form.yuklenici_proje_sorumlusu.trim())
+      errs.yuklenici_proje_sorumlusu = "Yüklenici Proje Sorumlusu zorunludur";
     if (form.sozlesme_tarihi && !displayToISO(form.sozlesme_tarihi))
       errs.sozlesme_tarihi = "Geçerli tarih girin (gg/aa/yyyy)";
     if (form.yer_teslim_tarihi && !displayToISO(form.yer_teslim_tarihi))
@@ -242,6 +252,8 @@ export default function AnaSozlesmePage() {
     setErr(null);
 
     const body: any = {
+      isveren_adi: form.isveren_adi.trim(),
+      yuklenici_proje_sorumlusu: form.yuklenici_proje_sorumlusu.trim(),
       sozlesme_turu: form.sozlesme_turu,
       fiyat_farki_var: form.fiyat_farki_var,
       fiyat_farki_formulu: form.fiyat_farki_var ? form.fiyat_farki_formulu : "",
@@ -354,6 +366,32 @@ export default function AnaSozlesmePage() {
         <ContractSummary form={form} meta={meta} />
       ) : (
       <>
+      {/* ── 0. Taraflar ───────────────────────────────────────────────────── */}
+      <Section title="Taraflar">
+        <div className="flex flex-col gap-4">
+          <Field label="İşveren *" error={fieldErr.isveren_adi}>
+            <input
+              type="text"
+              value={form.isveren_adi}
+              disabled={!canEdit}
+              onChange={e => set("isveren_adi", e.target.value)}
+              placeholder="Örn: T.C. Sağlık Bakanlığı"
+              className={inp}
+            />
+          </Field>
+          <Field label="Yüklenici Proje Sorumlusu *" error={fieldErr.yuklenici_proje_sorumlusu}>
+            <input
+              type="text"
+              value={form.yuklenici_proje_sorumlusu}
+              disabled={!canEdit}
+              onChange={e => set("yuklenici_proje_sorumlusu", e.target.value)}
+              placeholder="Ad Soyad"
+              className={inp}
+            />
+          </Field>
+        </div>
+      </Section>
+
       {/* ── 1. Sözleşme Türü ─────────────────────────────────────────────── */}
       <Section title="Sözleşme Türü">
         <div className="flex flex-col gap-3">
@@ -765,6 +803,13 @@ function ContractSummary({ form, meta }: {
           {updatedAtDisplay() && ` · ${updatedAtDisplay()}`}
         </span>
       </div>
+
+      <Section title="Taraflar">
+        <div className="flex flex-col gap-3 text-sm">
+          <SummaryRow label="İşveren" value={form.isveren_adi || "—"} />
+          <SummaryRow label="Yüklenici Proje Sorumlusu" value={form.yuklenici_proje_sorumlusu || "—"} />
+        </div>
+      </Section>
 
       <Section title="Sözleşme Türü ve Fiyat Farkı">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">

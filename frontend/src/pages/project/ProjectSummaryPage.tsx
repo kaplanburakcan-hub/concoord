@@ -14,6 +14,21 @@ interface Milestone {
 }
 interface Task { id: string; status: string; priority: string; due_date?: string; }
 interface DailyReport { id: string; report_date: string; status: string; }
+interface Giderler {
+  satinalma: number;
+  kasa_harcamalari: number;
+  tasaron_hakedis: number;
+  sabit_giderler: number;
+}
+interface SozlesmeTakipItem {
+  id: string;
+  kategori: string;
+  poz_no: string;
+  tanim: string;
+  birim: string;
+  miktar: number;
+  eslesmeler: unknown[];
+}
 
 const STATUS_LABEL: Record<string, string> = {
   Planning: "Planlama", Active: "Aktif", OnHold: "Beklemede",
@@ -87,6 +102,8 @@ export default function ProjectSummaryPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [tasks, setTasks]           = useState<Task[]>([]);
   const [reports, setReports]       = useState<DailyReport[]>([]);
+  const [giderler, setGiderler]     = useState<Giderler | null>(null);
+  const [kalanIsler, setKalanIsler] = useState<SozlesmeTakipItem[]>([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(false);
 
@@ -100,11 +117,17 @@ export default function ProjectSummaryPage() {
       api<{ tasks: Task[] }>(`/projects/${pid}/tasks`, { projectId: pid }),
       api<{ reports: DailyReport[] }>(`/projects/${pid}/daily-reports`, { projectId: pid })
         .catch(() => ({ reports: [] })),
-    ]).then(([pd, md, td, rd]) => {
+      api<{ dashboard: { giderler?: Giderler } }>(`/projects/${pid}/dashboard`, { projectId: pid })
+        .catch(() => ({ dashboard: { giderler: undefined } })),
+      api<{ items: SozlesmeTakipItem[] }>(`/projects/${pid}/sozlesme-takip`, { projectId: pid })
+        .catch(() => ({ items: [] })),
+    ]).then(([pd, md, td, rd, dashd, std]) => {
       setProject(pd.project);
       setMilestones(md.milestones ?? []);
       setTasks(td.tasks ?? []);
       setReports((rd.reports ?? []).slice(0, 5));
+      setGiderler(dashd.dashboard?.giderler ?? null);
+      setKalanIsler((std.items ?? []).filter(it => (it.eslesmeler ?? []).length === 0));
     }).catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [proj?.id]);
@@ -214,6 +237,87 @@ export default function ProjectSummaryPage() {
           accent={taskOverdue > 0 ? "text-red-600" : "text-beton-100"}
         />
       </div>
+
+      {/* Giderler kırılımı */}
+      {giderler && (() => {
+        const rows: { label: string; value: number; cls: string }[] = [
+          { label: "Satınalmalar", value: giderler.satinalma, cls: "bg-blue-500" },
+          { label: "Kasa Harcamaları", value: giderler.kasa_harcamalari, cls: "bg-amber-500" },
+          { label: "Taşeron Hakedişler", value: giderler.tasaron_hakedis, cls: "bg-emerald-500" },
+          { label: "Sabit Giderler", value: giderler.sabit_giderler, cls: "bg-violet-500" },
+        ];
+        const total = rows.reduce((s, r) => s + r.value, 0);
+        return (
+          <div className="rounded-xl border border-beton-800 bg-beton-900 p-4">
+            <h2 className="text-sm font-semibold text-beton-100 mb-3 flex items-center justify-between">
+              Giderler
+              <span className="text-xs font-normal text-beton-400">{fmt(total, project.currency)}</span>
+            </h2>
+            {total === 0 ? (
+              <p className="text-sm text-beton-400">Henüz gider kaydı yok.</p>
+            ) : (
+              <div className="space-y-2">
+                {rows.filter(r => r.value > 0).map(r => {
+                  const pct = total > 0 ? Math.round((r.value / total) * 100) : 0;
+                  return (
+                    <div key={r.label} className="flex items-center gap-2">
+                      <span className="text-xs text-beton-400 w-36 shrink-0">{r.label}</span>
+                      <div className="flex-1 h-1.5 bg-[var(--bg-hover)] rounded-full">
+                        <div className={`h-full rounded-full ${r.cls}`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-xs font-medium text-beton-100 w-28 text-right tabular-nums">
+                        {fmt(r.value, project.currency)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Kalan İşler — Anlaşılacak İmalatlar */}
+      {kalanIsler.length > 0 && (
+        <div className="rounded-xl border border-beton-800 bg-beton-900 p-4">
+          <h2 className="text-sm font-semibold text-beton-100 mb-3 flex items-center justify-between">
+            Kalan İşler — Anlaşılacak İmalatlar
+            <span className="text-xs font-normal text-beton-400">{kalanIsler.length} kalem</span>
+          </h2>
+          <p className="text-xs text-beton-400 mb-3">
+            Proje keşfinde tanımlı ama henüz hiçbir taşeron sözleşmesiyle (poz no eşleşmesi) ilişkilendirilmemiş imalat kalemleri.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-beton-500 text-xs border-b border-beton-800/40">
+                  <th className="py-1.5 pr-3 text-left font-medium w-20">Poz No</th>
+                  <th className="py-1.5 pr-3 text-left font-medium">Tanım</th>
+                  <th className="py-1.5 pr-3 text-left font-medium w-28">Kategori</th>
+                  <th className="py-1.5 pr-3 text-right font-medium w-24">Miktar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {kalanIsler.slice(0, 12).map(it => (
+                  <tr key={it.id} className="border-b border-beton-800/20">
+                    <td className="py-1.5 pr-3 text-beton-500 text-xs font-mono">{it.poz_no || "—"}</td>
+                    <td className="py-1.5 pr-3 text-beton-100">{it.tanim}</td>
+                    <td className="py-1.5 pr-3 text-beton-400 text-xs">{it.kategori}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums text-beton-400">
+                      {it.miktar.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} {it.birim}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {kalanIsler.length > 12 && (
+              <p className="text-xs text-beton-500 mt-2">
+                + {kalanIsler.length - 12} kalem daha — tümü için Sözleşme Takip sayfasına bakın.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Kilometre Taşları */}

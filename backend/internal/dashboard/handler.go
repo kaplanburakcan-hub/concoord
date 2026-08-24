@@ -141,6 +141,7 @@ type dashboardDTO struct {
 	// Dashboard v2 — kullanıcının paylaştığı örnek panelden ilham alınan,
 	// birebir değil KONSEPT olarak uyarlanan yeni widget'lar.
 	CostBreakdown    *costBreakdownDTO           `json:"cost_breakdown,omitempty"` // finansal izinle (evm ile aynı kapı)
+	Giderler         *giderlerDTO                `json:"giderler,omitempty"`       // Proje Özet: 4 ayrı kalem (finansal izinle)
 	DocumentStatus   *documentStatusDTO          `json:"document_status,omitempty"`
 	CoverImage       *coverImageDTO              `json:"cover_image,omitempty"`
 	AccidentFreeDays ohsaccidents.FreeDaysSummary `json:"accident_free_days"`
@@ -152,6 +153,16 @@ type costBreakdownDTO struct {
 	Tasaron float64 `json:"tasaron"`
 	Malzeme float64 `json:"malzeme"`
 	Diger   float64 `json:"diger"`
+}
+
+// giderlerDTO — Proje Özet sayfasındaki gider kırılımı: aynı cash_events
+// verisi costBreakdownDTO ile aynı kaynaktan gelir, sadece "Diğer" burada
+// Kasa Harcamaları ve Sabit Giderler olarak ayrıştırılır.
+type giderlerDTO struct {
+	Satinalma       float64 `json:"satinalma"`
+	KasaHarcamalari float64 `json:"kasa_harcamalari"`
+	TasaronHakedis  float64 `json:"tasaron_hakedis"`
+	SabitGiderler   float64 `json:"sabit_giderler"`
 }
 
 type documentStatusDTO struct {
@@ -238,6 +249,7 @@ func (h *Handler) ProjectDashboard(w http.ResponseWriter, r *http.Request) {
 			httpx.Internal(w, r)
 			return
 		}
+		var expandedFixed float64
 		if projectStart != nil {
 			expenses, err := fixedexpenses.ListActive(ctx, h.pool, pid)
 			if err != nil {
@@ -245,10 +257,24 @@ func (h *Handler) ProjectDashboard(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			for _, v := range fixedexpenses.Expand(expenses, *projectStart, time.Now().UTC()) {
-				cb.Diger += v.Amount
+				expandedFixed += v.Amount
 			}
 		}
+		cb.Diger += expandedFixed
 		out.CostBreakdown = &cb
+
+		// Proje Özet giderler kırılımı — aynı cash_events sorgusu, "Diğer"i
+		// Kasa Harcamaları / Sabit Giderler olarak ayırır.
+		gd := giderlerDTO{Satinalma: cb.Malzeme, TasaronHakedis: cb.Tasaron, SabitGiderler: expandedFixed}
+		if err := h.pool.QueryRow(ctx, `
+			SELECT COALESCE(sum(amount) FILTER (WHERE source_entity='kasa_fisi'),0)::float8
+			FROM cash_events
+			WHERE project_id=$1 AND direction='out' AND deleted_at IS NULL`, pid).
+			Scan(&gd.KasaHarcamalari); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		out.Giderler = &gd
 	}
 
 	// Kazasız gün sayacı (Dashboard v2) — herkese açık (finansal veri değil).

@@ -239,11 +239,11 @@ function DisciplineSection({
   const onaylandi = docs.filter((d) => d.durum === "onaylı").length;
 
   return (
-    <div className="mb-4 border border-beton-800 rounded-lg overflow-hidden">
-      {/* Header */}
+    <div className="mb-4 border border-white/10 bg-white/[0.03] rounded-lg overflow-hidden">
+      {/* Header — durum rozetleri zaten renkli olduğu için dolgu nötr/beyaz tutulur */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-beton-900 hover:bg-beton-800/60 transition-colors text-left"
+        className="w-full flex items-center justify-between px-4 py-3 bg-white/[0.06] hover:bg-white/[0.09] transition-colors text-left"
       >
         <div className="flex items-center gap-3">
           <span className="text-beton-400 text-xs">{open ? "▼" : "▶"}</span>
