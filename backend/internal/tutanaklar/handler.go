@@ -10,8 +10,10 @@
 package tutanaklar
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -23,25 +25,33 @@ import (
 
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/notify"
 	"github.com/ipks/ipks/backend/internal/validate"
 )
 
-type Handler struct{ pool *pgxpool.Pool }
+type Handler struct {
+	pool   *pgxpool.Pool
+	notify *notify.Service
+}
 
-func NewHandler(pool *pgxpool.Pool) *Handler { return &Handler{pool: pool} }
+func NewHandler(pool *pgxpool.Pool, notifySvc *notify.Service) *Handler {
+	return &Handler{pool: pool, notify: notifySvc}
+}
 
 // TIP_HAKEDIS — hangi tutanak tipleri, tümü onaylandığında hakedişe
 // (ilave iş olarak) akmaya adaydır. kaza/yangın/hırsızlık bir olay
-// kaydıdır, maliyet kalemi değildir.
+// kaydıdır, maliyet kalemi değildir; zimmet de bir mal teslim kaydıdır,
+// hakedişe akmaz.
 var tipHakedis = map[string]bool{
 	"kaza_yangin_hirsizlik": false,
 	"ek_imalat":             true,
 	"mesai":                 true,
 	"yevmiyeli":             true,
+	"zimmet":                false,
 }
 
 var validTip = map[string]bool{
-	"kaza_yangin_hirsizlik": true, "ek_imalat": true, "mesai": true, "yevmiyeli": true,
+	"kaza_yangin_hirsizlik": true, "ek_imalat": true, "mesai": true, "yevmiyeli": true, "zimmet": true,
 }
 
 type OnayAdim struct {
@@ -60,6 +70,9 @@ type Tutanak struct {
 	Tarih           string     `json:"tarih"`
 	TaseronID       *uuid.UUID `json:"taseron_id,omitempty"`
 	TaseronAdi      *string    `json:"taseron_adi,omitempty"`
+	PersonelID      *uuid.UUID `json:"personel_id,omitempty"`
+	PersonelAdSoyad *string    `json:"personel_ad_soyad,omitempty"`
+	PersonelFirma   *string    `json:"personel_firma,omitempty"`
 	Kisim           *string    `json:"kisim,omitempty"`
 	Aciklama        string     `json:"aciklama"`
 	Tutar           *float64   `json:"tutar,omitempty"`
@@ -75,13 +88,14 @@ type Tutanak struct {
 
 const listCols = `
 	t.id, t.project_id, t.tip, t.baslik, to_char(t.tarih,'YYYY-MM-DD'),
-	t.taseron_id, s.company_name, t.kisim, t.aciklama, t.tutar, t.birim, t.miktar,
+	t.taseron_id, s.company_name, t.personel_id, p.ad_soyad, p.firma, t.kisim, t.aciklama, t.tutar, t.birim, t.miktar,
 	t.durum, t.onay_zinciri::text, t.hakedise_eklendi, u.full_name, t.created_at, t.row_version`
 
 func scanRow(row pgx.Row, t *Tutanak) error {
 	var onayJSON string
 	if err := row.Scan(&t.ID, &t.ProjectID, &t.Tip, &t.Baslik, &t.Tarih,
-		&t.TaseronID, &t.TaseronAdi, &t.Kisim, &t.Aciklama, &t.Tutar, &t.Birim, &t.Miktar,
+		&t.TaseronID, &t.TaseronAdi, &t.PersonelID, &t.PersonelAdSoyad, &t.PersonelFirma,
+		&t.Kisim, &t.Aciklama, &t.Tutar, &t.Birim, &t.Miktar,
 		&t.Durum, &onayJSON, &t.HakediseEklendi, &t.CreatedByName, &t.CreatedAt, &t.RowVersion); err != nil {
 		return err
 	}
@@ -128,6 +142,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		FROM saha_tutanaklari t
 		JOIN users u ON u.id = t.created_by
 		LEFT JOIN subcontractors s ON s.id = t.taseron_id
+		LEFT JOIN project_personnel p ON p.id = t.personel_id
 		WHERE t.project_id=$1 AND t.deleted_at IS NULL
 		  AND ($2='' OR t.tip=$2)
 		  AND ($3='' OR t.durum=$3)
@@ -158,6 +173,7 @@ type createReq struct {
 	Baslik       string   `json:"baslik"`
 	Tarih        string   `json:"tarih"`
 	TaseronID    *string  `json:"taseron_id"`
+	PersonelID   *string  `json:"personel_id"`
 	Kisim        *string  `json:"kisim"`
 	Aciklama     string   `json:"aciklama"`
 	Tutar        *float64 `json:"tutar"`
@@ -228,22 +244,84 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		taseronID = &id
 	}
+	var personelID *uuid.UUID
+	var personelAdSoyad, personelFirma string
+	if req.PersonelID != nil && strings.TrimSpace(*req.PersonelID) != "" {
+		id, err := uuid.Parse(strings.TrimSpace(*req.PersonelID))
+		if err != nil {
+			httpx.ValidationFailed(w, r, map[string]string{"personel_id": "geçersiz UUID"})
+			return
+		}
+		var firma *string
+		if err := h.pool.QueryRow(r.Context(),
+			`SELECT ad_soyad, firma FROM project_personnel WHERE id=$1 AND project_id=$2`,
+			id, pid).Scan(&personelAdSoyad, &firma); err != nil {
+			httpx.ValidationFailed(w, r, map[string]string{"personel_id": "personel bulunamadı"})
+			return
+		}
+		if firma != nil {
+			personelFirma = *firma
+		}
+		personelID = &id
+	}
 	zincir, _ := json.Marshal(onayZinciriOlustur(req.KisimSefiVar))
 
 	var id uuid.UUID
 	if err := h.pool.QueryRow(r.Context(), `
 		INSERT INTO saha_tutanaklari
-			(project_id, tip, baslik, tarih, taseron_id, kisim, aciklama, tutar, birim, miktar,
+			(project_id, tip, baslik, tarih, taseron_id, personel_id, kisim, aciklama, tutar, birim, miktar,
 			 durum, onay_zinciri, created_by)
-		VALUES ($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10,'taslak',$11::jsonb,$12)
+		VALUES ($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10,$11,'taslak',$12::jsonb,$13)
 		RETURNING id`,
-		pid, req.Tip, strings.TrimSpace(req.Baslik), req.Tarih, taseronID, req.Kisim,
+		pid, req.Tip, strings.TrimSpace(req.Baslik), req.Tarih, taseronID, personelID, req.Kisim,
 		strings.TrimSpace(req.Aciklama), req.Tutar, req.Birim, req.Miktar, zincir, uid,
 	).Scan(&id); err != nil {
 		httpx.Internal(w, r)
 		return
 	}
+
+	if req.Tip == "zimmet" && personelFirma != "" {
+		h.notifyZimmetFirma(r.Context(), pid, id, req.Baslik, personelAdSoyad, personelFirma)
+	}
+
 	httpx.JSON(w, http.StatusCreated, map[string]any{"id": id})
+}
+
+// notifyZimmetFirma — personelin firma alanını (serbest metin) subcontractors
+// tablosuna ada göre eşleştirir (Sözleşme Takip'teki poz_no eşleşmesiyle aynı
+// ruhta: gerçek bir FK değil, isimden yumuşak eşleştirme), o firmanın
+// project_members'taki (subcontractor_id dolu) kullanıcılarına bildirim
+// gönderir. Eşleşme yoksa sessizce atlanır — hata değildir.
+func (h *Handler) notifyZimmetFirma(ctx context.Context, pid, tutanakID uuid.UUID, baslik, personelAdSoyad, firma string) {
+	rows, err := h.pool.Query(ctx, `
+		SELECT DISTINCT pm.user_id
+		FROM subcontractors s
+		JOIN project_members pm ON pm.subcontractor_id = s.id AND pm.project_id = s.project_id AND pm.deleted_at IS NULL
+		WHERE s.project_id = $1 AND s.deleted_at IS NULL AND lower(s.company_name) = lower($2)`,
+		pid, firma)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	var userIDs []uuid.UUID
+	for rows.Next() {
+		var uid uuid.UUID
+		if rows.Scan(&uid) == nil {
+			userIDs = append(userIDs, uid)
+		}
+	}
+	if len(userIDs) == 0 {
+		return
+	}
+	h.notify.Send(ctx, notify.Input{
+		UserIDs:    userIDs,
+		Type:       notify.TypeZimmetCreated,
+		Title:      "Yeni Zimmet Tutanağı",
+		Body:       fmt.Sprintf("%s adına \"%s\" zimmet tutanağı oluşturuldu.", personelAdSoyad, baslik),
+		EntityType: "saha_tutanagi",
+		EntityID:   &tutanakID,
+		ProjectID:  &pid,
+	})
 }
 
 // ── Submit (taslak → onay_sureci) ───────────────────────────────────────────

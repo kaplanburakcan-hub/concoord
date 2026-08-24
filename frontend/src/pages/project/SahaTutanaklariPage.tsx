@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, apiFetchBlob, apiUpload } from "../../api/client";
 import { useProjects } from "../../projects/ProjectContext";
 import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
@@ -10,7 +11,7 @@ import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 // motoru üzerinden bağlanır (entity_type='saha_tutanagi').
 
 // ── Tipler ───────────────────────────────────────────────────────────
-type TutanakTip = "kaza_yangin_hirsizlik" | "ek_imalat" | "mesai" | "yevmiyeli";
+type TutanakTip = "kaza_yangin_hirsizlik" | "ek_imalat" | "mesai" | "yevmiyeli" | "zimmet";
 
 type OnayAdim = {
   rol: string;
@@ -27,6 +28,9 @@ type Tutanak = {
   tarih: string;
   taseron_id?: string;
   taseron_adi?: string;
+  personel_id?: string;
+  personel_ad_soyad?: string;
+  personel_firma?: string;
   kisim?: string;
   aciklama: string;
   tutar?: number;
@@ -41,6 +45,7 @@ type Tutanak = {
 };
 
 type Sub = { id: string; company_name: string };
+type Personel = { id: string; ad_soyad: string; firma: string; is_aktif: boolean };
 type DocItem = { id: string; title: string; latest_version?: number };
 // Önizleme için çözümlenmiş fotoğraf: yeni-tutanak formunda henüz yüklenmemiş
 // (staged) bir File ya da kaydedilmiş bir documents kaydından gelen blob URL.
@@ -51,6 +56,7 @@ const TIP_LABEL: Record<TutanakTip, string> = {
   ek_imalat: "Ek İmalat Tutanağı",
   mesai: "Mesai Tutanağı",
   yevmiyeli: "Yevmiyeli Çalışma Tutanağı",
+  zimmet: "Zimmet Tutanağı",
 };
 
 const TIP_ICON: Record<TutanakTip, string> = {
@@ -58,6 +64,7 @@ const TIP_ICON: Record<TutanakTip, string> = {
   ek_imalat: "🔨",
   mesai: "⏰",
   yevmiyeli: "👷",
+  zimmet: "📦",
 };
 
 const TIP_HAKEDIS: Record<TutanakTip, boolean> = {
@@ -65,6 +72,7 @@ const TIP_HAKEDIS: Record<TutanakTip, boolean> = {
   ek_imalat: true,
   mesai: true,
   yevmiyeli: true,
+  zimmet: false,
 };
 
 const KISIMLAR = ["İnşaat", "Elektrik", "Mekanik", "Peyzaj", "Altyapı", "Çelik", "Diğer"];
@@ -90,6 +98,7 @@ const BOŞ_FORM = {
   baslik: "",
   tarih: new Date().toISOString().slice(0, 10),
   taseron_id: "",
+  personel_id: "",
   kisim: "",
   aciklama: "",
   tutar: "",
@@ -103,9 +112,11 @@ export default function SahaTutanaklariPage() {
   const { current } = useProjects();
   const pid = current?.id;
   const kesinKabul = useKesinKabulTarihi(pid);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [tutanaklar, setTutanaklar] = useState<Tutanak[]>([]);
   const [subs, setSubs] = useState<Sub[]>([]);
+  const [personeller, setPersoneller] = useState<Personel[]>([]);
   const [formAcik, setFormAcik] = useState(false);
   const [form, setForm] = useState({ ...BOŞ_FORM });
   const [formFotograflar, setFormFotograflar] = useState<Foto[]>([]);
@@ -123,23 +134,39 @@ export default function SahaTutanaklariPage() {
   const detayFotoRef = useRef<HTMLInputElement>(null);
 
   const subName = (id?: string) => subs.find((s) => s.id === id)?.company_name;
+  const personelFirma = (id?: string) => personeller.find((p) => p.id === id)?.firma;
 
   const load = useCallback(async () => {
     if (!pid) return;
     setErr(null);
     try {
-      const [t, s] = await Promise.all([
+      const [t, s, p] = await Promise.all([
         api<{ tutanaklar: Tutanak[] }>(`/projects/${pid}/tutanaklar`, { projectId: pid }),
         api<{ subcontractors: Sub[] }>(`/projects/${pid}/subcontractors`, { projectId: pid }),
+        api<{ personnel: Personel[] }>(`/projects/${pid}/personnel`, { projectId: pid }),
       ]);
       setTutanaklar(t.tutanaklar ?? []);
       setSubs(s.subcontractors ?? []);
+      setPersoneller((p.personnel ?? []).filter((x) => x.is_aktif));
     } catch {
       setErr("Tutanaklar yüklenemedi ya da erişim yetkiniz yok.");
     }
   }, [pid]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Depo Raporları'ndan "+ Zimmet Tutanağı" ile gelindiğinde formu doğrudan
+  // Zimmet tipiyle açar (?tip=zimmet).
+  useEffect(() => {
+    if (searchParams.get("tip") === "zimmet") {
+      setForm((f) => ({ ...f, tip: "zimmet" }));
+      setFormAcik(true);
+      setFiltre("zimmet");
+      searchParams.delete("tip");
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Seçili tutanağın fotoğrafları: documents listesi + her biri için blob URL.
   const loadFotograflar = useCallback(async (t: Tutanak) => {
@@ -207,6 +234,7 @@ export default function SahaTutanaklariPage() {
 
   async function tutanakOlustur() {
     if (!form.baslik.trim() || !form.aciklama.trim() || !pid) return;
+    if (form.tip === "zimmet" && !form.personel_id) return;
     setOlusturuluyor(true);
     setErr(null);
     try {
@@ -217,6 +245,7 @@ export default function SahaTutanaklariPage() {
           baslik: form.baslik.trim(),
           tarih: form.tarih,
           taseron_id: form.taseron_id || null,
+          personel_id: form.personel_id || null,
           kisim: form.kisim || null,
           aciklama: form.aciklama.trim(),
           tutar: form.tutar ? Number(form.tutar) : null,
@@ -381,6 +410,12 @@ export default function SahaTutanaklariPage() {
             {(secili.taseron_adi || subName(secili.taseron_id)) && (
               <p className="text-sm text-beton-300">Taşeron: <span className="text-white">{secili.taseron_adi ?? subName(secili.taseron_id)}</span></p>
             )}
+            {secili.personel_ad_soyad && (
+              <p className="text-sm text-beton-300">
+                Personel: <span className="text-white">{secili.personel_ad_soyad}</span>
+                {secili.personel_firma && <span className="text-beton-400"> ({secili.personel_firma})</span>}
+              </p>
+            )}
             <p className="text-sm text-beton-200">{secili.aciklama}</p>
 
             {(secili.tutar || secili.miktar) && (
@@ -518,16 +553,39 @@ export default function SahaTutanaklariPage() {
               />
             </div>
 
+            {/* Zimmet: Personel seçimi — firma otomatik belirir */}
+            {form.tip === "zimmet" && (
+              <div>
+                <label className="block text-xs text-beton-400 mb-1">Personel *</label>
+                <select value={form.personel_id} onChange={(e) => setForm({ ...form, personel_id: e.target.value })}
+                  className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+                >
+                  <option value="">Seçin</option>
+                  {personeller.map((p) => <option key={p.id} value={p.id}>{p.ad_soyad}</option>)}
+                </select>
+                {form.personel_id && (
+                  <p className="mt-1 text-xs text-beton-400">
+                    Firma: <span className="text-emniyet-500 font-medium">{personelFirma(form.personel_id) || "—"}</span>
+                    {personelFirma(form.personel_id) && (
+                      <span className="text-beton-500"> · onay sonrası firmanın tanımlı kullanıcılarına bildirim gider</span>
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Taşeron */}
-            <div>
-              <label className="block text-xs text-beton-400 mb-1">Taşeron</label>
-              <select value={form.taseron_id} onChange={(e) => setForm({ ...form, taseron_id: e.target.value })}
-                className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
-              >
-                <option value="">Seçin (opsiyonel)</option>
-                {subs.map((s) => <option key={s.id} value={s.id}>{s.company_name}</option>)}
-              </select>
-            </div>
+            {form.tip !== "zimmet" && (
+              <div>
+                <label className="block text-xs text-beton-400 mb-1">Taşeron</label>
+                <select value={form.taseron_id} onChange={(e) => setForm({ ...form, taseron_id: e.target.value })}
+                  className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+                >
+                  <option value="">Seçin (opsiyonel)</option>
+                  {subs.map((s) => <option key={s.id} value={s.id}>{s.company_name}</option>)}
+                </select>
+              </div>
+            )}
 
             {/* Kısım */}
             <div>
@@ -550,8 +608,8 @@ export default function SahaTutanaklariPage() {
             </div>
 
             {/* Tutar / Miktar */}
-            {TIP_HAKEDIS[form.tip] && (
-              <div className="grid grid-cols-3 gap-2">
+            {(TIP_HAKEDIS[form.tip] || form.tip === "zimmet") && (
+              <div className={form.tip === "zimmet" ? "grid grid-cols-2 gap-2" : "grid grid-cols-3 gap-2"}>
                 <div>
                   <label className="block text-xs text-beton-400 mb-1">Miktar</label>
                   <input type="number" value={form.miktar} onChange={(e) => setForm({ ...form, miktar: e.target.value })}
@@ -566,13 +624,15 @@ export default function SahaTutanaklariPage() {
                     placeholder="adet"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs text-beton-400 mb-1">Tutar (TL)</label>
-                  <input type="number" value={form.tutar} onChange={(e) => setForm({ ...form, tutar: e.target.value })}
-                    className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
-                    placeholder="0"
-                  />
-                </div>
+                {TIP_HAKEDIS[form.tip] && (
+                  <div>
+                    <label className="block text-xs text-beton-400 mb-1">Tutar (TL)</label>
+                    <input type="number" value={form.tutar} onChange={(e) => setForm({ ...form, tutar: e.target.value })}
+                      className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+                      placeholder="0"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -630,7 +690,7 @@ export default function SahaTutanaklariPage() {
                 className="rounded-md border border-beton-700 px-4 py-2 text-sm text-beton-300 hover:border-beton-500"
               >İptal</button>
               <button onClick={tutanakOlustur}
-                disabled={!form.baslik.trim() || !form.aciklama.trim() || olusturuluyor}
+                disabled={!form.baslik.trim() || !form.aciklama.trim() || olusturuluyor || (form.tip === "zimmet" && !form.personel_id)}
                 className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50"
               >{olusturuluyor ? "Oluşturuluyor…" : "Oluştur"}</button>
             </div>

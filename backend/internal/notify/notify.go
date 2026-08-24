@@ -59,6 +59,9 @@ const (
 
 	// Makine/Ekipman/Araç Envanteri Faz E — kiralama sözleşmesi hatırlatması
 	TypeRentalContractMissing = "rental_contract_missing" // kiralık ekipmanın sözleşmesi 7+ gündür yüklenmedi → onay yetkilileri
+
+	// Saha Tutanakları — Zimmet Tutanağı
+	TypeZimmetCreated = "zimmet_created" // zimmet tutanağı oluşturuldu → ilgili firmanın tanımlı kullanıcıları
 )
 
 const (

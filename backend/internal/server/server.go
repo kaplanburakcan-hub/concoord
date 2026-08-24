@@ -133,7 +133,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	designH := design.NewHandler(pool)
 	warehouseH := warehouse.NewHandler(pool)
 	meetingsH := meetings.NewHandler(pool)
-	tutanaklarH := tutanaklar.NewHandler(pool)
+	tutanaklarH := tutanaklar.NewHandler(pool, notifySvc)
 	stakeholdersH := stakeholders.NewHandler(pool)
 	customReportsH := customreports.NewHandler(pool)
 

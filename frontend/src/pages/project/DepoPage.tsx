@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
@@ -294,6 +295,12 @@ export default function DepoPage() {
           <p className="text-sm text-beton-400 mt-0.5">{proj.name} — Stok takibi ve hareket kayıtları</p>
         </div>
         <div className="flex gap-2">
+          <Link
+            to="/saha/tutanaklar?tip=zimmet"
+            className="px-3 py-1.5 rounded-lg border border-beton-700 text-beton-300 hover:border-emniyet-500 hover:text-emniyet-500 text-sm font-medium transition-colors"
+          >
+            📦 Zimmet Tutanağı
+          </Link>
           <button
             onClick={() => setShowItemModal(true)}
             className="px-3 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium transition-colors"
