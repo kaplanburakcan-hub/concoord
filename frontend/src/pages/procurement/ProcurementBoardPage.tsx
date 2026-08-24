@@ -161,6 +161,10 @@ export default function ProcurementBoardPage() {
         <h1 className="text-lg font-display font-bold text-white">Satınalma</h1>
         <span className="text-xs text-beton-500">{total} kayıt</span>
         <div className="ml-auto flex gap-2">
+          <Link to="/satinalma/tedarik-plani"
+            className="rounded border border-beton-700 text-beton-300 hover:border-emniyet-500 hover:text-emniyet-500 px-3 py-1.5 text-xs font-medium transition-colors">
+            📋 Tedarik Planı
+          </Link>
           <button onClick={load}
             className="rounded bg-[var(--group-accent)] hover:brightness-110 text-white-solid px-3 py-1.5 text-xs font-medium">
             Yenile
