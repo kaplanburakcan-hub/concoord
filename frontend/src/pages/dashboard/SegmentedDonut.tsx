@@ -1,32 +1,28 @@
-// Çok kategorili segmentli/gradyanlı halka — RadialRing.tsx'in tekli-metrik
-// versiyonunun kategorili karşılığı. Her kategori toplam içindeki payına
-// orantılı bir tick bloğu alır, o blok kendi renk ailesinde küçük bir
-// gradyana sahiptir (kullanıcının onayladığı referans görsele göre).
-// Panel her zaman koyu render olduğundan renkler --panel-* sabit
-// token'lara bağlıdır (temadan bağımsız).
+// Çok kategorili donut grafik — RadialRing.tsx'in tekli-metrik versiyonunun
+// kategorili karşılığı. Düz, sürekli renkli SVG yaylar (kullanıcının
+// paylaştığı referans görsele göre) — tick/kesikli görünüm yerine her
+// kategori kendi payına orantılı, aralarında ince boşluklu tek parça bir
+// yay olarak çizilir. Panel her zaman koyu render olduğundan halka
+// arka planı --panel-* sabit tokenlara bağlıdır (temadan bağımsız).
 
 export type ColorStop = { t: number; hex: string };
 export type DonutSegment = { label: string; value: number; colorStops: ColorStop[]; swatch: string };
 
-const TOTAL_TICKS = 36;
+const GAP_DEG = 3;
 
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace("#", "");
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
-}
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t;
-}
-function colorAt(stops: ColorStop[], t: number): string {
-  for (let i = 0; i < stops.length - 1; i++) {
-    if (t >= stops[i].t && t <= stops[i + 1].t) {
-      const localT = (t - stops[i].t) / (stops[i + 1].t - stops[i].t || 1);
-      const c0 = hexToRgb(stops[i].hex);
-      const c1 = hexToRgb(stops[i + 1].hex);
-      return `rgb(${Math.round(lerp(c0[0], c1[0], localT))},${Math.round(lerp(c0[1], c1[1], localT))},${Math.round(lerp(c0[2], c1[2], localT))})`;
-    }
-  }
-  return stops[stops.length - 1].hex;
+// Büyük para tutarlarının (ör. ₺13.895.000) halkanın dar iç boşluğuna
+// sığması için kısaltılmış gösterim (₺13,9M) — legend'deki tam değerler
+// (formatValue) bundan etkilenmez, yalnızca halka merkezindeki toplam.
+function compactCenter(full: string, raw: number): string {
+  const symbolMatch = full.match(/^[^\d\-]+/);
+  const symbol = symbolMatch ? symbolMatch[0] : "";
+  const abs = Math.abs(raw);
+  let num: string;
+  if (abs >= 1_000_000_000) num = (raw / 1_000_000_000).toLocaleString("tr-TR", { maximumFractionDigits: 1 }) + "B";
+  else if (abs >= 1_000_000) num = (raw / 1_000_000).toLocaleString("tr-TR", { maximumFractionDigits: 1 }) + "M";
+  else if (abs >= 10_000) num = (raw / 1_000).toLocaleString("tr-TR", { maximumFractionDigits: 1 }) + "K";
+  else return full;
+  return symbol + num;
 }
 
 export default function SegmentedDonut({
@@ -42,55 +38,56 @@ export default function SegmentedDonut({
 }) {
   const total = segments.reduce((s, seg) => s + Math.max(0, seg.value), 0);
   const fmt = formatValue ?? ((v: number) => v.toLocaleString("tr-TR"));
-  const radius = size * 0.36;
-  const tickW = size * 0.028;
-  const tickH = size * 0.11;
+  const centerText = total === 0 ? "—" : compactCenter(fmt(total), total);
 
-  const ticks: { deg: number; color: string }[] = [];
-  if (total > 0) {
-    let tickIdx = 0;
-    for (const seg of segments) {
-      const value = Math.max(0, seg.value);
-      const catTicks = Math.round((value / total) * TOTAL_TICKS);
-      for (let j = 0; j < catTicks && tickIdx < TOTAL_TICKS; j++, tickIdx++) {
-        const localT = catTicks > 1 ? j / (catTicks - 1) : 0;
-        ticks.push({ deg: (360 / TOTAL_TICKS) * tickIdx, color: colorAt(seg.colorStops, localT) });
-      }
-    }
-  }
+  const strokeWidth = size * 0.15;
+  const r = (size - strokeWidth) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circumference = 2 * Math.PI * r;
+
+  let cumulativeDeg = 0;
+  const arcs = total > 0
+    ? segments
+        .filter((s) => s.value > 0)
+        .map((s, i) => {
+          const frac = Math.max(0, s.value) / total;
+          const sweepDeg = Math.max(0, frac * 360 - GAP_DEG);
+          const startDeg = cumulativeDeg;
+          cumulativeDeg += frac * 360;
+          const len = (sweepDeg / 360) * circumference;
+          const offset = -((startDeg / 360) * circumference);
+          return { key: i, color: s.swatch, dash: `${len} ${Math.max(0, circumference - len)}`, offset };
+        })
+    : [];
 
   return (
     <div className="flex items-center gap-5">
       <div className="relative shrink-0" style={{ width: size, height: size }}>
-        {total === 0
-          ? Array.from({ length: TOTAL_TICKS }).map((_, i) => (
-              <div
-                key={i}
-                className="absolute left-1/2 top-1/2 rounded-full"
-                style={{
-                  width: tickW, height: tickH, marginLeft: -tickW / 2, transformOrigin: "50% 0",
-                  transform: `rotate(${(360 / TOTAL_TICKS) * i}deg) translateY(-${radius}px)`,
-                  background: "rgb(var(--panel-hairline))",
-                }}
-              />
-            ))
-          : ticks.map((tk, i) => (
-              <div
-                key={i}
-                className="absolute left-1/2 top-1/2 rounded-full"
-                style={{
-                  width: tickW, height: tickH, marginLeft: -tickW / 2, transformOrigin: "50% 0",
-                  transform: `rotate(${tk.deg}deg) translateY(-${radius}px)`,
-                  background: tk.color,
-                }}
-              />
-            ))}
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgb(var(--panel-hairline))" strokeWidth={strokeWidth} />
+          {arcs.map((a) => (
+            <circle
+              key={a.key}
+              cx={cx}
+              cy={cy}
+              r={r}
+              fill="none"
+              stroke={a.color}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              strokeDasharray={a.dash}
+              strokeDashoffset={a.offset}
+              transform={`rotate(-90 ${cx} ${cy})`}
+            />
+          ))}
+        </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span
-            className="font-display font-extrabold leading-none"
-            style={{ fontSize: size * 0.17, color: "rgb(var(--panel-ink))", fontVariantNumeric: "tabular-nums" }}
+            className="font-display font-extrabold leading-none tabular-nums"
+            style={{ fontSize: size * 0.155, color: "rgb(var(--panel-ink))" }}
           >
-            {total === 0 ? "—" : fmt(total)}
+            {centerText}
           </span>
           <span
             className="mt-1 uppercase tracking-wide"

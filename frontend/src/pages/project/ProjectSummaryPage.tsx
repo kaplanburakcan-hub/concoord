@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
-import RadialRing, { type ColorStop } from "../dashboard/RadialRing";
+import type { ColorStop } from "../dashboard/RadialRing";
 import SegmentedDonut, { type DonutSegment } from "../dashboard/SegmentedDonut";
 import {
   PanelRow, PanelCell, PanelKpi,
@@ -227,7 +227,7 @@ export default function ProjectSummaryPage() {
       <PanelRow cols="1fr 1fr 1.3fr">
         <PanelCell title="Zaman İlerlemesi">
           <div className="flex items-center gap-5">
-            <RadialRing pct={timePct} colorStops={ZAMAN_STOPS} size={116} />
+            <SolidRing pct={timePct} colorStops={ZAMAN_STOPS} size={116} gradId="ring-zaman" />
             <div className="flex flex-col gap-1.5 min-w-0 flex-1">
               <MetaRow label="Başlangıç" value={fmtDate(project.start_date?.slice(0, 10))} />
               <MetaRow label="Bitiş" value={fmtDate(project.end_date?.slice(0, 10))} />
@@ -253,7 +253,7 @@ export default function ProjectSummaryPage() {
           <span className="text-[10.5px]" style={{ color: "rgb(var(--panel-ink3))" }}>kullanılan / planlanan</span>
         }>
           <div className="flex items-center gap-5">
-            <RadialRing pct={adamSaatPct} colorStops={ADAMSAAT_STOPS} size={116} />
+            <SolidRing pct={adamSaatPct} colorStops={ADAMSAAT_STOPS} size={116} gradId="ring-adamsaat" />
             <div className="flex flex-col gap-1.5 min-w-0 flex-1">
               <MetaRow label="Kullanılan" value={`${ADAM_SAAT_KULLANILAN.toLocaleString("tr-TR")} sa.`} />
               <MetaRow label="Planlanan" value={`${ADAM_SAAT_PLANLANAN.toLocaleString("tr-TR")} sa.`} />
@@ -459,6 +459,54 @@ function MetaRow({ label, value, bad }: { label: string; value: string; bad?: bo
     <div className="flex items-center justify-between gap-3 text-[11.5px]">
       <span style={{ color: "rgb(var(--panel-ink3))" }}>{label}</span>
       <span className="font-bold tabular-nums" style={{ color: bad ? "#f87171" : "rgb(var(--panel-ink))" }}>{value}</span>
+    </div>
+  );
+}
+
+// Tek metrikli, DÜZ (kesiksiz/dolgulu) yay halkası — RadialRing'in tick'li
+// (kesikli) stiline alternatif. Şimdilik yalnızca bu sayfada kullanılıyor;
+// gradId, aynı sayfada birden çok halka olduğunda SVG <linearGradient>
+// id çakışmasını önlemek için benzersiz olmalı.
+function SolidRing({ pct, colorStops, size = 116, gradId }: { pct: number; colorStops: ColorStop[]; size?: number; gradId: string }) {
+  const strokeWidth = size * 0.13;
+  const r = (size - strokeWidth) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circumference = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(100, pct));
+  const len = (clamped / 100) * circumference;
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <defs>
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            {colorStops.map((s, i) => (
+              <stop key={i} offset={`${s.t * 100}%`} stopColor={s.hex} />
+            ))}
+          </linearGradient>
+        </defs>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgb(var(--panel-hairline))" strokeWidth={strokeWidth} />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke={`url(#${gradId})`}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={`${len} ${Math.max(0, circumference - len)}`}
+          transform={`rotate(-90 ${cx} ${cy})`}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span
+          className="font-display font-extrabold"
+          style={{ fontSize: size * 0.167, fontVariantNumeric: "tabular-nums", color: "rgb(var(--panel-ink))" }}
+        >
+          %{clamped.toFixed(1)}
+        </span>
+      </div>
     </div>
   );
 }
