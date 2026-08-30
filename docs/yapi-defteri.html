@@ -1,0 +1,410 @@
+<title>Yapı Defteri</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@500;700&family=Source+Sans+3:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --paper:#eef1ee;
+  --paper-2:#e3e7e2;
+  --ink:#1b231f;
+  --ink-2:#4a544e;
+  --ink-3:#78837c;
+  --line:#c7cec6;
+  --line-strong:#a9b3aa;
+  --accent:#c97c00;
+  --accent-ink:#7a4b00;
+  --accent-soft:#f4e2bd;
+  --danger:#a8402e;
+  --danger-soft:#f3ded9;
+  --good:#3f6b52;
+  --good-soft:#dde8e0;
+  --blue:#3a5f7d;
+  --blue-soft:#dbe6ec;
+  --card:#f7f8f6;
+}
+:root:not([data-theme="light"]){
+  @media (prefers-color-scheme: dark){
+    --paper:#14181a;
+    --paper-2:#1a1f21;
+    --ink:#e7ece9;
+    --ink-2:#aab5ae;
+    --ink-3:#7c8882;
+    --line:#2c3432;
+    --line-strong:#3d4744;
+    --accent:#e0a03f;
+    --accent-ink:#f6c979;
+    --accent-soft:#3a2c10;
+    --danger:#d9776a;
+    --danger-soft:#3a201d;
+    --good:#7fb497;
+    --good-soft:#1c2a22;
+    --blue:#8fb4cf;
+    --blue-soft:#1b2a33;
+    --card:#191e20;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#14181a;
+  --paper-2:#1a1f21;
+  --ink:#e7ece9;
+  --ink-2:#aab5ae;
+  --ink-3:#7c8882;
+  --line:#2c3432;
+  --line-strong:#3d4744;
+  --accent:#e0a03f;
+  --accent-ink:#f6c979;
+  --accent-soft:#3a2c10;
+  --danger:#d9776a;
+  --danger-soft:#3a201d;
+  --good:#7fb497;
+  --good-soft:#1c2a22;
+  --blue:#8fb4cf;
+  --blue-soft:#1b2a33;
+  --card:#191e20;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Source Sans 3',system-ui,-apple-system,sans-serif;
+  font-size:16.5px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.sheet{ max-width:800px; margin:0 auto; padding:64px 28px 120px; }
+@media (max-width:600px){ .sheet{ padding:40px 18px 90px; } }
+
+.doc-head{
+  display:flex; flex-direction:column; gap:6px;
+  padding-bottom:28px; margin-bottom:36px;
+  border-bottom:2px solid var(--line-strong);
+}
+.doc-tag{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--blue);
+}
+.doc-title{
+  font-family:'Roboto Slab',serif; font-weight:700;
+  font-size:clamp(2rem,5vw,2.7rem); line-height:1.08; letter-spacing:-.01em;
+  margin:2px 0 4px; text-wrap:balance;
+}
+.doc-meta{
+  font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--ink-3);
+  display:flex; flex-wrap:wrap; gap:4px 14px;
+}
+.doc-meta b{color:var(--ink-2); font-weight:600;}
+.lede{ font-size:1.08rem; color:var(--ink-2); max-width:64ch; margin:0 0 8px; }
+
+.section{ margin-top:56px; }
+.section-head{ display:flex; align-items:baseline; gap:12px; margin-bottom:6px; }
+.section-no{
+  font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600;
+  color:var(--blue); background:var(--blue-soft);
+  padding:2px 8px; border-radius:3px; flex-shrink:0;
+}
+.section-title{ font-family:'Roboto Slab',serif; font-weight:700; font-size:1.5rem; margin:0; text-wrap:balance; }
+.section-sub{ color:var(--ink-3); font-size:.96rem; margin:0 0 26px; max-width:62ch; }
+
+p{ margin:0 0 14px; }
+.section p{ color:var(--ink-2); }
+.section p b{ color:var(--ink); font-weight:600; }
+
+code, .mono{
+  font-family:'JetBrains Mono',monospace; font-size:.88em;
+  background:var(--paper-2); padding:.1em .35em; border-radius:3px; color:var(--ink);
+}
+
+/* ── mimari şeması ── */
+.stack{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:1px;
+  background:var(--line); border:1px solid var(--line); border-radius:3px;
+  overflow:hidden; margin:22px 0 28px;
+}
+.stack-cell{ background:var(--card); padding:16px 14px; }
+.stack-cell .lbl{
+  font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:6px; display:block;
+}
+.stack-cell .val{ font-weight:600; font-size:.94rem; color:var(--ink); }
+.stack-cell .sub{ font-size:.82rem; color:var(--ink-2); margin-top:2px; }
+@media (max-width:640px){ .stack{ grid-template-columns:1fr 1fr; } }
+
+/* ── modül tablosu ── */
+.module-table{ width:100%; border-collapse:collapse; margin:18px 0 8px; font-size:.94rem; }
+.module-table th{
+  text-align:left; font-family:'JetBrains Mono',monospace; font-size:10.5px;
+  letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3);
+  padding:0 12px 8px 0; border-bottom:1px solid var(--line-strong);
+}
+.module-table td{ padding:11px 12px 11px 0; border-bottom:1px solid var(--line); vertical-align:top; }
+.module-table tr:last-child td{ border-bottom:none; }
+.module-table .m-name{ font-weight:600; color:var(--ink); white-space:nowrap; }
+.module-table .m-desc{ color:var(--ink-2); }
+.badge{
+  display:inline-block; font-family:'JetBrains Mono',monospace; font-size:10px;
+  font-weight:600; letter-spacing:.03em; padding:2px 7px; border-radius:99px;
+  white-space:nowrap;
+}
+.badge.live{ background:var(--good-soft); color:var(--good); }
+.badge.wait{ background:var(--accent-soft); color:var(--accent-ink); }
+.overflow{ overflow-x:auto; }
+
+.pull{
+  font-family:'Roboto Slab',serif; font-size:1.2rem; font-weight:500;
+  color:var(--ink); border-left:3px solid var(--blue); padding:2px 0 2px 18px;
+  margin:24px 0; text-wrap:balance;
+}
+
+.chip-row{ display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 22px; }
+.chip{
+  font-size:.85rem; padding:5px 12px; border-radius:99px;
+  border:1px solid var(--line-strong); color:var(--ink-2); background:var(--card);
+}
+
+.term{ margin:16px 0; }
+.term dt{ font-weight:600; color:var(--ink); font-size:.96rem; }
+.term dd{ margin:2px 0 0; color:var(--ink-2); font-size:.92rem; }
+
+footer{
+  margin-top:70px; padding-top:20px; border-top:1px solid var(--line);
+  font-size:.85rem; color:var(--ink-3);
+}
+</style>
+
+<div class="sheet">
+
+  <div class="doc-head">
+    <span class="doc-tag">Yapı Defteri · Teknik &amp; İş Özeti</span>
+    <h1 class="doc-title">İPKS Teknik ve İş Deneyimi Özeti</h1>
+    <div class="doc-meta">
+      <span><b>Proje:</b> ConCoord / İPKS</span>
+      <span><b>Dönem:</b> 11 Temmuz – 30 Ağustos 2026</span>
+      <span><b>Canlı:</b> concoord-frontend.onrender.com</span>
+    </div>
+  </div>
+
+  <p class="lede">
+    İPKS (İnşaat Proje Koordinasyon ve Saha Takip Sistemi), tek bir müşteriye
+    değil, herhangi bir inşaat projesine uyarlanabilir genel amaçlı bir proje
+    yönetim platformu olarak kurgulandı. Bu belge mimariyi, geliştirilen ana
+    modülleri, entegrasyonları ve bekleyen iş kararlarını özetler.
+  </p>
+
+  <!-- ════════ 01 — MİMARİ ════════ -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">01</span>
+      <h2 class="section-title">Mimari</h2>
+    </div>
+
+    <div class="stack">
+      <div class="stack-cell">
+        <span class="lbl">Backend</span>
+        <div class="val">Go</div>
+        <div class="sub">chi router · pgx/v5 · httpx yardımcı katmanı</div>
+      </div>
+      <div class="stack-cell">
+        <span class="lbl">Frontend</span>
+        <div class="val">React + TypeScript</div>
+        <div class="sub">Vite · Tailwind CSS · CSS custom property tema sistemi</div>
+      </div>
+      <div class="stack-cell">
+        <span class="lbl">Veritabanı</span>
+        <div class="val">PostgreSQL</div>
+        <div class="sub">52+ sıralı SQL migration</div>
+      </div>
+      <div class="stack-cell">
+        <span class="lbl">Depolama</span>
+        <div class="val">MinIO → R2 (planlı)</div>
+        <div class="sub">S3-uyumlu polimorfik <code>documents</code> motoru</div>
+      </div>
+    </div>
+
+    <p><b>Deploy hattı:</b> GitHub (<code>kaplanburakcan-hub/concoord</code>, <code>main</code>
+    branch) → Render.com. Frontend ve backend ayrı servisler olarak çalışır; push
+    sonrası otomatik deploy tetiklenir ve yeni migration'lar bir Pre-Deploy Command
+    aracılığıyla deploy'un parçası olarak kendiliğinden uygulanır (elle müdahale
+    genelde gerekmez).</p>
+
+    <p><b>Yetkilendirme:</b> İzin bazlı erişim kontrolü (<code>internal/rbac</code>),
+    rol başına varsayılan izin seti. Yeni bir izin türü eklendiğinde bu, migration'dan
+    BAĞIMSIZ bir seed adımı (<code>go run ./cmd/api -seed</code>) gerektirir — hem
+    yerelde hem prod'da ayrıca çalıştırılmalıdır.</p>
+
+    <p><b>Tasarım token katmanları:</b> <code>--beton-*</code>/<code>--emniyet-*</code>
+    (temaya duyarlı, genel içerik), <code>--chrome-*</code>/<code>--accent</code>
+    (sabit Grafit, yalnızca kenar çubuğu/üst bar), <code>--panel-*</code> (sabit koyu,
+    yalnızca Panel ve Proje Özet — temadan tamamen bağımsız), <code>--group-accent</code>
+    (marka sarısı #f5a800, her yerde sabit).</p>
+  </div>
+
+  <!-- ════════ 02 — MODÜLLER ════════ -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">02</span>
+      <h2 class="section-title">Geliştirilen Ana Modüller</h2>
+    </div>
+    <p class="section-sub">v1.0 (Faz 0-10) temelinden bugünkü çok modüllü platforma.</p>
+
+    <div class="overflow">
+    <table class="module-table">
+      <thead><tr><th>Modül</th><th>Kapsam</th><th>Durum</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="m-name">Taşeron Hakediş</td>
+          <td class="m-desc">Gerçek hesap sırası, KDV tevkifatı, kesinti katalogu, 9 adımlı onay zinciri</td>
+          <td><span class="badge live">Canlı</span></td>
+        </tr>
+        <tr>
+          <td class="m-name">Satın Alma</td>
+          <td class="m-desc">PR/PO akış panosu, mal kabul, teminat iadesi, Tedarik Planı (Excel/CSV içe aktarma)</td>
+          <td><span class="badge live">Canlı</span></td>
+        </tr>
+        <tr>
+          <td class="m-name">Nakit Akış (6 faz)</td>
+          <td class="m-desc">Merkezi <code>cash_events</code> defteri; ödeme planları + kısmi ödeme onay akışı; İdari Hakediş (nakit giriş kaynağı); Sabit Giderler (sanal aylık genişletme); "Ödemeler" sekmesi</td>
+          <td><span class="badge live">Canlı</span></td>
+        </tr>
+        <tr>
+          <td class="m-name">Ana Sözleşme</td>
+          <td class="m-desc">Kaydet-ve-kilitle/revize akışı; Taraflar (İşveren/Yüklenici/Yüklenici Proje Sorumlusu)</td>
+          <td><span class="badge live">Canlı</span></td>
+        </tr>
+        <tr>
+          <td class="m-name">Sigorta ve Poliçeler</td>
+          <td class="m-desc">CAR/EAR, İşveren/3. Şahıs Mali Sorumluluk, Nakliyat; teminat/prim vade takibi</td>
+          <td><span class="badge live">Canlı</span></td>
+        </tr>
+        <tr>
+          <td class="m-name">Makine/Ekipman/Araç Envanteri (5 faz)</td>
+          <td class="m-desc">Firma çapında kanonik envanter; proje-arası transfer onayı; kiralama sözleşmesi takibi; iş başı tarihi doğrulama; 45 katalog tipi + gerçek fotoğraf galerisi</td>
+          <td><span class="badge live">Canlı</span></td>
+        </tr>
+        <tr>
+          <td class="m-name">Proje Paydaşları / Tedarikçi</td>
+          <td class="m-desc">localStorage'dan gerçek backend varlığına taşındı (8 paydaş kategorisi + tedarikçi CRUD)</td>
+          <td><span class="badge live">Canlı</span></td>
+        </tr>
+        <tr>
+          <td class="m-name">Sözleşme Takip</td>
+          <td class="m-desc">Proje Keşfi × Taşeron İş Kalemleri, <code>poz_no</code> üzerinden canlı çapraz eşleştirme raporu</td>
+          <td><span class="badge live">Canlı</span></td>
+        </tr>
+        <tr>
+          <td class="m-name">İdari Hakediş</td>
+          <td class="m-desc">Gerçek hakediş rapor formuna göre A→H hesap zinciri (tutar artık kullanıcıdan değil, hesaplanarak geliyor)</td>
+          <td><span class="badge live">Canlı</span></td>
+        </tr>
+        <tr>
+          <td class="m-name">Saha modülleri</td>
+          <td class="m-desc">Yazışmalar (Gelen/Giden Evrak), Personel &amp; Puantaj, İSG &amp; OSGB, Depo Raporları, Toplantı ve Saha Tutanakları (+ Zimmet Tutanağı)</td>
+          <td><span class="badge live">Canlı</span></td>
+        </tr>
+        <tr>
+          <td class="m-name">Panel / Dashboard (v1→v3)</td>
+          <td class="m-desc">EVM göstergeleri (SPI/CPI), segmentli/gradyanlı halkalar, kesintisiz koyu levha tasarımı</td>
+          <td><span class="badge live">Canlı</span></td>
+        </tr>
+        <tr>
+          <td class="m-name">Proje Özet (v1→v2)</td>
+          <td class="m-desc">Zaman İlerlemesi / Adam-Saat / Giderler halkaları, konum bazlı hava durumu + canlı saat</td>
+          <td><span class="badge live">Canlı</span></td>
+        </tr>
+        <tr>
+          <td class="m-name">Fotoğraf / Doküman Yükleme</td>
+          <td class="m-desc">7+ sayfada kod hazır ve deploy edilmiş; gerçek dosya depolama (R2) bekliyor</td>
+          <td><span class="badge wait">Bekliyor</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- ════════ 03 — ENTEGRASYONLAR ════════ -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">03</span>
+      <h2 class="section-title">Entegrasyonlar</h2>
+    </div>
+
+    <p><b>Render.com</b> — frontend (Static Site) + backend (Web Service) + PostgreSQL,
+    GitHub push'ta otomatik deploy. Backend'de S3/MinIO henüz yok, PDF üretimi bu
+    yüzden senkron çalışır (arka plan worker'ı prod'da devrede değil).</p>
+
+    <p><b>GitHub</b> (<code>kaplanburakcan-hub/concoord</code>) — kaynak kontrol ve
+    deploy tetikleyicisi; her push doğrudan canlıya yansır.</p>
+
+    <p><b>Open-Meteo</b> — ücretsiz, API anahtarı gerektirmeyen geocoding + hava durumu
+    servisi; proje konumuna göre header'daki canlı hava durumu widget'ında kullanılıyor.</p>
+
+    <div class="chip-row">
+      <span class="chip">Planlı — Cloudflare R2 (S3-uyumlu depolama)</span>
+      <span class="chip">Planlı — Render Cron Job (kiralama hatırlatması)</span>
+    </div>
+  </div>
+
+  <!-- ════════ 04 — TERMİNOLOJİ ════════ -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">04</span>
+      <h2 class="section-title">Alan Terminolojisi</h2>
+    </div>
+    <p class="section-sub">Platformun iş mantığını taşıyan, inşaat sektörüne özgü kavramlar.</p>
+
+    <dl class="term">
+      <dt>Hakediş</dt>
+      <dd>Taşeronun tamamladığı iş karşılığı, dönemsel olarak hesaplanıp onaylanan ödeme hak edişi; KDV tevkifatı ve standart kesinti kalemleriyle birlikte çok adımlı bir onay zincirinden geçer.</dd>
+    </dl>
+    <dl class="term">
+      <dt>Poz No</dt>
+      <dd>Bir imalat kalemini benzersiz şekilde tanımlayan kod; Proje Keşfi ve Taşeron İş Kalemleri modüllerini birbirine bağlayan anahtar.</dd>
+    </dl>
+    <dl class="term">
+      <dt>EVM (SPI / CPI)</dt>
+      <dd>Kazanılmış Değer Yönetimi göstergeleri — Zaman Performans İndeksi ve Maliyet Performans İndeksi; Panel'de göstergelerle (ibre/halka) sunulur.</dd>
+    </dl>
+    <dl class="term">
+      <dt>cash_events</dt>
+      <dd>Nakit Akış modülünün merkezi defter tablosu — hakediş/ekstre/PO ödemeleri ve kasa fişleri buraya <code>direction</code>/<code>event_date</code>/<code>payment_method</code> ile yazılır.</dd>
+    </dl>
+  </div>
+
+  <!-- ════════ 05 — BEKLEYEN İŞ KARARLARI ════════ -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">05</span>
+      <h2 class="section-title">Bekleyen İş Kararları</h2>
+    </div>
+    <p class="section-sub">Kod tarafında engel yok — sıradaki adım bir iş/altyapı kararı.</p>
+
+    <p class="pull">Kodun hazır olması yeterli değil; bazı özellikler yalnızca bir
+    satın alma kararıyla hayata geçer.</p>
+
+    <p><b>Cloudflare R2 satın alımı</b> — TÜM dosya/fotoğraf yükleme özelliğini
+    (7+ sayfa) tek seferde aktive eder; kod tarafında değişiklik gerekmez, yalnızca
+    6 ortam değişkeni.</p>
+
+    <p><b>Render Cron Job için ödemeli plan</b> — kiralama sözleşmesi hatırlatma
+    job'ını aktive eder; backend endpoint'i ve gizli anahtar zaten hazır.</p>
+
+    <p><b>Sözleşme revizyon onay hiyerarşisi</b> — şu an Ana Sözleşme revizyonu tek
+    adımda kilitleniyor; çok kademeli onay akışı (mevcut ödeme planı onay desenine
+    benzer şekilde) bilinçli olarak sonraki bir işe bırakıldı.</p>
+
+    <p><b>Çeyrek / Özel Dönem Raporu</b> — backend hesaplaması şu an yalnızca
+    (yıl, ay) çiftine kilitli; rastgele tarih aralığı için hem şema hem yeni bir
+    tarih-aralığı seçici arayüzü gerekiyor.</p>
+
+    <p><b>Adam-Saat (manhour) veritabanı entegrasyonu</b> — kullanıcı 5 geçmiş
+    projeden imalat kalemi bazlı tarihsel verimlilik verisi paylaştı; Personel &amp;
+    Puantaj ile kıyaslama veya yeni proje tahmini için kullanılabilir, henüz
+    işlenmedi.</p>
+  </div>
+
+  <footer>
+    Bu belge canlı geliştirme geçmişinden (git log + oturum hafızası) derlenmiştir.
+    Tarihler ve modül durumları 30 Ağustos 2026 itibarıyla günceldir.
+  </footer>
+
+</div>

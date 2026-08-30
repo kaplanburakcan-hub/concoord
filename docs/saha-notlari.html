@@ -1,0 +1,484 @@
+<title>Saha Notları</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@500;700&family=Source+Sans+3:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --paper:#eef1ee;
+  --paper-2:#e3e7e2;
+  --ink:#1b231f;
+  --ink-2:#4a544e;
+  --ink-3:#78837c;
+  --line:#c7cec6;
+  --line-strong:#a9b3aa;
+  --accent:#c97c00;
+  --accent-ink:#7a4b00;
+  --accent-soft:#f4e2bd;
+  --danger:#a8402e;
+  --danger-soft:#f3ded9;
+  --good:#3f6b52;
+  --good-soft:#dde8e0;
+  --card:#f7f8f6;
+  --shadow: 0 1px 0 var(--line);
+}
+:root:not([data-theme="light"]){
+  @media (prefers-color-scheme: dark){
+    --paper:#14181a;
+    --paper-2:#1a1f21;
+    --ink:#e7ece9;
+    --ink-2:#aab5ae;
+    --ink-3:#7c8882;
+    --line:#2c3432;
+    --line-strong:#3d4744;
+    --accent:#e0a03f;
+    --accent-ink:#f6c979;
+    --accent-soft:#3a2c10;
+    --danger:#d9776a;
+    --danger-soft:#3a201d;
+    --good:#7fb497;
+    --good-soft:#1c2a22;
+    --card:#191e20;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#14181a;
+  --paper-2:#1a1f21;
+  --ink:#e7ece9;
+  --ink-2:#aab5ae;
+  --ink-3:#7c8882;
+  --line:#2c3432;
+  --line-strong:#3d4744;
+  --accent:#e0a03f;
+  --accent-ink:#f6c979;
+  --accent-soft:#3a2c10;
+  --danger:#d9776a;
+  --danger-soft:#3a201d;
+  --good:#7fb497;
+  --good-soft:#1c2a22;
+  --card:#191e20;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Source Sans 3',system-ui,-apple-system,sans-serif;
+  font-size:16.5px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.sheet{
+  max-width:760px;
+  margin:0 auto;
+  padding:64px 28px 120px;
+}
+@media (max-width:600px){ .sheet{ padding:40px 18px 90px; } }
+
+/* ── Üstbilgi ── */
+.doc-head{
+  display:flex; flex-direction:column; gap:6px;
+  padding-bottom:28px; margin-bottom:36px;
+  border-bottom:2px solid var(--line-strong);
+}
+.doc-tag{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--accent-ink);
+}
+.doc-title{
+  font-family:'Roboto Slab',serif; font-weight:700;
+  font-size:clamp(2rem,5vw,2.7rem); line-height:1.08; letter-spacing:-.01em;
+  margin:2px 0 4px; text-wrap:balance;
+}
+.doc-meta{
+  font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--ink-3);
+  display:flex; flex-wrap:wrap; gap:4px 14px;
+}
+.doc-meta b{color:var(--ink-2); font-weight:600;}
+
+.lede{
+  font-size:1.08rem; color:var(--ink-2); max-width:62ch;
+  margin:0 0 8px;
+}
+
+/* ── Bölümler ── */
+.section{ margin-top:56px; }
+.section-head{
+  display:flex; align-items:baseline; gap:12px;
+  margin-bottom:6px;
+}
+.section-no{
+  font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600;
+  color:var(--accent-ink); background:var(--accent-soft);
+  padding:2px 8px; border-radius:3px; flex-shrink:0;
+}
+.section-title{
+  font-family:'Roboto Slab',serif; font-weight:700; font-size:1.5rem;
+  margin:0; text-wrap:balance;
+}
+.section-sub{
+  color:var(--ink-3); font-size:.96rem; margin:0 0 26px; max-width:60ch;
+}
+
+/* ── Vaka kartı (not) ── */
+.case{
+  border:1px solid var(--line); border-left:3px solid var(--line-strong);
+  background:var(--card);
+  border-radius:2px;
+  padding:18px 22px;
+  margin-bottom:16px;
+}
+.case.danger{ border-left-color:var(--danger); }
+.case.good{ border-left-color:var(--good); }
+.case-title{
+  font-weight:600; font-size:1.02rem; color:var(--ink);
+  margin:0 0 6px;
+}
+.case-title .kicker{
+  font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--danger);
+  background:var(--danger-soft); padding:2px 7px; border-radius:3px;
+  margin-right:9px; display:inline-block; vertical-align:2px;
+}
+.case.good .case-title .kicker{ color:var(--good); background:var(--good-soft); }
+.case p{ margin:0 0 8px; color:var(--ink-2); font-size:.98rem; }
+.case p:last-child{ margin-bottom:0; }
+.case .ders{
+  margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);
+  font-size:.95rem;
+}
+.case .ders b{ color:var(--accent-ink); }
+code, .mono{
+  font-family:'JetBrains Mono',monospace; font-size:.88em;
+  background:var(--paper-2); padding:.1em .35em; border-radius:3px;
+  color:var(--ink);
+}
+
+/* ── Timeline özeti ── */
+.stat-row{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:1px;
+  background:var(--line); border:1px solid var(--line);
+  margin:22px 0 8px; border-radius:3px; overflow:hidden;
+}
+.stat{ background:var(--card); padding:14px 12px; text-align:center; }
+.stat b{
+  display:block; font-family:'Roboto Slab',serif; font-size:1.5rem; font-weight:700;
+  color:var(--ink); font-variant-numeric:tabular-nums;
+}
+.stat span{ font-size:.72rem; color:var(--ink-3); text-transform:uppercase; letter-spacing:.04em; }
+@media (max-width:560px){ .stat-row{ grid-template-columns:repeat(2,1fr); } }
+
+.pull{
+  font-family:'Roboto Slab',serif; font-size:1.2rem; font-weight:500;
+  color:var(--ink); border-left:3px solid var(--accent); padding:2px 0 2px 18px;
+  margin:24px 0; text-wrap:balance;
+}
+
+footer{
+  margin-top:70px; padding-top:20px; border-top:1px solid var(--line);
+  font-size:.85rem; color:var(--ink-3);
+}
+</style>
+
+<div class="sheet">
+
+  <div class="doc-head">
+    <span class="doc-tag">Saha Notları · İç Rapor</span>
+    <h1 class="doc-title">İPKS Geliştirme Süreci — Öğrenilen Dersler</h1>
+    <div class="doc-meta">
+      <span><b>Proje:</b> ConCoord / İPKS</span>
+      <span><b>Dönem:</b> 11 Temmuz – 30 Ağustos 2026</span>
+      <span><b>Canlı:</b> concoord-frontend.onrender.com</span>
+    </div>
+  </div>
+
+  <p class="lede">
+    Bu belge, İPKS'nin geliştirilmesi boyunca tekrar eden hataları, yanlış
+    teşhis edilen "bug"ları, talep değişikliklerinin sürece verdiği molaları
+    ve dış kısıtların yol açtığı bekleme sürelerini kayıt altına alır. Amaç
+    suçlamak değil — aynı tuzağa ikinci kez düşmemek.
+  </p>
+
+  <div class="stat-row">
+    <div class="stat"><b>150</b><span>Commit</span></div>
+    <div class="stat"><b>52+</b><span>Migration</span></div>
+    <div class="stat"><b>~7</b><span>Hafta</span></div>
+    <div class="stat"><b>0</b><span>Kaybolan veri</span></div>
+  </div>
+
+  <!-- ════════ BÖLÜM 1 ════════ -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">01</span>
+      <h2 class="section-title">Sessiz Sorunlar — Kodun Kendisi Hata Vermedi</h2>
+    </div>
+    <p class="section-sub">Bu grubun ortak özelliği: hiçbir yerde kırmızı bir hata mesajı yok — sonuç sessizce yanlıştı.</p>
+
+    <div class="case danger">
+      <p class="case-title"><span class="kicker">Kök neden</span>Nitelemesiz correlated subquery</p>
+      <p>Hakediş ödeme, ekstre ödeme ve PO ödeme kayıtlarındaki <code>pending_approval</code>
+      hesabı, paylaşılan bir <code>cols</code> sabiti içinde <code>EXISTS(SELECT 1 FROM
+      payment_plan_change_requests c WHERE c.source_id = id ...)</code> şeklinde yazılmıştı.
+      <code>payment_plan_change_requests</code> tablosunun da kendi <code>id</code> birincil
+      anahtarı olduğu için Postgres nitelemesiz <code>id</code>'yi EN İÇ kapsama (alt sorgunun
+      kendi tablosuna) bağladı — dış satırın id'sine değil. Sonuç: API her satır için
+      <code>pending_approval: false</code> döndürdü, veritabanında eşleşen bekleyen kayıt
+      olsa bile. Ne bir hata, ne bir uyarı, ne bir query-plan ipucu vardı.</p>
+      <p class="ders"><b>Ders:</b> paylaşılan bir cols-sabiti hem düz <code>SELECT</code>'te
+      hem <code>INSERT ... RETURNING</code>'de kullanılıyorsa, içindeki her correlated
+      subquery'de dış tablonun sütunu mutlaka <code>tabloadi.kolon</code> ile nitelenmeli.
+      Şüphede kalınca sorguyu doğrudan psql'de, bilinen bir satıra karşı çalıştır.</p>
+    </div>
+
+    <div class="case danger">
+      <p class="case-title"><span class="kicker">Kök neden</span>Tanımsız CSS değişkenleri</p>
+      <p>Yeni modal bileşenleri yazılırken <code>--card</code>, <code>--bg</code>,
+      <code>--border</code>, <code>--text</code> gibi projede hiçbir yerde tanımlanmamış CSS
+      özel özellikleri kullanıldı. Tarayıcı sessizce başlangıç değerine (genelde
+      <code>transparent</code>) düşer — modal şeffaf, sayfanın üzerinden okunaksız görünür.</p>
+      <p class="ders"><b>Ders:</b> yeni bir popup/modal yazarken önce çalışan bir referansı
+      (o an için <code>ProjePaydaslariPage.tsx</code>'in modalı) aç ve aynı <code>beton-*</code>
+      token ailesini kopyala — sıfırdan renk ismi icat etme.</p>
+    </div>
+
+    <div class="case danger">
+      <p class="case-title"><span class="kicker">Kök neden</span>İki paralel renk sistemi karışması</p>
+      <p><code>--chrome-*</code>/<code>--accent</code> yalnızca kenar çubuğu ve üst bar için,
+      temadan bağımsız sabit Grafit tonlarıdır. Ana Sözleşme ve Proje Keşfi sayfaları bunları
+      yanlışlıkla genel kart/kenarlık rengi olarak kullandı. Açık temada
+      <code>--chrome-border: rgba(255,255,255,.08)</code> neredeyse görünmez olduğundan
+      kartların kenarlığı kayboldu — kullanıcının "kutucuksuz görünüyor" şikayetinin kök
+      nedeni buydu, aylar sonra fark edildi.</p>
+      <p class="ders"><b>Ders:</b> genel içerik alanı her zaman <code>beton-*</code>/<code>emniyet-*</code>
+      (temaya duyarlı) kullanır; <code>chrome-*</code> yalnızca kenar çubuğu/üst bar'a özeldir.</p>
+    </div>
+
+    <div class="case danger">
+      <p class="case-title"><span class="kicker">Kök neden</span>Global override'ın öngörülemeyen kapsamı</p>
+      <p><code>[data-theme="light"] main .text-white</code> kuralı yalnızca açık temada
+      başlıkları okunur kılmak için eklenmişti, ama <code>&lt;main&gt;</code> içindeki HER
+      <code>.text-white</code> kullanımını (yeşil/kırmızı/mavi dolgulu butonların üzerindeki
+      beyaz yazı dahil) karartıyordu. 7 ekran görüntüsü, 12 dosya ve 23 buton etkilendi —
+      hepsi tek bir kök nedene bağlıydı.</p>
+      <p class="ders"><b>Ders:</b> yeni <code>.text-white-solid</code> sınıfı (koşulsuz,
+      her iki temada da beyaz) eklendi. Global bir CSS kuralı yazarken etki alanını
+      (hangi sınıflar, hangi kapsayıcı) net tut.</p>
+    </div>
+
+    <div class="case danger">
+      <p class="case-title"><span class="kicker">Kullanıcı girdisi</span>Türkçe/ABD ondalık format karışıklığı</p>
+      <p>İdari Hakediş test girişinde bir tutar ABD biçiminde (<code>67799471.86</code>)
+      girilince hesap zinciri (A→H) 100 kat yanlış çıktı. Kod hatası değildi:
+      <code>parseFmt</code> Türkçe biçim bekliyordu (nokta=binlik ayırıcı,
+      virgül=ondalık). Türkçe biçimde (<code>67.799.471,86</code>) girilince orijinal
+      hakediş raporundaki her rakamla birebir eşleşti.</p>
+      <p class="ders"><b>Ders:</b> bu sayfalarda test ederken her zaman Türkçe ondalık
+      format kullan — "yanlış hesaplıyor" izlenimi çoğu zaman girdi biçimi meselesidir.</p>
+    </div>
+
+    <div class="case danger">
+      <p class="case-title"><span class="kicker">Görsel</span>Yuvarlak uç, kendi boşluğunu yutuyor</p>
+      <p>Donut grafiklerde segmentler arasına 3° boşluk bırakılmıştı ama
+      <code>strokeLinecap="round"</code> ile çizildiğinden, her ucun kendi yuvarlak
+      genişliği (~çizgi kalınlığının yarısı) komşu segmentin ucuyla örtüştü — boşluk
+      matematiksel olarak vardı ama görsel olarak sıfırlandı. Kullanıcı sert yenileme
+      yapıp "hâlâ aynı" dedi — haklıydı, gerçekten aynıydı.</p>
+      <p class="ders"><b>Ders:</b> yuvarlak uçlu bir yayda görünür bir boşluk istiyorsan,
+      boşluğu ucun kendi genişliğini telafi edecek kadar büyük tut, ya da düz
+      (<code>butt</code>) uca geç. Kullanıcı "hâlâ düzelmedi" dediğinde önce DOM'dan
+      gerçek değerleri (<code>stroke-dasharray</code>, <code>stroke-linecap</code>) oku —
+      "zaten düzeldi" demeden önce kanıtla.</p>
+    </div>
+
+    <div class="case">
+      <p class="case-title"><span class="kicker">Ortam</span>Vite HMR'ın hayalet hatası</p>
+      <p>Uzun bir oturumda tarayıcı konsolunda <code>ReferenceError: fmtShort is not
+      defined</code> göründü — ama kaynak kodda fonksiyon doğru şekilde tanımlıydı ve
+      hoisted bir top-level fonksiyondu. Sadece eskimiş/bozulmuş bir Hot Module
+      Replacement durumuydu; tam sayfa yenilemesi sorunu anında çözdü, hiçbir kod
+      değişikliği gerekmedi.</p>
+      <p class="ders"><b>Ders:</b> uzun geliştirme oturumlarında garip runtime hataları
+      görünce önce "gerçek mi yoksa HMR mi" diye sorgula — hemen koda dalıp gereksiz
+      bir "düzeltme" yapma.</p>
+    </div>
+
+    <div class="case danger">
+      <p class="case-title"><span class="kicker">Ortam</span>Eşzamanlı oturumun veriyi değiştirmesi</p>
+      <p>Bu proje üzerinde zaman zaman başka bir oturum da paralel çalışıyor. Bir ara
+      DEMO-04'ün <code>project_id</code>'si prod'da sessizce değişti (muhtemelen bir
+      reseed olayı). Eski ID ile yapılan POST istekleri jenerik <code>internal_error</code>
+      (500) döndürdü — gerçek bir backend hatasından ayırt edilemezdi. Önceden "BUG:
+      İdari Hakedişler prod'da 500 veriyor" diye kaydedilmiş bir bulgu, sonradan bu
+      kök nedene bağlanıp yanlış alarm olarak kapatıldı.</p>
+      <p class="ders"><b>Ders:</b> prod'a yazmadan önce, özellikle uzun bir aradan
+      sonra, <code>GET /projects</code> ile güncel ID'yi doğrula — hardcoded/önceden
+      bilinen bir ID'ye güvenme.</p>
+    </div>
+
+  </div>
+
+  <!-- ════════ BÖLÜM 2 ════════ -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">02</span>
+      <h2 class="section-title">Talep Değişikliklerinin Süreci Uzattığı Yerler</h2>
+    </div>
+    <p class="section-sub">Kimsenin suçu değil — ama fark etmek gelecekteki turları kısaltır.</p>
+
+    <p class="pull">Bir özelliğin dört kez elden geçmesi, genelde ilk istekte iki farklı
+    şeyin tek alanmış gibi konuşulmasından kaynaklanır.</p>
+
+    <div class="case">
+      <p class="case-title">Ana Sözleşme "Taraflar" alanı — dört turlu revizyon</p>
+      <p>Sıra şöyleydi: <i>"İşveren ve Yüklenici aynı hizada olsun"</i> → canlıda
+      kontrol edilip ekran görüntüsü paylaşılınca <i>"şu an öyle değil, düzeltebilir
+      miyiz"</i> → <i>"ana sözleşmede yüklenici ve yüklenici proje sorumlusu ayrı
+      olacaktı"</i> (yeni bir alan + migration gerekti, çünkü "Yüklenici" firma adı ile
+      "Yüklenici Proje Sorumlusu" kişi adı aslında hep tek alanmış gibi ele alınmıştı)
+      → <i>"yüklenici proje sorumlusu bir alt satırda olsun ve zorunlu olsun"</i>.
+      Tek bir migration (000059) ve üç ayrı frontend turu gerekti.</p>
+      <p class="ders"><b>Ders:</b> "iki bilgi aynı hizada/yan yana olsun" isteği geldiğinde,
+      önce bu iki bilginin GERÇEKTEN aynı varlığa mı ait olduğunu, yoksa örtük şekilde
+      iki ayrı alan mı istendiğini netleştirmek, sonradan şema değişikliğini önler.</p>
+    </div>
+
+    <div class="case">
+      <p class="case-title">Panel v3 yeniden tasarımı — üç mockup turu</p>
+      <p>Modern bir referans dashboard görseli paylaşıldıktan sonra ilk iki geri
+      bildirim turu yüzey detaylarına (ikon, renk, boşluk) odaklandı; asıl sorunun
+      YAPISAL olduğu — ayrı "kart ızgarası" yerine tek kesintisiz koyu levha istendiği —
+      ancak üçüncü turda, kullanıcının "dolu dolu ve kesintisiz" ifadesiyle netleşti.</p>
+      <p class="ders"><b>Ders:</b> büyük bir tasarım değişikliğinde ilk geri bildirim
+      "hâlâ örnekle alakası yok" gibi genel kalırsa, ikinci turdan önce açıkça sor:
+      "sorun yüzey mi (renk/ikon) yoksa yapı mı (yerleşim/bölümleme)?"</p>
+    </div>
+
+    <div class="case">
+      <p class="case-title">"Kesikli" kelimesinin iki zıt anlamda kullanılması</p>
+      <p>Önce <i>"kesikli donut olmasın"</i> denildi — bu, halkanın 36 küçük tick-mark
+      parçacığından (barkod gibi) oluşan eski stilini kastediyordu; düz-dolgulu SVG
+      yaya geçildi. Birkaç mesaj sonra <i>"renkler arasında kesikler olmasını
+      istiyorum... kesiksiz değil kesikli olmalı"</i> denildi — bu kez SEGMENTLER
+      ARASI görsel boşluk kastediliyordu, ilk isteğin tam tersi bir talep gibi
+      okunabilirdi ama aslında farklı bir katmandı (tick deseni vs. segment sınırı).</p>
+      <p class="ders"><b>Ders:</b> "kesikli/dolgulu/kesintisiz" gibi görsel terimler
+      referans görselle birlikte teyit edilmeli; aynı kelime konuşmanın farklı
+      noktalarında farklı bir görsel özelliğe işaret edebilir.</p>
+    </div>
+
+    <div class="case">
+      <p class="case-title">Zaten yapılmış bir düzeltmenin tekrar sorulması</p>
+      <p>Panel'deki iki donut grafik, paylaşılan <code>SegmentedDonut</code> bileşeni
+      üzerinden otomatik olarak yeni stile geçmişti — ayrıca dokunulmasına gerek yoktu.
+      Yine de kullanıcı ekran görüntüsünde bunları işaretleyip "bunları da düzelt" dedi.
+      Sonucu netleştirmek sözle değil, DOM'dan canlı kanıt (gerçek
+      <code>stroke-dasharray</code> değerleri) okuyup göstermekle mümkün oldu.</p>
+      <p class="ders"><b>Ders:</b> "bu zaten düzeldi" derken somut kanıt (ekran görüntüsü,
+      DOM incelemesi) sun — salt sözle ikna etmeye çalışmak, aynı konunun tekrar
+      açılmasına yol açar.</p>
+    </div>
+
+    <div class="case">
+      <p class="case-title">Header saat/hava durumu widget'ı — üç görsel iterasyon</p>
+      <p>Önce "neon ve modern" bir saat istendi ve yapıldı → "neon beğenmedim, sarı
+      renklere uyarla, hava durumu ikonu ekle" → hava durumu widget'ı "çok sade"
+      bulunup nem/rüzgar bilgisiyle zenginleştirildi. Her tur ayrı bir commit + deploy
+      döngüsü gerektirdi (üç ayrı push, üç ayrı Render bekleme süresi).</p>
+      <p class="ders"><b>Ders:</b> küçük ama görsel-ağırlıklı widget'larda bile, ilk
+      turda "beğenmezsen ne yönde değişsin" diye bir tercih sorusu sormak (renk paleti,
+      yoğunluk) sonraki turları azaltabilir.</p>
+    </div>
+
+  </div>
+
+  <!-- ════════ BÖLÜM 3 ════════ -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">03</span>
+      <h2 class="section-title">Dış Kısıtların Yol Açtığı Bekleyen İşler</h2>
+    </div>
+    <p class="section-sub">Zaman kaybı değil, iş kaybı — kod hazır, bir iş kararı bekliyor.</p>
+
+    <div class="case">
+      <p class="case-title">Cloudflare R2 satın alınamadı</p>
+      <p>Render backend'de gerçek S3-uyumlu depolama yok — 7'den fazla sayfadaki
+      (Fotoğraflar, Saha Tutanakları, MAR ekleri, yazışma ekleri, hakediş faturası...)
+      doküman/fotoğraf yükleme kodu tamamen hazır ve deploy edilmiş durumda, ama
+      dosya baytları yazılamıyor (<code>502</code>). Kullanıcı R2'yi henüz satın
+      alamadı, iş bu noktada bilinçli olarak beklemede.</p>
+      <p class="ders"><b>Not:</b> 6 ortam değişkeni eklenince (kod değişikliği
+      GEREKMEDEN) hepsi aynı anda aktive olacak.</p>
+    </div>
+
+    <div class="case">
+      <p class="case-title">Render Cron Job için kayıtlı kart yok</p>
+      <p>Kiralama sözleşmesi 7-günlük hatırlatma job'ı backend'de tamamen hazır
+      (<code>POST /internal/cron/check-rental-contracts</code>), ama Render'ın
+      ücretsiz planında Cron Job kaynağı oluşturulamıyor (en ucuz plan bile ödemeli
+      kart istiyor). Kullanıcı bunu R2 ile aynı gerekçeyle erteledi.</p>
+    </div>
+
+    <div class="case">
+      <p class="case-title">Migration otomasyonunun belirsizliği</p>
+      <p>Başlarda Render'da migration'ların otomatik uygulanıp uygulanmadığı net
+      değildi — birkaç kez elle <code>migrate/migrate</code> Docker imajıyla harici
+      DB'ye karşı migrate çalıştırıldı. Sonradan (muhtemelen bir Pre-Deploy Command
+      ile) deploy'un migration'ları kendiliğinden uyguladığı keşfedildi. Bu belirsizlik
+      birkaç migration turunda gereksiz elle-doğrulama adımına yol açtı.</p>
+      <p class="ders"><b>Ders:</b> yeni bir migration push edildikten sonra önce
+      <code>schema_migrations</code> tablosunu kontrol et — muhtemelen zaten
+      uygulanmıştır, elle migrate komutu çalıştırmadan önce.</p>
+    </div>
+
+  </div>
+
+  <!-- ════════ BÖLÜM 4 ════════ -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">04</span>
+      <h2 class="section-title">Tekrarlanmaya Değer Yöntemler</h2>
+    </div>
+    <p class="section-sub">Bu turlar sorunsuz geçti çünkü belirli bir disiplin uygulandı.</p>
+
+    <div class="case good">
+      <p class="case-title"><span class="kicker">Doğru</span>Önce mockup, sonra kod</p>
+      <p>Büyük görsel/yerleşim değişikliklerinde (Dashboard v2, Panel v3, Proje Özet v2,
+      İdari Hakediş formu) her seferinde önce gerçek CSS token'larıyla bir HTML mockup
+      Artifact olarak yayınlandı, onay alındıktan sonra koda geçildi. Bu desen aynı
+      oturumda birden çok kez doğrulandı — mockup aşamasında yapılan bir düzeltme
+      dakikalar sürerken, kod yazıldıktan sonra "hayır böyle değil" demek çok daha
+      pahalı bir geri dönüş olurdu.</p>
+    </div>
+
+    <div class="case good">
+      <p class="case-title"><span class="kicker">Doğru</span>Gerçek backend'e bağlama ilkesi</p>
+      <p>"Tedarikçi" ve "Proje Paydaşları" verisinin tamamen tarayıcı
+      <code>localStorage</code>'ında yaşadığı, hiç API'ye gitmediği fark edilince
+      geçici bir yama yerine gerçek tablo + backend paketi kuruldu. Bu ilke boyunca
+      korundu: sunucuya gitmeyen hiçbir özellik "geçici çözüm" olarak bırakılmadı.</p>
+    </div>
+
+    <div class="case good">
+      <p class="case-title"><span class="kicker">Doğru</span>Faz bazlı ilerleme</p>
+      <p>Büyük istekler (Nakit Akış 6 faz, Makine/Ekipman/Araç Envanteri 5 faz) küçük,
+      bağımsız doğrulanabilir parçalara bölündü — her faz canlıda test edilip onay
+      alındıktan sonra bir sonrakine geçildi. Bir faz bitmeden sonrakine atlanmadı.
+      Sonuç: 6+5 fazın tamamı, geri dönüş gerektiren bir kırılma olmadan tamamlandı.</p>
+    </div>
+
+    <div class="case good">
+      <p class="case-title"><span class="kicker">Doğru</span>"Genel platform" disiplini</p>
+      <p>Bir raporun/özetin yalnızca DEMO-04'ün dolu verisiyle "iyi göründüğü" fark
+      edilince, kural netleşti: her yeni bölüm veri olmayan durumda da (başka bir
+      proje, sıfır taşeron/sipariş/kasa hareketi) doğru render olmalı, açık bir
+      "kayıt yok" mesajıyla — bölümü koşullu gizlemek ya da sahte demo verisiyle
+      doldurmak yerine.</p>
+    </div>
+
+  </div>
+
+  <footer>
+    Bu belge canlı geliştirme geçmişinden (git log + oturum hafızası) derlenmiştir.
+    Tarihler ve commit sayıları 30 Ağustos 2026 itibarıyla günceldir.
+  </footer>
+
+</div>
