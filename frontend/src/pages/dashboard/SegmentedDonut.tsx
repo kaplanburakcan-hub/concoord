@@ -8,7 +8,7 @@
 export type ColorStop = { t: number; hex: string };
 export type DonutSegment = { label: string; value: number; colorStops: ColorStop[]; swatch: string };
 
-const GAP_DEG = 3;
+const GAP_DEG = 6;
 
 // Büyük para tutarlarının (ör. ₺13.895.000) halkanın dar iç boşluğuna
 // sığması için kısaltılmış gösterim (₺13,9M) — legend'deki tam değerler
@@ -75,7 +75,7 @@ export default function SegmentedDonut({
               fill="none"
               stroke={a.color}
               strokeWidth={strokeWidth}
-              strokeLinecap="round"
+              strokeLinecap="butt"
               strokeDasharray={a.dash}
               strokeDashoffset={a.offset}
               transform={`rotate(-90 ${cx} ${cy})`}
