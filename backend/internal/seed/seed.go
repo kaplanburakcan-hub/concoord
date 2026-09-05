@@ -47,6 +47,8 @@ var registry = []Step{
 	{Name: "0009_nakit_akis_faz_c_izin_sync", Run: stepFaz2PermSync},
 	// Makine/Ekipman/Araç Envanteri Faz B: equipment.approve_transfer izni eklendi.
 	{Name: "0010_ekipman_transfer_izin_sync", Run: stepFaz2PermSync},
+	// Blok 2 Aşama 2 — PDKS/GPS Puantaj: attendance.* izinleri eklendi.
+	{Name: "0011_pdks_puantaj_izin_sync", Run: stepFaz2PermSync},
 }
 
 // stepFaz2PermSync — izin sözlüğünü ve rol varsayılanlarını yeniden senkronlar.

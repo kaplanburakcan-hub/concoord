@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ipks/ipks/backend/internal/admin"
+	"github.com/ipks/ipks/backend/internal/attendance"
 	"github.com/ipks/ipks/backend/internal/audit"
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/cashflow"
@@ -161,6 +162,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	// --- Dashboard v2: İş kazası kaydı ("kazasız gün" sayacı) ---
 	ohsAccidentsH := ohsaccidents.NewHandler(pool)
 
+	// --- Blok 2 Aşama 2: PDKS/GPS Puantaj ---
+	attendanceH := attendance.NewHandler(pool, recorder, notifySvc, eval)
+
 	// Liveness — süreç ayakta mı?
 	r.Get("/healthz", func(w http.ResponseWriter, req *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -211,6 +215,8 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 		api.Route("/internal/cron", func(cr chi.Router) {
 			cr.Use(cronSecretGuard(cfg.CronSecret))
 			cr.Post("/check-rental-contracts", machinesH.CheckRentalContracts)
+			// Blok 2 Aşama 2: PDKS konum verisi KVKK saklama süresi (varsayılan 730 gün).
+			cr.Post("/purge-attendance-location", attendanceH.PurgeStaleLocations)
 		})
 
 		// ---- Admin Paneli v1 (tümü kimlik doğrulamalı + izin korumalı) ----
@@ -706,6 +712,27 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("correspondence.view")).Get("/projects/{projectID}/correspondences/{id}", correspondenceH.Get)
 			pr.With(mw.RequirePermission("correspondence.edit")).Patch("/projects/{projectID}/correspondences/{id}", correspondenceH.Update)
 			pr.With(mw.RequirePermission("correspondence.delete")).Delete("/projects/{projectID}/correspondences/{id}", correspondenceH.Delete)
+		})
+
+		// ---- Blok 2 Aşama 2: PDKS/GPS Puantaj ----
+		// Herkese açık: PdksCheckinPage kimlik doğrulaması OLMADAN çalışır —
+		// işçi uygulamaya giriş yapmaz, güvenlik 60 saniyelik/tek kullanımlık
+		// QR token'ın kendisinden gelir (handler içinde doğrulanır).
+		api.Post("/attendance/events", attendanceH.CreateEvents)
+		// Aynı token güvenlik modeli: personel seçici için (ad/görev dışında hiçbir şey sızdırmaz).
+		api.Get("/attendance/personnel", attendanceH.ListPersonnelByToken)
+
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+
+			pr.With(mw.RequirePermission("attendance.view")).Get("/projects/{projectID}/geofences", attendanceH.ListGeofences)
+			pr.With(mw.RequirePermission("attendance.manage_geofences")).Post("/projects/{projectID}/geofences", attendanceH.CreateGeofence)
+			pr.With(mw.RequirePermission("attendance.manage_geofences")).Get("/geofences/{id}/qr-token", attendanceH.IssueQRToken)
+
+			pr.With(mw.RequirePermission("attendance.view")).Get("/projects/{projectID}/attendance/days", attendanceH.ListDays)
+			pr.With(mw.RequirePermission("attendance.view")).Get("/projects/{projectID}/attendance/events", attendanceH.ListEvents)
+			pr.With(mw.RequirePermission("attendance.adjust")).Patch("/attendance/days/{dayId}", attendanceH.AdjustDay)
+			pr.With(mw.RequirePermission("attendance.approve")).Post("/projects/{projectID}/attendance/approve", attendanceH.ApproveDays)
 		})
 
 		api.NotFound(func(w http.ResponseWriter, req *http.Request) {

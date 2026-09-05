@@ -23,6 +23,10 @@ const (
 	ActionInsert Action = "INSERT"
 	ActionUpdate Action = "UPDATE"
 	ActionDelete Action = "DELETE" // soft delete dahil
+	// ActionView — hassas verinin (ör. PDKS konum kayıtları) OKUNMASINI
+	// (yazılmasını değil) denetim izine düşürmek için. Bkz. migration
+	// 000061 (audit_logs.action CHECK kısıtına eklendi).
+	ActionView Action = "VIEW"
 )
 
 type Entry struct {

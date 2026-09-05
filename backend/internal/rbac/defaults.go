@@ -78,6 +78,13 @@ var AllPermissions = []PermissionDef{
 
 	{"equipment", "approve_transfer", "Proje-arası makine/ekipman/araç transfer talebini onayla"},
 
+	{"attendance", "view", "PDKS puantaj kayıtlarını görüntüle"},
+	{"attendance", "view_location", "PDKS puantaj konum verisini (lat/lng) görüntüle"},
+	{"attendance", "record", "Giriş/çıkış olayını elle kaydet"},
+	{"attendance", "adjust", "PDKS puantaj saatini düzelt"},
+	{"attendance", "approve", "PDKS puantaj dönemini onayla"},
+	{"attendance", "manage_geofences", "Şantiye sınırı (geofence) tanımla/düzenle"},
+
 	{"ohs", "view", "İSG kayıtlarını görüntüle"},
 	{"ohs", "perform_inspection", "İSG denetimi yap"},
 	{"ohs", "issue_penalty", "İSG ceza tutanağı kes"},
@@ -124,6 +131,8 @@ var roleDefaults = map[string][]string{
 		"procurement.view", "procurement.create_pr", "procurement.approve_pr", "procurement.manage_po", "procurement.upload_delivery",
 		"payments.approve_plan_change",
 		"equipment.approve_transfer",
+		"attendance.view", "attendance.view_location", "attendance.record",
+		"attendance.adjust", "attendance.approve", "attendance.manage_geofences",
 		"ohs.view", "ohs.issue_penalty", "ohs.manage_checklists",
 		"admin.view_audit_log",
 	},
@@ -137,6 +146,8 @@ var roleDefaults = map[string][]string{
 		"tasks.view", "tasks.create", "tasks.edit_own", "tasks.edit_all", "tasks.assign",
 		"reports.view", "reports.create_daily", "reports.generate_weekly", "reports.view_financial_reports",
 		"procurement.view", "procurement.create_pr", "procurement.approve_pr",
+		"attendance.view", "attendance.view_location", "attendance.record",
+		"attendance.adjust", "attendance.approve", "attendance.manage_geofences",
 		"ohs.view", "ohs.perform_inspection", "ohs.issue_penalty",
 		"admin.view_audit_log",
 	},
@@ -150,9 +161,11 @@ var roleDefaults = map[string][]string{
 		"tasks.view", "tasks.create", "tasks.edit_own", "tasks.edit_all", "tasks.assign",
 		"reports.view", "reports.create_daily",
 		"procurement.view", "procurement.create_pr",
+		"attendance.view",
 		"ohs.view", "ohs.perform_inspection",
 		// Not: view_financials ve generate_weekly VARSAYILAN DEĞİL —
 		// saha mühendisi günlük rapor girer, haftalık raporu göremez/üretemez.
+		// Aynı ilke: attendance.view_location/adjust/approve de VARSAYILAN DEĞİL.
 	},
 	"SubcontractorRep": {
 		"projects.view",
@@ -165,6 +178,7 @@ var roleDefaults = map[string][]string{
 		"tasks.view", "tasks.edit_own",
 		"reports.view",
 		"procurement.view",
+		"attendance.view",
 		"ohs.view",
 		// Satır seviyesi güvenlik: yalnızca kendi firmasının kayıtları (backend'de zorunlu).
 	},
@@ -178,6 +192,8 @@ var roleDefaults = map[string][]string{
 		"tasks.view",
 		"reports.view", "reports.view_financial_reports",
 		"procurement.view",
+		"attendance.view",
+		// KVKK: müşteri konum verisini (view_location) VARSAYILAN OLARAK görmez.
 		"ohs.view",
 	},
 	"ProcurementOfficer": {

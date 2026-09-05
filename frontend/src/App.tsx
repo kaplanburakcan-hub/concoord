@@ -64,6 +64,10 @@ import NakitAkisPage from "./pages/payments/NakitAkisPage";
 import OdemePlanlariPage from "./pages/payments/OdemePlanlariPage";
 import GelenEvrakPage from "./pages/project/GelenEvrakPage";
 import GidenEvrakPage from "./pages/project/GidenEvrakPage";
+import PdksCheckinPage from "./pages/attendance/PdksCheckinPage";
+import PuantajPage from "./pages/attendance/PuantajPage";
+import GeofencePage from "./pages/attendance/GeofencePage";
+import QrPanoPage from "./pages/attendance/QrPanoPage";
 
 // Basit ComingSoon sarmalayıcı — yeni sayfalar için geçici placeholder
 function ComingSoonPage({ title, description }: { title: string; description: string }) {
@@ -77,6 +81,21 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          {/* PDKS/GPS Puantaj — kimlik doğrulaması GEREKTİRMEZ (işçi QR okutur, oturum açmaz). */}
+          <Route path="/pdks" element={<PdksCheckinPage />} />
+          {/* Şantiye panosu — kimlik doğrulamalı ama AppShell'siz (tam ekran kiosk görünümü). */}
+          <Route
+            path="/proje/pdks-pano"
+            element={
+              <RequireAuth>
+                <ProjectProvider>
+                  <RequirePerm perm="attendance.manage_geofences">
+                    <QrPanoPage />
+                  </RequirePerm>
+                </ProjectProvider>
+              </RequireAuth>
+            }
+          />
           <Route
             path="/*"
             element={
@@ -373,6 +392,9 @@ export default function App() {
                       <Route path="/odeme-planlari" element={<RequirePerm perm="reports.view_financial_reports"><OdemePlanlariPage /></RequirePerm>} />
                       <Route path="/proje/personel-puantaj" element={<RequirePerm perm="reports.view"><PersonelPuantajPage /></RequirePerm>} />
                       <Route path="/saha/tutanaklar" element={<RequirePerm perm="reports.view"><SahaTutanaklariPage /></RequirePerm>} />
+                      {/* ── PDKS/GPS Puantaj (Blok 2, Aşama 2) — mevcut manuel /proje/personel-puantaj'dan BİLİNÇLİ olarak ayrı ── */}
+                      <Route path="/proje/pdks-puantaj" element={<RequirePerm perm="attendance.view"><PuantajPage /></RequirePerm>} />
+                      <Route path="/proje/pdks-geofence" element={<RequirePerm perm="attendance.manage_geofences"><GeofencePage /></RequirePerm>} />
                       {/* ── YAZIŞMALAR ── */}
                       <Route path="/yazismalar" element={<Navigate to="/yazismalar/gelen" replace />} />
                       <Route path="/yazismalar/gelen" element={<RequirePerm perm="correspondence.view"><GelenEvrakPage /></RequirePerm>} />

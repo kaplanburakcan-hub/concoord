@@ -44,6 +44,7 @@ const I = {
   ekstrem: <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>,
   puantaj: <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>,
   sigorta: <svg viewBox="0 0 24 24"><path d="M12 2l9 4v6c0 5-4 8-9 10-5-2-9-5-9-10V6z"/><path d="M9 12l2 2 4-4"/></svg>,
+  konum: <svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>,
 };
 
 const GROUPS: NavGroup[] = [
@@ -112,6 +113,8 @@ const GROUPS: NavGroup[] = [
       { to: "/saha-raporlari/haftalik", label: "Haftalık Raporlar", perm: "reports.generate_weekly", icon: I.rapor },
       { to: "/saha/tutanaklar", label: "Saha Tutanakları", perm: "reports.view", icon: I.rapor },
       { to: "/proje/personel-puantaj", label: "Personel & Puantaj Girişi", perm: "reports.view", icon: I.puantaj },
+      { to: "/proje/pdks-puantaj", label: "PDKS Puantaj (QR/GPS)", perm: "attendance.view", icon: I.puantaj },
+      { to: "/proje/pdks-geofence", label: "Şantiye Sınırları", perm: "attendance.manage_geofences", icon: I.konum },
       { to: "/proje/depo", label: "Depo Raporları", perm: "reports.view", icon: I.depo },
       {
         to: "/isg", label: "İSG & OSGB", perm: "ohs.view", icon: I.isg,
