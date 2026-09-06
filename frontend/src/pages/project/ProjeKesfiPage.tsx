@@ -45,10 +45,15 @@ type Item = {
   para_birimi: string;
   aciklama: string;
   sira: number;
+  work_item_id?: string | null;
+  subcontractor_adi?: string | null;
   // editing state
   _dirty?: boolean;
   _new?: boolean;
 };
+
+type Sub = { id: string; company_name: string };
+type Contract = { id: string; contract_no: string; subcontractor_id?: string };
 
 function fmt(n: number): string {
   if (!n) return "—";
@@ -75,6 +80,7 @@ export default function ProjeKesfiPage() {
   const { can } = useAuth();
   const pid = current?.id;
   const canEdit = can("projects.edit");
+  const canAssign = can("contracts.upload");
 
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,6 +88,7 @@ export default function ProjeKesfiPage() {
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [openKats, setOpenKats] = useState<Set<string>>(new Set(KATEGORILER));
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [assignItem, setAssignItem] = useState<Item | null>(null);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -204,6 +211,17 @@ export default function ProjeKesfiPage() {
     }
   }
 
+  async function unassignSubcontractor(it: Item) {
+    if (!pid || !it.id) return;
+    if (!confirm(`"${it.tanim}" kaleminin taşeron ataması kaldırılsın mı? (Oluşturulan hakediş poz kaydı silinmez.)`)) return;
+    try {
+      await api(`/projects/${pid}/survey-items/${it.id}/unassign`, { method: "POST", projectId: pid });
+      await load();
+    } catch {
+      setErr("Atama kaldırılamadı.");
+    }
+  }
+
   async function deleteItem(it: Item) {
     if (!pid || !it.id) return;
     if (it._new) {
@@ -291,6 +309,7 @@ export default function ProjeKesfiPage() {
                           <th className="py-2 px-3 text-right font-medium w-24">Miktar</th>
                           <th className="py-2 px-3 text-right font-medium w-32">Birim Fiyat</th>
                           <th className="py-2 px-3 text-right font-medium w-36">Tutar</th>
+                          <th className="py-2 px-3 text-left font-medium w-32">Taşeron</th>
                           {canEdit && <th className="py-2 px-3 w-16" />}
                         </tr>
                       </thead>
@@ -315,8 +334,11 @@ export default function ProjeKesfiPage() {
                               <ViewRow
                                 it={it}
                                 canEdit={canEdit}
+                                canAssign={canAssign}
                                 onEdit={() => setEditingId(it.id!)}
                                 onDelete={() => deleteItem(it)}
+                                onAssign={() => setAssignItem(it)}
+                                onUnassign={() => unassignSubcontractor(it)}
                               />
                             )}
                           </tr>
@@ -396,14 +418,112 @@ export default function ProjeKesfiPage() {
           </table>
         </div>
       </div>
+
+      {assignItem && (
+        <AssignModal
+          item={assignItem}
+          projectId={pid!}
+          onClose={() => setAssignItem(null)}
+          onAssigned={() => { setAssignItem(null); load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Taşeron atama modalı ─────────────────────────────────────────────────────
+
+function AssignModal({ item, projectId, onClose, onAssigned }: {
+  item: Item; projectId: string; onClose: () => void; onAssigned: () => void;
+}) {
+  const [subs, setSubs] = useState<Sub[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [subId, setSubId] = useState("");
+  const [contractId, setContractId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    api<{ subcontractors: Sub[] }>(`/projects/${projectId}/subcontractors`, { projectId })
+      .then((r) => setSubs(r.subcontractors ?? []));
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!subId) { setContracts([]); setContractId(""); return; }
+    api<{ contracts: Contract[] }>(`/projects/${projectId}/contracts?subcontractor_id=${subId}`, { projectId })
+      .then((r) => setContracts(r.contracts ?? []))
+      .catch(() => setContracts([]));
+  }, [projectId, subId]);
+
+  async function assign() {
+    setErr(null);
+    if (!item.poz_no.trim()) {
+      setErr("Atama yapabilmek için önce bu kalemde poz numarası girilmeli.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api(`/projects/${projectId}/survey-items/${item.id}/assign-subcontractor`, {
+        method: "POST", projectId,
+        body: { subcontractor_id: subId, contract_id: contractId || null },
+      });
+      onAssigned();
+    } catch (e: any) {
+      setErr(e?.api?.message || "Atanamadı.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-xl border border-beton-700 bg-beton-900 p-5" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold text-beton-100">Taşeron Ata</h2>
+        <p className="text-xs text-beton-400 mt-1">{item.poz_no} — {item.tanim}</p>
+        <p className="mt-2 text-xs text-beton-500">
+          Atama, bu kalemi seçilen taşeron altında gerçek bir hakediş poz kaydına dönüştürür — sonrasında
+          hakediş akışından bağımsız olarak revize edilebilir.
+        </p>
+
+        <label className="block mt-4 text-xs text-beton-400 mb-1">Taşeron *</label>
+        <select value={subId} onChange={(e) => setSubId(e.target.value)}
+          className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-1.5 text-sm text-beton-100">
+          <option value="">Seçin</option>
+          {subs.map((s) => <option key={s.id} value={s.id}>{s.company_name}</option>)}
+        </select>
+
+        {subId && (
+          <>
+            <label className="block mt-3 text-xs text-beton-400 mb-1">Sözleşme (opsiyonel)</label>
+            <select value={contractId} onChange={(e) => setContractId(e.target.value)}
+              className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-1.5 text-sm text-beton-100">
+              <option value="">Seçin (opsiyonel)</option>
+              {contracts.map((c) => <option key={c.id} value={c.id}>{c.contract_no}</option>)}
+            </select>
+          </>
+        )}
+
+        {err && <p className="mt-2 text-sm text-red-400">{err}</p>}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-md border border-beton-700 text-beton-300 hover:bg-beton-800 px-3 py-1.5 text-sm transition">
+            İptal
+          </button>
+          <button onClick={assign} disabled={busy || !subId}
+            className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-semibold px-3 py-1.5 text-sm transition">
+            {busy ? "Atanıyor…" : "Ata"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 // ── Görüntüleme satırı ────────────────────────────────────────────────────────
 
-function ViewRow({ it, canEdit, onEdit, onDelete }: {
-  it: Item; canEdit: boolean; onEdit: () => void; onDelete: () => void;
+function ViewRow({ it, canEdit, canAssign, onEdit, onDelete, onAssign, onUnassign }: {
+  it: Item; canEdit: boolean; canAssign: boolean;
+  onEdit: () => void; onDelete: () => void; onAssign: () => void; onUnassign: () => void;
 }) {
   return (
     <>
@@ -418,6 +538,26 @@ function ViewRow({ it, canEdit, onEdit, onDelete }: {
       </td>
       <td className="py-2 px-3 text-right tabular-nums font-mono text-beton-100 font-medium">
         {fmt(it.miktar * it.birim_fiyat)}
+      </td>
+      <td className="py-2 px-3">
+        {it.work_item_id ? (
+          <div className="flex items-center gap-1.5">
+            <span className="rounded bg-emniyet-500/15 text-emniyet-400 text-xs px-1.5 py-0.5 whitespace-nowrap">
+              {it.subcontractor_adi ?? "Atanmış"}
+            </span>
+            {canAssign && (
+              <button onClick={onUnassign} title="Atamayı kaldır"
+                      className="text-beton-500 hover:text-red-400 transition-colors text-xs">✕</button>
+            )}
+          </div>
+        ) : canAssign ? (
+          <button onClick={onAssign}
+                  className="text-xs text-beton-500 hover:text-emniyet-500 transition-colors underline decoration-dotted">
+            Ata
+          </button>
+        ) : (
+          <span className="text-beton-600 text-xs">—</span>
+        )}
       </td>
       {canEdit && (
         <td className="py-2 px-3">
@@ -480,6 +620,7 @@ function EditRow({ it, onUpdate, onSave, onCancel, saving, canEdit }: {
       <td className="py-1 px-2 text-right font-mono tabular-nums text-beton-400 text-xs">
         {fmt(it.miktar * it.birim_fiyat)}
       </td>
+      <td className="py-1 px-2" />
       <td className="py-1 px-2">
         <div className="flex gap-1">
           <button onClick={onSave} disabled={saving || !it.tanim}

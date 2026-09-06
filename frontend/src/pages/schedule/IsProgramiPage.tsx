@@ -26,6 +26,8 @@ type Baseline = { id: string; project_id: string; revision_no: number; frozen_at
 type BaselineDetail = Baseline & { snapshot: { id: string; progress: number; baseline_start: string | null; baseline_finish: string | null }[] };
 type AvailablePoz = { id: string; poz_no: string; description: string; unit: string; contract_qty: number; subcontractor_adi: string };
 type SCurvePoint = { date: string; planned_physical: number; actual_physical: number; planned_cash: number; actual_cash: number };
+type SurveyPlanItem = { survey_item_id: string; name: string; weight: number; work_item_id: string | null };
+type SurveyPlanCategory = { name: string; weight: number; items: SurveyPlanItem[] };
 
 function isDelayed(it: ScheduleItem): boolean {
   return !it.actual_finish && !!it.baseline_finish && new Date(it.baseline_finish) < new Date() && it.progress < 100;
@@ -54,6 +56,9 @@ export default function IsProgramiPage() {
   const [pozModalItem, setPozModalItem] = useState<ScheduleItem | null>(null);
   const [depPanelOpen, setDepPanelOpen] = useState(false);
   const [freezing, setFreezing] = useState(false);
+  const [surveyPlan, setSurveyPlan] = useState<SurveyPlanCategory[] | null>(null);
+  const [surveyErr, setSurveyErr] = useState<string | null>(null);
+  const [surveyBusy, setSurveyBusy] = useState(false);
 
   useEffect(() => {
     load();
@@ -96,6 +101,31 @@ export default function IsProgramiPage() {
     }
   }
 
+  async function openSurveyPreview() {
+    if (!current?.id) return;
+    setSurveyErr(null);
+    try {
+      const r = await api<{ categories: SurveyPlanCategory[] }>(`/projects/${current.id}/schedule/survey-preview`, { projectId: current.id });
+      setSurveyPlan(r.categories);
+    } catch (e: any) {
+      setSurveyErr(e?.api?.message || "Keşif kalemleri okunamadı.");
+    }
+  }
+
+  async function confirmSurveyGenerate() {
+    if (!current?.id) return;
+    setSurveyBusy(true);
+    try {
+      await api(`/projects/${current.id}/schedule/generate-from-survey`, { method: "POST", projectId: current.id });
+      setSurveyPlan(null);
+      await load();
+    } catch (e: any) {
+      setSurveyErr(e?.api?.message || "Oluşturulamadı.");
+    } finally {
+      setSurveyBusy(false);
+    }
+  }
+
   const byParent = useMemo(() => {
     const m = new Map<string, ScheduleItem[]>();
     for (const it of items) {
@@ -134,6 +164,14 @@ export default function IsProgramiPage() {
               {freezing ? "Dondruluyor…" : "Revizyonu Dondur"}
             </button>
           )}
+          {canEdit && items.length === 0 && (
+            <button
+              onClick={openSurveyPreview}
+              className="rounded-md border border-emniyet-500/50 text-emniyet-400 hover:bg-emniyet-500/10 px-3 py-1.5 text-xs font-semibold transition"
+            >
+              Keşiften Otomatik Oluştur
+            </button>
+          )}
           {canEdit && (
             <button
               onClick={() => { setNewItemParent(null); setEditingItem("new"); }}
@@ -144,6 +182,7 @@ export default function IsProgramiPage() {
           )}
         </div>
       </div>
+      {surveyErr && <p className="mt-2 text-xs text-red-400">{surveyErr}</p>}
 
       <div className="mt-4 flex gap-1 border-b border-beton-800">
         {(["tablo", "gantt", "s-egrisi"] as const).map((t) => (
@@ -217,6 +256,70 @@ export default function IsProgramiPage() {
           onChanged={() => { setPozModalItem(null); load(); }}
         />
       )}
+      {surveyPlan && (
+        <SurveyGenModal
+          categories={surveyPlan} busy={surveyBusy}
+          onClose={() => setSurveyPlan(null)}
+          onConfirm={confirmSurveyGenerate}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Keşiften otomatik WBS oluşturma — önizleme modalı
+// ---------------------------------------------------------------------------
+
+function SurveyGenModal({ categories, busy, onClose, onConfirm }: {
+  categories: SurveyPlanCategory[]; busy: boolean; onClose: () => void; onConfirm: () => void;
+}) {
+  const itemCount = categories.reduce((s, c) => s + c.items.length, 0);
+  const derivedCount = categories.reduce((s, c) => s + c.items.filter((i) => i.work_item_id).length, 0);
+  const grandTotal = categories.reduce((s, c) => s + c.weight, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-xl border border-beton-700 bg-beton-900 p-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold text-beton-100">Keşiften Otomatik WBS Önizleme</h2>
+        <p className="mt-1 text-xs text-beton-400">
+          {categories.length} kategori, {itemCount} kalem oluşturulacak — {derivedCount} tanesi taşerona atanmış
+          olduğu için doğrudan hakedişten türetilen ilerlemeyle, kalanı elle girilecek şekilde başlar.
+          Kategoriler inşaat mantığına göre sıralandı; sonrasında normal şekilde düzenleyebilirsiniz.
+        </p>
+
+        <div className="mt-4 space-y-3">
+          {categories.map((c) => (
+            <div key={c.name} className="rounded-lg border border-beton-800 p-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold text-beton-100">{c.name}</span>
+                <span className="font-mono tabular-nums text-beton-400">{c.weight.toLocaleString("tr-TR")}</span>
+              </div>
+              <ul className="mt-2 space-y-1">
+                {c.items.map((it) => (
+                  <li key={it.survey_item_id} className="flex items-center gap-2 text-xs text-beton-400">
+                    <span className={`w-1.5 h-1.5 rounded-full ${it.work_item_id ? "bg-emniyet-500" : "bg-beton-600"}`} />
+                    <span className="flex-1">{it.name}</span>
+                    <span className="font-mono tabular-nums">{it.weight.toLocaleString("tr-TR")}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-4 text-xs text-beton-500">Toplam: <span className="font-mono">{grandTotal.toLocaleString("tr-TR")}</span></p>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-md border border-beton-700 text-beton-300 hover:bg-beton-800 px-3 py-1.5 text-sm transition">
+            Vazgeç
+          </button>
+          <button onClick={onConfirm} disabled={busy}
+            className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-semibold px-3 py-1.5 text-sm transition">
+            {busy ? "Oluşturuluyor…" : "Oluştur"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

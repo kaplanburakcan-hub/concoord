@@ -8,25 +8,33 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/ipks/ipks/backend/internal/audit"
 	"github.com/ipks/ipks/backend/internal/httpx"
 )
 
-type Handler struct{ db *pgxpool.Pool }
+type Handler struct {
+	db  *pgxpool.Pool
+	rec *audit.Recorder
+}
 
-func NewHandler(pool *pgxpool.Pool) *Handler { return &Handler{db: pool} }
+func NewHandler(pool *pgxpool.Pool, rec *audit.Recorder) *Handler {
+	return &Handler{db: pool, rec: rec}
+}
 
 type Item struct {
-	ID          string   `json:"id,omitempty"`
-	ProjectID   string   `json:"project_id,omitempty"`
-	Kategori    string   `json:"kategori"`
-	PozNo       string   `json:"poz_no"`
-	Tanim       string   `json:"tanim"`
-	Birim       string   `json:"birim"`
-	Miktar      float64  `json:"miktar"`
-	BirimFiyat  float64  `json:"birim_fiyat"`
-	ParaBirimi  string   `json:"para_birimi"`
-	Aciklama    string   `json:"aciklama"`
-	Sira        int      `json:"sira"`
+	ID              string  `json:"id,omitempty"`
+	ProjectID       string  `json:"project_id,omitempty"`
+	Kategori        string  `json:"kategori"`
+	PozNo           string  `json:"poz_no"`
+	Tanim           string  `json:"tanim"`
+	Birim           string  `json:"birim"`
+	Miktar          float64 `json:"miktar"`
+	BirimFiyat      float64 `json:"birim_fiyat"`
+	ParaBirimi      string  `json:"para_birimi"`
+	Aciklama        string  `json:"aciklama"`
+	Sira            int     `json:"sira"`
+	WorkItemID      *string `json:"work_item_id"`
+	SubcontractorAd *string `json:"subcontractor_adi"`
 }
 
 // List — proje keşif kalemlerini kategori/sıra sırasıyla döner.
@@ -38,12 +46,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.db.Query(r.Context(), `
-		SELECT id, project_id, kategori, COALESCE(poz_no,''), tanim,
-		       birim, miktar, birim_fiyat, COALESCE(para_birimi,'TRY'),
-		       COALESCE(aciklama,''), sira
-		FROM project_survey_items
-		WHERE project_id=$1
-		ORDER BY kategori, sira, tanim`, pid)
+		SELECT psi.id, psi.project_id, psi.kategori, COALESCE(psi.poz_no,''), psi.tanim,
+		       psi.birim, psi.miktar, psi.birim_fiyat, COALESCE(psi.para_birimi,'TRY'),
+		       COALESCE(psi.aciklama,''), psi.sira, psi.work_item_id, s.company_name
+		FROM project_survey_items psi
+		LEFT JOIN work_items wi ON wi.id = psi.work_item_id
+		LEFT JOIN subcontractors s ON s.id = wi.subcontractor_id
+		WHERE psi.project_id=$1
+		ORDER BY psi.kategori, psi.sira, psi.tanim`, pid)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -54,7 +64,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var it Item
 		if err := rows.Scan(&it.ID, &it.ProjectID, &it.Kategori, &it.PozNo, &it.Tanim,
-			&it.Birim, &it.Miktar, &it.BirimFiyat, &it.ParaBirimi, &it.Aciklama, &it.Sira); err != nil {
+			&it.Birim, &it.Miktar, &it.BirimFiyat, &it.ParaBirimi, &it.Aciklama, &it.Sira,
+			&it.WorkItemID, &it.SubcontractorAd); err != nil {
 			httpx.Internal(w, r)
 			return
 		}

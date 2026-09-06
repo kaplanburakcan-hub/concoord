@@ -24,6 +24,10 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 		httpx.Error(w, r, http.StatusUnprocessableEntity, httpx.CodeValidation, "Kayıt başka bir projeye ait.", nil)
 	case errors.Is(err, ErrCycle):
 		httpx.Error(w, r, http.StatusUnprocessableEntity, httpx.CodeValidation, "Bu bağımlılık döngüsel bir zincir oluşturur.", nil)
+	case errors.Is(err, ErrScheduleNotEmpty):
+		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "Bu proje için zaten bir iş programı var; öneri yalnızca boş bir iş programında kullanılabilir.", nil)
+	case errors.Is(err, ErrNoSurveyItems):
+		httpx.Error(w, r, http.StatusUnprocessableEntity, httpx.CodeValidation, "Projede henüz keşif kalemi yok.", nil)
 	default:
 		httpx.Internal(w, r)
 	}
@@ -290,6 +294,38 @@ func (h *Handler) GetBaselineHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"baseline": b})
+}
+
+// GET /projects/{projectID}/schedule/survey-preview
+func (h *Handler) SurveyPreviewHTTP(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	plan, err := h.PreviewSurveyPlan(r.Context(), pid)
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"categories": plan})
+}
+
+// POST /projects/{projectID}/schedule/generate-from-survey
+func (h *Handler) GenerateFromSurveyHTTP(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	uid, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	items, err := h.GenerateFromSurvey(r.Context(), pid, uid)
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, map[string]any{"items": items})
 }
 
 // GET /projects/{projectID}/schedule/s-curve?from=&to=&bucket=week|month

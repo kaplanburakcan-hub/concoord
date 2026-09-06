@@ -129,7 +129,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	insuranceH := insurance.NewHandler(pool)
 
 	// --- Faz 19: Proje Keşfi ---
-	surveyH := survey.NewHandler(pool)
+	surveyH := survey.NewHandler(pool, recorder)
 
 	// --- Faz 20: Tasarım ve Projeler ---
 	designH := design.NewHandler(pool)
@@ -578,6 +578,8 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/survey-items", surveyH.Create)
 			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/survey-items/{id}", surveyH.Update)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/survey-items/{id}", surveyH.Delete)
+			pr.With(mw.RequirePermission("contracts.upload")).Post("/projects/{projectID}/survey-items/{id}/assign-subcontractor", surveyH.AssignSubcontractor)
+			pr.With(mw.RequirePermission("contracts.upload")).Post("/projects/{projectID}/survey-items/{id}/unassign", surveyH.Unassign)
 		})
 
 		// ---- Faz 20: Tasarım ve Projeler ----
@@ -759,6 +761,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("schedule.view")).Get("/schedule/baselines/{baselineId}", scheduleH.GetBaselineHTTP)
 
 			pr.With(mw.RequirePermission("schedule.view")).Get("/projects/{projectID}/schedule/s-curve", scheduleH.SCurveHTTP)
+
+			pr.With(mw.RequirePermission("schedule.view")).Get("/projects/{projectID}/schedule/survey-preview", scheduleH.SurveyPreviewHTTP)
+			pr.With(mw.RequirePermission("schedule.edit")).Post("/projects/{projectID}/schedule/generate-from-survey", scheduleH.GenerateFromSurveyHTTP)
 		})
 
 		api.NotFound(func(w http.ResponseWriter, req *http.Request) {

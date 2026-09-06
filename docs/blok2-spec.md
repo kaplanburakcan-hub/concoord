@@ -476,6 +476,41 @@ GET  /api/v1/projects/{id}/attendance/export?format=xlsx
 
 ---
 
+## Ek — Keşif × Taşeron/Sözleşme Entegrasyonu + Otomatik WBS
+
+> **DURUM: UYGULANDI, uçtan uca doğrulandı (2026-09-06).** Şartname dışında,
+> kullanıcının "ana özelliklerden biri" olarak talep ettiği bir ekleme:
+> Proje Keşfi (`project_survey_items`) kalemlerinin taşeron/sözleşmeye
+> atanabilmesi ve keşiften otomatik WBS üretimi.
+
+- **Keşif × taşeron bağı**: `project_survey_items.work_item_id` (migration
+  000063) — bir keşif kalemi taşerona atandığında o an ki poz_no/tanım/
+  birim/miktar/birim_fiyat ile GERÇEK bir `work_items` satırı oluşur ve
+  buraya bağlanır (`internal/survey/assign.go`,
+  `POST /projects/{id}/survey-items/{itemId}/assign-subcontractor` — perm
+  `contracts.upload` — ve `.../unassign`). Keşif master BOQ olarak kalır;
+  `work_items` ondan bağımsız olarak hakediş akışında revize edilebilir.
+  Not: mevcut **Sözleşme Takip** raporu (`internal/payments/sozlesme_takip.go`,
+  poz_no string-eşleştirmesiyle) bu FK'yı henüz kullanmıyor — istenirse
+  ayrı bir iyileştirme olarak güçlendirilebilir.
+- **Otomatik WBS**: `internal/schedule/surveygen.go` — saf `BuildSurveyPlan`
+  fonksiyonu keşif kalemlerini `kategori`ye göre gruplar, kategorileri sabit
+  bir inşaat-mantığı sırasıyla (Betonarme→Cephe→Çatı→Mimari→Mekanik→
+  Elektrik→Peyzaj→Diğer, bilinmeyenler Diğer'den önce alfabetik) ve kategori
+  içi kalemleri zaten küratörlenmiş `sira`ya göre sıralar; ağırlık =
+  miktar×birim_fiyat. `GET .../schedule/survey-preview` (yazmaz) +
+  `POST .../schedule/generate-from-survey` (yalnızca WBS boşken kullanılabilir
+  — mevcut elle oluşturma akışına dokunmaz). Taşerona atanmış (work_item_id
+  dolu) keşif kalemleri `progress_source='derived'` ve `schedule_item_pozlar`a
+  otomatik bağlı oluşur (gerçek hakedişten türetilen ilerleme); atanmamışlar
+  `manual`, %0'dan başlar. Yeni izin/migration'a gerek kalmadan mevcut
+  `schedule.view`/`schedule.edit` kullanılıyor.
+- Yeni migration/izin gerekmeyen tasarım kararı: work_items normalde taşeron
+  bazlı listelenir (`internal/payments`); bu ek proje çapında tek bir listede
+  toplayan `ListAvailablePozlar` (Aşama 1) ile aynı prensip.
+
+---
+
 ## Yapılmayacaklar (kapsam dışı)
 
 - Native mobil uygulama
