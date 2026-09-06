@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, apiFetchBlob, apiUpload } from "../../api/client";
 import { useProjects } from "../../projects/ProjectContext";
+import { useAuth } from "../../auth/AuthContext";
 import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 
 // Saha Tutanakları — önceden tamamen tarayıcı localStorage'ındaydı (hiç
@@ -111,6 +112,7 @@ const BOŞ_FORM = {
 export default function SahaTutanaklariPage() {
   const { current } = useProjects();
   const pid = current?.id;
+  const { can } = useAuth();
   const kesinKabul = useKesinKabulTarihi(pid);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -129,6 +131,7 @@ export default function SahaTutanaklariPage() {
   const [fotYukleniyor, setFotYukleniyor] = useState(false);
   const [olusturuluyor, setOlusturuluyor] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [pdksDurum, setPdksDurum] = useState<"bos" | "yukleniyor" | "bulundu" | "yok">("bos");
 
   const formFotoRef = useRef<HTMLInputElement>(null);
   const detayFotoRef = useRef<HTMLInputElement>(null);
@@ -232,6 +235,31 @@ export default function SahaTutanaklariPage() {
     setFormFotograflar((prev) => prev.filter((f) => f.key !== key));
   }
 
+  // PDKS'ten öndolgu — Blok 2 Aşama 3: onaylı (status='approved') attendance_days
+  // kaydı varsa Miktar/Birim alanlarını doldurur. Mevcut /attendance/days
+  // ucunu (person_id filtresiyle) kullanır, yeni bir backend ucu gerekmiyor.
+  async function pdksTenDoldur() {
+    if (!pid || !form.personel_id || !form.tarih) return;
+    setPdksDurum("yukleniyor");
+    try {
+      const r = await api<{ days: { status: string; derived_hours: number | null; adjusted_hours: number | null; overtime_hours: number }[] }>(
+        `/projects/${pid}/attendance/days?from=${form.tarih}&to=${form.tarih}&person_id=${form.personel_id}`,
+        { projectId: pid }
+      );
+      const gun = r.days?.[0];
+      if (!gun || gun.status !== "approved") {
+        setPdksDurum("yok");
+        return;
+      }
+      const toplamSaat = gun.adjusted_hours ?? gun.derived_hours ?? 0;
+      const saat = form.tip === "mesai" && gun.overtime_hours > 0 ? gun.overtime_hours : toplamSaat;
+      setForm((f) => ({ ...f, miktar: String(saat), birim: "saat" }));
+      setPdksDurum("bulundu");
+    } catch {
+      setPdksDurum("yok");
+    }
+  }
+
   async function tutanakOlustur() {
     if (!form.baslik.trim() || !form.aciklama.trim() || !pid) return;
     if (form.tip === "zimmet" && !form.personel_id) return;
@@ -268,6 +296,7 @@ export default function SahaTutanaklariPage() {
       formFotograflar.forEach((f) => URL.revokeObjectURL(f.url));
       setForm({ ...BOŞ_FORM });
       setFormFotograflar([]);
+      setPdksDurum("bos");
       setFormAcik(false);
       await load();
     } catch {
@@ -523,7 +552,7 @@ export default function SahaTutanaklariPage() {
               <label className="block text-xs text-beton-400 mb-1">Tutanak Tipi *</label>
               <div className="grid grid-cols-2 gap-2">
                 {(Object.keys(TIP_LABEL) as TutanakTip[]).map((tip) => (
-                  <button key={tip} onClick={() => setForm({ ...form, tip })}
+                  <button key={tip} onClick={() => { setForm({ ...form, tip }); setPdksDurum("bos"); }}
                     className={`rounded-md border p-2 text-xs text-left transition ${
                       form.tip === tip ? "border-emniyet-500 bg-emniyet-500/10 text-emniyet-500"
                       : "border-beton-700 text-beton-400 hover:border-beton-500"
@@ -548,7 +577,8 @@ export default function SahaTutanaklariPage() {
             {/* Tarih */}
             <div>
               <label className="block text-xs text-beton-400 mb-1">Tarih *</label>
-              <input type="date" value={form.tarih} max={kesinKabul} onChange={(e) => setForm({ ...form, tarih: e.target.value })}
+              <input type="date" value={form.tarih} max={kesinKabul}
+                onChange={(e) => { setForm({ ...form, tarih: e.target.value }); setPdksDurum("bos"); }}
                 className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
               />
             </div>
@@ -570,6 +600,37 @@ export default function SahaTutanaklariPage() {
                       <span className="text-beton-500"> · onay sonrası firmanın tanımlı kullanıcılarına bildirim gider</span>
                     )}
                   </p>
+                )}
+              </div>
+            )}
+
+            {/* Mesai/Yevmiyeli: Personel seçimi (opsiyonel) — seçilirse PDKS'ten
+                onaylı saatler tek tıkla doldurulabilir. */}
+            {(form.tip === "mesai" || form.tip === "yevmiyeli") && (
+              <div>
+                <label className="block text-xs text-beton-400 mb-1">Personel</label>
+                <select
+                  value={form.personel_id}
+                  onChange={(e) => { setForm({ ...form, personel_id: e.target.value }); setPdksDurum("bos"); }}
+                  className="w-full rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+                >
+                  <option value="">Seçin (opsiyonel)</option>
+                  {personeller.map((p) => <option key={p.id} value={p.id}>{p.ad_soyad}</option>)}
+                </select>
+                {form.personel_id && can("attendance.view") && (
+                  <div className="mt-1.5">
+                    <button type="button" onClick={pdksTenDoldur} disabled={pdksDurum === "yukleniyor"}
+                      className="text-xs text-emniyet-500 hover:underline disabled:opacity-60"
+                    >
+                      {pdksDurum === "yukleniyor" ? "PDKS kontrol ediliyor…" : "PDKS'ten Doldur"}
+                    </button>
+                    {pdksDurum === "bulundu" && (
+                      <p className="mt-1 text-xs text-beton-400">Onaylı PDKS kaydından dolduruldu.</p>
+                    )}
+                    {pdksDurum === "yok" && (
+                      <p className="mt-1 text-xs text-beton-500">Bu tarihte onaylı PDKS kaydı bulunamadı, elle girin.</p>
+                    )}
+                  </div>
                 )}
               </div>
             )}

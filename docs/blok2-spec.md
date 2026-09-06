@@ -413,8 +413,23 @@ GET  /api/v1/projects/{id}/attendance/export?format=xlsx
 >
 > **DÜZELTME (durum, 2026-09-06):** Aşama 1 artık uygulandı — ikinci madde
 > (ilerleme, "İlerleme Raporları" sayfasında kullanılsın) önündeki engel
-> kalktı, ancak Aşama 3'ün kendisi (bu iki entegrasyon maddesi) henüz
-> uygulanmadı — ayrı bir iş olarak ele alınmalı.
+> kalktı, ancak henüz uygulanmadı.
+>
+> **DÜZELTME (uygulama, 2026-09-06):** Birinci madde (puantaj → tutanak
+> öndolgu) UYGULANDI — yeni bir backend ucu GEREKMEDİ, mevcut `GET
+> /projects/{id}/attendance/days?from=&to=&person_id=` (zaten `person_id`
+> filtresi destekliyordu) doğrudan yeniden kullanıldı, çünkü `saha_tutanaklari.
+> personel_id` ile `attendance_days.person_id` ZATEN aynı tabloyu
+> (`project_personnel`) paylaşıyor. Uygulanan: `SahaTutanaklariPage.tsx`'te
+> personel seçici artık `mesai`/`yevmiyeli` tiplerinde de gösteriliyor
+> (önceden yalnız `zimmet`'te vardı, opsiyonel bırakıldı); personel+tarih
+> seçilince "PDKS'ten Doldur" butonu (mevcut `WeatherPrefill` desenindeki
+> gibi tek tıkla, OTOMATİK DEĞİL) o günün onaylı (`status='approved'`)
+> kaydını çekip Miktar/Birim'i dolduruyor — `mesai` tipinde `overtime_hours`
+> (>0 ise), yoksa/`yevmiyeli`'de toplam saat (`adjusted_hours ?? derived_hours`)
+> kullanılıyor, birim "saat". Onaylı kayıt yoksa "elle girin" mesajıyla
+> zarif geri düşüyor. `attendance.view` izni olmayan kullanıcıya buton hiç
+> gösterilmiyor.
 
 ### Kabul kriterleri
 
