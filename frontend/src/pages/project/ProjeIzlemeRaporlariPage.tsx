@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+} from "recharts";
 import { api } from "../../api/client";
 import { useProjects } from "../../projects/ProjectContext";
+import { useAuth } from "../../auth/AuthContext";
 
 // Proje İzleme Raporları — finansal ve operasyonel izleme raporları.
 // Maliyet Takip, Malzeme/Stok ve Nakit Akış kartları gerçek sayfalara
@@ -57,6 +61,8 @@ const COLORS = [
 export default function ProjeIzlemeRaporlariPage() {
   const { current } = useProjects();
   const pid = current?.id;
+  const { can } = useAuth();
+  const [tab, setTab] = useState<"genel" | "is-programi">("genel");
   const [custom, setCustom] = useState<CustomReportDTO[]>([]);
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -115,6 +121,26 @@ export default function ProjeIzlemeRaporlariPage() {
         </p>
       </div>
 
+      {can("schedule.view") && (
+        <div className="flex gap-1 border-b border-beton-800">
+          {(["genel", "is-programi"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${
+                tab === t ? "border-emniyet-500 text-white" : "border-transparent text-beton-400 hover:text-beton-200"
+              }`}
+            >
+              {t === "genel" ? "Genel Bakış" : "İş Programı İlerlemesi"}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === "is-programi" && can("schedule.view") ? (
+        <IsProgramiOzet pid={pid!} />
+      ) : (
+      <>
       {/* Varsayılan + özel raporlar */}
       <div className="grid gap-3 sm:grid-cols-3">
         {DEFAULT_REPORTS.map((r) => (
@@ -180,6 +206,103 @@ export default function ProjeIzlemeRaporlariPage() {
             </div>
           </div>
         )}
+      </div>
+      </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// İş Programı İlerlemesi — Blok 2 Aşama 3: İş Programı'ndaki (istek anında
+// hesaplanan, hakedişten türetilen) ilerleme burada özet olarak gösterilir.
+// Düzenleme burada YAPILMAZ — tam Gantt/Tablo/bağımlılık yönetimi için
+// /proje/is-programi'ye yönlendirilir.
+// ---------------------------------------------------------------------------
+
+type ScheduleItemLite = {
+  id: string; parent_id: string | null; wbs_code: string; name: string;
+  progress: number; progress_source: "manual" | "derived"; weight: number;
+};
+type SCurvePoint = { date: string; planned_physical: number; actual_physical: number };
+
+function IsProgramiOzet({ pid }: { pid: string }) {
+  const [items, setItems] = useState<ScheduleItemLite[] | null>(null);
+  const [points, setPoints] = useState<SCurvePoint[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      api<{ items: ScheduleItemLite[] }>(`/projects/${pid}/schedule`, { projectId: pid }),
+      api<{ points: SCurvePoint[] }>(`/projects/${pid}/schedule/s-curve?bucket=month`, { projectId: pid }),
+    ])
+      .then(([s, c]) => { setItems(s.items); setPoints(c.points); })
+      .catch(() => { setItems([]); setPoints([]); })
+      .finally(() => setLoading(false));
+  }, [pid]);
+
+  if (loading) return <p className="px-4 py-8 text-center text-beton-400 text-sm">Yükleniyor…</p>;
+
+  const roots = (items ?? []).filter((it) => !it.parent_id).sort((a, b) => a.wbs_code.localeCompare(b.wbs_code, "tr", { numeric: true }));
+
+  if (!items || items.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-beton-700 p-8 text-center">
+        <p className="text-sm text-beton-400">Bu projede henüz bir İş Programı (WBS) kalemi tanımlanmamış.</p>
+        <Link to="/proje/is-programi" className="mt-3 inline-block text-sm text-emniyet-500 hover:underline">
+          İş Programı'nda oluştur →
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-xl border border-beton-800 bg-beton-950 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-medium text-beton-200">Ana Kalemler</p>
+          <Link to="/proje/is-programi" className="text-xs text-emniyet-500 hover:underline">
+            Gantt / Tablo / Bağımlılıklar için İş Programı'na git →
+          </Link>
+        </div>
+        <div className="space-y-2">
+          {roots.map((it) => (
+            <div key={it.id} className="flex items-center gap-3">
+              <span className="w-14 shrink-0 font-mono text-xs text-beton-500">{it.wbs_code}</span>
+              <span className="flex-1 text-sm text-beton-200 truncate">{it.name}</span>
+              <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold shrink-0 ${
+                it.progress_source === "derived" ? "bg-emniyet-500/15 text-emniyet-400" : "bg-beton-800 text-beton-400"
+              }`}>
+                {it.progress_source === "derived" ? "Hakedişten" : "Elle"}
+              </span>
+              <div className="w-32 h-1.5 rounded-full bg-beton-800 overflow-hidden shrink-0">
+                <div
+                  className={`h-full ${it.progress >= 100 ? "bg-green-500" : "bg-emniyet-500"}`}
+                  style={{ width: `${Math.min(100, Math.max(0, it.progress))}%` }}
+                />
+              </div>
+              <span className="w-12 text-right font-mono text-xs tabular-nums text-beton-300 shrink-0">
+                %{it.progress.toFixed(0)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-beton-800 bg-beton-950 p-4" style={{ height: 300 }}>
+        <p className="text-xs text-beton-400 mb-2">Fiziksel İlerleme — Planlanan / Gerçekleşen (%)</p>
+        <ResponsiveContainer width="100%" height="90%">
+          <LineChart data={points}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+            <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#999" }} />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#999" }} />
+            <Tooltip contentStyle={{ background: "#1a1a1a", border: "1px solid #333", fontSize: 12 }} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Line type="monotone" dataKey="planned_physical" name="Planlanan" stroke="#6b7280" strokeDasharray="4 3" dot={false} />
+            <Line type="monotone" dataKey="actual_physical" name="Gerçekleşen" stroke="#10b981" strokeWidth={2} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );

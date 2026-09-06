@@ -412,8 +412,7 @@ GET  /api/v1/projects/{id}/attendance/export?format=xlsx
 > zaten uygulandığı için ayrıca ele alınabilir — henüz yapılmadı.
 >
 > **DÜZELTME (durum, 2026-09-06):** Aşama 1 artık uygulandı — ikinci madde
-> (ilerleme, "İlerleme Raporları" sayfasında kullanılsın) önündeki engel
-> kalktı, ancak henüz uygulanmadı.
+> önündeki engel kalktı ve ARDINDAN UYGULANDI (bkz. aşağıdaki not).
 >
 > **DÜZELTME (uygulama, 2026-09-06):** Birinci madde (puantaj → tutanak
 > öndolgu) UYGULANDI — yeni bir backend ucu GEREKMEDİ, mevcut `GET
@@ -430,6 +429,21 @@ GET  /api/v1/projects/{id}/attendance/export?format=xlsx
 > kullanılıyor, birim "saat". Onaylı kayıt yoksa "elle girin" mesajıyla
 > zarif geri düşüyor. `attendance.view` izni olmayan kullanıcıya buton hiç
 > gösterilmiyor.
+>
+> **DÜZELTME (uygulama, 2026-09-06):** İkinci madde (iş programı ilerlemesi,
+> "İlerleme Raporları" sayfasında kullanılsın) da UYGULANDI — kullanıcının
+> kararıyla ayrı bir SEKME olarak (`ProjeIzlemeRaporlariPage.tsx`'e "Genel
+> Bakış" / "İş Programı İlerlemesi" sekmeleri eklendi). Yeni sekme
+> `schedule.view` izni yoksa hiç gösterilmiyor (bu sayfanın izni
+> `reports.view` — iki izin her rolde birebir örtüşmüyor, ör.
+> ProcurementOfficer/OHSExpert `reports.view` alır ama `schedule.view`
+> almaz). İçerik: kök WBS kalemlerinin ilerleme çubukları (Elle/Hakedişten
+> rozetiyle) + S-eğrisi (planlanan/gerçekleşen fiziksel), ve tam
+> düzenleme/Gantt/bağımlılık yönetimi için `/proje/is-programi`'ye link.
+> Yeni backend ucu gerekmedi — mevcut `GET .../schedule` ve `GET
+> .../schedule/s-curve` doğrudan yeniden kullanıldı.
+>
+> **Blok 2'nin üç aşaması da (Aşama 1, 2, 3) artık tamamlandı.**
 
 ### Kabul kriterleri
 
