@@ -45,6 +45,7 @@ const I = {
   puantaj: <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>,
   sigorta: <svg viewBox="0 0 24 24"><path d="M12 2l9 4v6c0 5-4 8-9 10-5-2-9-5-9-10V6z"/><path d="M9 12l2 2 4-4"/></svg>,
   konum: <svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>,
+  gantt: <svg viewBox="0 0 24 24"><rect x="3" y="5" width="10" height="3"/><rect x="7" y="10.5" width="12" height="3"/><rect x="3" y="16" width="8" height="3"/></svg>,
 };
 
 const GROUPS: NavGroup[] = [
@@ -82,6 +83,7 @@ const GROUPS: NavGroup[] = [
         ],
       },
       { to: "/malzeme-onaylari", label: "Malzeme Onayları", perm: "material_approvals.view", icon: I.malzeme },
+      { to: "/proje/is-programi", label: "İş Programı", perm: "schedule.view", icon: I.gantt },
       { to: "/proje/ilerleme-raporlari", label: "Proje İzleme Raporları", perm: "reports.view", icon: I.rapor },
       { to: "/aylik-raporlar/imalat", label: "İmalat Raporları", perm: "reports.view_financial_reports", icon: I.aylik },
       { to: "/proje/personel", label: "Personel Yönetimi", perm: "reports.view", icon: I.personel, end: true },

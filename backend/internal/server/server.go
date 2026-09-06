@@ -40,6 +40,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/projects"
 	"github.com/ipks/ipks/backend/internal/rbac"
 	"github.com/ipks/ipks/backend/internal/reports"
+	"github.com/ipks/ipks/backend/internal/schedule"
 	"github.com/ipks/ipks/backend/internal/stakeholders"
 	"github.com/ipks/ipks/backend/internal/statements"
 	"github.com/ipks/ipks/backend/internal/storage"
@@ -164,6 +165,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 	// --- Blok 2 Aşama 2: PDKS/GPS Puantaj ---
 	attendanceH := attendance.NewHandler(pool, recorder, notifySvc, eval)
+
+	// --- Blok 2 Aşama 1: İş Programı (WBS + Gantt) ---
+	scheduleH := schedule.NewHandler(pool, recorder)
 
 	// Liveness — süreç ayakta mı?
 	r.Get("/healthz", func(w http.ResponseWriter, req *http.Request) {
@@ -733,6 +737,28 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("attendance.view")).Get("/projects/{projectID}/attendance/events", attendanceH.ListEvents)
 			pr.With(mw.RequirePermission("attendance.adjust")).Patch("/attendance/days/{dayId}", attendanceH.AdjustDay)
 			pr.With(mw.RequirePermission("attendance.approve")).Post("/projects/{projectID}/attendance/approve", attendanceH.ApproveDays)
+		})
+
+		// ---- Blok 2 Aşama 1: İş Programı (WBS + Gantt) ----
+		api.Group(func(pr chi.Router) {
+			pr.Use(mw.Authenticate)
+
+			pr.With(mw.RequirePermission("schedule.view")).Get("/projects/{projectID}/schedule", scheduleH.ListSchedule)
+			pr.With(mw.RequirePermission("schedule.edit")).Post("/projects/{projectID}/schedule/items", scheduleH.CreateItemHTTP)
+			pr.With(mw.RequirePermission("schedule.edit")).Patch("/schedule/items/{itemId}", scheduleH.UpdateItemHTTP)
+			pr.With(mw.RequirePermission("schedule.edit")).Delete("/schedule/items/{itemId}", scheduleH.DeleteItemHTTP)
+			pr.With(mw.RequirePermission("schedule.edit")).Post("/schedule/items/{itemId}/pozlar", scheduleH.LinkPozHTTP)
+			pr.With(mw.RequirePermission("schedule.view")).Get("/projects/{projectID}/schedule/available-pozlar", scheduleH.ListAvailablePozlarHTTP)
+
+			pr.With(mw.RequirePermission("schedule.view")).Get("/projects/{projectID}/schedule/dependencies", scheduleH.ListDependenciesHTTP)
+			pr.With(mw.RequirePermission("schedule.edit")).Post("/projects/{projectID}/schedule/dependencies", scheduleH.CreateDependencyHTTP)
+			pr.With(mw.RequirePermission("schedule.edit")).Delete("/schedule/dependencies/{predId}/{succId}", scheduleH.DeleteDependencyHTTP)
+
+			pr.With(mw.RequirePermission("schedule.freeze_baseline")).Post("/projects/{projectID}/schedule/baseline", scheduleH.FreezeBaselineHTTP)
+			pr.With(mw.RequirePermission("schedule.view")).Get("/projects/{projectID}/schedule/baselines", scheduleH.ListBaselinesHTTP)
+			pr.With(mw.RequirePermission("schedule.view")).Get("/schedule/baselines/{baselineId}", scheduleH.GetBaselineHTTP)
+
+			pr.With(mw.RequirePermission("schedule.view")).Get("/projects/{projectID}/schedule/s-curve", scheduleH.SCurveHTTP)
 		})
 
 		api.NotFound(func(w http.ResponseWriter, req *http.Request) {

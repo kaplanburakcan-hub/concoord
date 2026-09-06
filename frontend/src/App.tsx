@@ -66,6 +66,7 @@ import GelenEvrakPage from "./pages/project/GelenEvrakPage";
 import GidenEvrakPage from "./pages/project/GidenEvrakPage";
 import PdksCheckinPage from "./pages/attendance/PdksCheckinPage";
 import PuantajPage from "./pages/attendance/PuantajPage";
+import IsProgramiPage from "./pages/schedule/IsProgramiPage";
 import GeofencePage from "./pages/attendance/GeofencePage";
 import QrPanoPage from "./pages/attendance/QrPanoPage";
 
@@ -378,6 +379,7 @@ export default function App() {
                       <Route path="/proje/kesif" element={<RequirePerm perm="projects.view"><ProjeKesfiPage /></RequirePerm>} />
                       <Route path="/proje/personel" element={<RequirePerm perm="reports.view"><PersonelPage /></RequirePerm>} />
                       <Route path="/aylik-raporlar/imalat" element={<RequirePerm perm="reports.view_financial_reports"><ImalatRaporlariPage /></RequirePerm>} />
+                      <Route path="/proje/is-programi" element={<RequirePerm perm="schedule.view"><IsProgramiPage /></RequirePerm>} />
                       <Route path="/proje/ilerleme-raporlari" element={<RequirePerm perm="reports.view"><ProjeIzlemeRaporlariPage /></RequirePerm>} />
                       <Route path="/proje/depo" element={<RequirePerm perm="reports.view"><DepoPage /></RequirePerm>} />
                       <Route path="/proje/toplanti" element={<RequirePerm perm="reports.view"><ToplantiPage /></RequirePerm>} />

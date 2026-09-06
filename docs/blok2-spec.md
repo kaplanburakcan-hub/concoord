@@ -8,8 +8,8 @@
 > **Revizyon notu (2026-09-05):** Aşama 0 keşfi yapıldı ve bulgularına göre bu
 > dosya düzeltildi. Düzeltilen her yer aşağıda `> DÜZELTME (Aşama 0):` bloğuyla
 > işaretli — orijinal madde metni korunmuş, yalnızca yanlış/eksik varsayımın
-> hemen altına gerçek durum eklenmiştir. Aşama 2 bu düzeltilmiş haliyle
-> uygulanmış ve canlıda doğrulanmıştır; Aşama 1 henüz uygulanmamıştır.
+> hemen altına gerçek durum eklenmiştir. Aşama 1 ve Aşama 2 bu düzeltilmiş
+> haliyle uygulanmış ve (Aşama 2 canlıda, Aşama 1 lokalde) doğrulanmıştır.
 
 ---
 
@@ -55,11 +55,31 @@ Aşağıdakileri oku ve özetle:
 
 ## Aşama 1 — İş Programı (WBS + Gantt)
 
-> **DÜZELTME (Aşama 0):** Bu aşama, bu repoda (ne `main` dalında ne başka bir
-> dalda) **henüz uygulanmamıştır** — `schedule_items` vb. hiçbir tabloya/koda
-> rastlanmadı. Aşağıdaki tasarım hâlâ geçerli bir plandır ama "Aşama 1
-> tamamlandı" varsayımıyla yazılan Aşama 3 maddeleri (bkz. orada) şu an
-> uygulanamaz durumdadır.
+> **DURUM: UYGULANDI, lokalde uçtan uca doğrulandı (2026-09-06).** Aşama 0
+> keşfinde bu aşamanın repoda hiç bulunmadığı (`schedule_items` vb. hiçbir
+> tabloya/koda rastlanmadı) doğru tespit edilmişti; aşağıdaki tasarım bu haliyle
+> uygulandı. Aşama 3'ün Aşama 1'e bağımlı maddeleri artık uygulanabilir
+> durumdadır. Gerçek uygulama sırasında bulunan/karar verilen noktalar
+> aşağıda `> DÜZELTME (uygulama, 2026-09-06):` bloklarıyla işaretli:
+>
+> - `schedule_items`/`schedule_item_pozlar`/`schedule_dependencies`/
+>   `schedule_baselines` migration 000062'de, repo genelindeki
+>   `deleted_at`/`row_version` (soft-delete/optimistic-concurrency)
+>   konvansiyonuyla eklendi (orijinal DDL'de yoktu, bilinçli bir uyum).
+> - İzinler `schedule.view`/`schedule.edit`/`schedule.freeze_baseline` olarak
+>   eklendi; `freeze_baseline` `progress_payments.finalize` ile aynı ilkeyle
+>   yalnız ProjectManager'ın varsayılanında.
+> - API listesine (1.4) spec'te olmayan üç uç eklendi: `GET
+>   .../schedule/dependencies` (Gantt okları ve bağımlılık paneli için), `GET
+>   .../schedule/available-pozlar` (poz bağlama seçicisi — `work_items`
+>   normalde taşeron bazlı listelenir, burada proje çapında toplanır), `GET
+>   /schedule/baselines/{id}` (dondurulmuş revizyonun tam anlık görüntüsü).
+> - `export?format=xlsx|pdf` ve `import` (XLSX) UYGULANMADI — ayrı, bağımsız
+>   bir iş olarak kapsam dışı bırakıldı (kabul kriterleriyle ilgisizdi).
+> - Baseline karşılaştırması Gantt'ta "gölge çubuk" olarak DEĞİL, Tablo
+>   görünümünde bir "Baseline'a Göre" fark kolonu olarak uygulandı —
+>   frappe-gantt her görev için tek bir bar render eder, aynı satırda
+>   çakışan ikinci bir "hayalet" bar'ı temiz bir şekilde desteklemiyor.
 
 ### 1.1 Veri modeli
 
@@ -390,6 +410,11 @@ GET  /api/v1/projects/{id}/attendance/export?format=xlsx
 > bu repoda henüz uygulanmadığından şu an yapılamaz. Birinci madde
 > (puantaj → hakediş/tutanak bağı) Aşama 1'den bağımsızdır, `attendance_days`
 > zaten uygulandığı için ayrıca ele alınabilir — henüz yapılmadı.
+>
+> **DÜZELTME (durum, 2026-09-06):** Aşama 1 artık uygulandı — ikinci madde
+> (ilerleme, "İlerleme Raporları" sayfasında kullanılsın) önündeki engel
+> kalktı, ancak Aşama 3'ün kendisi (bu iki entegrasyon maddesi) henüz
+> uygulanmadı — ayrı bir iş olarak ele alınmalı.
 
 ### Kabul kriterleri
 
@@ -404,8 +429,15 @@ GET  /api/v1/projects/{id}/attendance/export?format=xlsx
 9. Tüm yeni migration'lar `down` ile geri alınabiliyor.
 10. Yeni izin anahtarları izin matrisi arayüzünde görünüyor.
 
-> **DÜZELTME (durum, 2026-09-05):** Kriter 1-4 Aşama 1'e ait, henüz
-> uygulanmadığı için test edilemez. Kriter 5, 6, 7 canlı tarayıcıda uçtan
+> **DÜZELTME (durum, 2026-09-06):** Kriter 1-4 Aşama 1'e ait — dördü de Go
+> testleriyle karşılandı (`internal/schedule/progress_test.go`,
+> `dependencies_test.go`, `baselines_test.go`): 200 kalemlik ağaçta
+> `ComputeProgress` mikrosaniyeler sürüyor (kriter 1); aynı yaprağın hakedişten
+> gelen kümülatif miktarı değiştirildiğinde ilerleme elle invalidation
+> olmadan değişiyor (kriter 2, cache olmadığının kanıtı); baseline
+> donduktan sonra kaynak veri mutasyona uğratılıp donmuş JSON'un
+> değişmediği doğrulandı (kriter 3); `WouldCreateCycle` 7 senaryoyla test
+> edildi (kriter 4). Kriter 5, 6, 7 canlı tarayıcıda uçtan
 > uca doğrulandı (gerçek geofence + gerçek QR + gerçek check-in akışıyla).
 > Kriter 8 backend'de `withinTokenWindow` biriminde test edildi (offline
 > senaryoyu mümkün kılan tasarım), frontend'de kuyruk mekanizması

@@ -49,6 +49,8 @@ var registry = []Step{
 	{Name: "0010_ekipman_transfer_izin_sync", Run: stepFaz2PermSync},
 	// Blok 2 Aşama 2 — PDKS/GPS Puantaj: attendance.* izinleri eklendi.
 	{Name: "0011_pdks_puantaj_izin_sync", Run: stepFaz2PermSync},
+	// Blok 2 Aşama 1 — İş Programı (WBS/Gantt): schedule.* izinleri eklendi.
+	{Name: "0012_is_programi_izin_sync", Run: stepFaz2PermSync},
 }
 
 // stepFaz2PermSync — izin sözlüğünü ve rol varsayılanlarını yeniden senkronlar.

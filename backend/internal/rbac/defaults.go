@@ -85,6 +85,10 @@ var AllPermissions = []PermissionDef{
 	{"attendance", "approve", "PDKS puantaj dönemini onayla"},
 	{"attendance", "manage_geofences", "Şantiye sınırı (geofence) tanımla/düzenle"},
 
+	{"schedule", "view", "İş programını (WBS/Gantt) görüntüle"},
+	{"schedule", "edit", "İş programı kalemlerini, poz bağlantılarını ve bağımlılıkları düzenle"},
+	{"schedule", "freeze_baseline", "İş programı revizyonunu (baseline) dondur"},
+
 	{"ohs", "view", "İSG kayıtlarını görüntüle"},
 	{"ohs", "perform_inspection", "İSG denetimi yap"},
 	{"ohs", "issue_penalty", "İSG ceza tutanağı kes"},
@@ -133,6 +137,7 @@ var roleDefaults = map[string][]string{
 		"equipment.approve_transfer",
 		"attendance.view", "attendance.view_location", "attendance.record",
 		"attendance.adjust", "attendance.approve", "attendance.manage_geofences",
+		"schedule.view", "schedule.edit", "schedule.freeze_baseline",
 		"ohs.view", "ohs.issue_penalty", "ohs.manage_checklists",
 		"admin.view_audit_log",
 	},
@@ -148,6 +153,9 @@ var roleDefaults = map[string][]string{
 		"procurement.view", "procurement.create_pr", "procurement.approve_pr",
 		"attendance.view", "attendance.view_location", "attendance.record",
 		"attendance.adjust", "attendance.approve", "attendance.manage_geofences",
+		"schedule.view", "schedule.edit",
+		// Not: freeze_baseline VARSAYILAN DEĞİL — idareye verilen resmi program
+		// revizyonu, progress_payments.finalize ile aynı ilkeyle PM'e özel.
 		"ohs.view", "ohs.perform_inspection", "ohs.issue_penalty",
 		"admin.view_audit_log",
 	},
@@ -162,6 +170,7 @@ var roleDefaults = map[string][]string{
 		"reports.view", "reports.create_daily",
 		"procurement.view", "procurement.create_pr",
 		"attendance.view",
+		"schedule.view",
 		"ohs.view", "ohs.perform_inspection",
 		// Not: view_financials ve generate_weekly VARSAYILAN DEĞİL —
 		// saha mühendisi günlük rapor girer, haftalık raporu göremez/üretemez.
@@ -179,6 +188,7 @@ var roleDefaults = map[string][]string{
 		"reports.view",
 		"procurement.view",
 		"attendance.view",
+		"schedule.view",
 		"ohs.view",
 		// Satır seviyesi güvenlik: yalnızca kendi firmasının kayıtları (backend'de zorunlu).
 	},
@@ -193,6 +203,7 @@ var roleDefaults = map[string][]string{
 		"reports.view", "reports.view_financial_reports",
 		"procurement.view",
 		"attendance.view",
+		"schedule.view",
 		// KVKK: müşteri konum verisini (view_location) VARSAYILAN OLARAK görmez.
 		"ohs.view",
 	},
