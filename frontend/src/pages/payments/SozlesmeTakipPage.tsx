@@ -4,16 +4,18 @@ import { useProjects } from "../ProjectContext";
 
 // Sözleşme Takip — Proje Keşfi kalemlerinin karşısında, o imalat için
 // sözleşme yapılmış taşeron(lar)ı ve sözleşme bilgilerini gösterir.
-// Eşleştirme poz_no üzerinden yapılır: Proje Keşfi kalemi ile taşeronun
-// "İş Kalemleri" (work_items) tablosundaki poz_no birebir aynıysa
-// eşleşme sayılır — hiçbir yeni veri girişi/yazma yok, salt okunur
-// çapraz rapor (bkz. backend internal/payments/sozlesme_takip.go).
+// İki katmanlı eşleştirme: Proje Keşfi'nde "Taşeron Ata" ile bağlanmış
+// kalemler (work_item_id doluysa) KESİN sayılır; bağlanmamışlar için eski
+// davranışa (poz_no birebir eşleşmesi, tahmini) düşülür — hiçbir yeni veri
+// girişi/yazma yok, salt okunur çapraz rapor
+// (bkz. backend internal/payments/sozlesme_takip.go).
 
 type Eslesme = {
   taseron_adi: string;
   sozlesme_no?: string;
   sozlesme_turu?: string;
   sozlesme_tarihi?: string;
+  kesin: boolean;
 };
 type Item = {
   id: string;
@@ -83,7 +85,7 @@ export default function SozlesmeTakipPage() {
       <div>
         <h1 className="font-display font-extrabold text-xl text-white">Sözleşme Takip</h1>
         <p className="text-xs text-beton-400 mt-0.5">
-          Proje Keşfi kalemleri × poz no eşleşmesiyle bulunan taşeron ve sözleşme bilgileri — {current.name}
+          Proje Keşfi kalemleri × taşeron ataması / poz no eşleşmesiyle bulunan sözleşme bilgileri — {current.name}
         </p>
       </div>
 
@@ -169,7 +171,14 @@ export default function SozlesmeTakipPage() {
                           <div className="flex flex-col gap-1">
                             {it.eslesmeler.map((e, idx) => (
                               <div key={idx} className="flex flex-wrap items-center gap-1.5">
+                                <span
+                                  title={e.kesin ? "Taşeron Ata ile doğrudan bağlanmış" : "Poz no eşleşmesiyle tahmini bulundu"}
+                                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${e.kesin ? "bg-green-500" : "bg-amber-500"}`}
+                                />
                                 <span className="text-xs font-medium text-beton-100">{e.taseron_adi}</span>
+                                {!e.kesin && (
+                                  <span className="text-[10px] text-beton-500 italic">(poz no ile, doğrulanmamış)</span>
+                                )}
                                 {e.sozlesme_no ? (
                                   <span className="rounded-full border border-emniyet-500/40 bg-emniyet-500/10 px-2 py-0.5 text-[10.5px] text-emniyet-400">
                                     {e.sozlesme_no}

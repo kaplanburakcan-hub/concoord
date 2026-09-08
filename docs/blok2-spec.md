@@ -490,9 +490,12 @@ GET  /api/v1/projects/{id}/attendance/export?format=xlsx
   `POST /projects/{id}/survey-items/{itemId}/assign-subcontractor` — perm
   `contracts.upload` — ve `.../unassign`). Keşif master BOQ olarak kalır;
   `work_items` ondan bağımsız olarak hakediş akışında revize edilebilir.
-  Not: mevcut **Sözleşme Takip** raporu (`internal/payments/sozlesme_takip.go`,
-  poz_no string-eşleştirmesiyle) bu FK'yı henüz kullanmıyor — istenirse
-  ayrı bir iyileştirme olarak güçlendirilebilir.
+  **DÜZELTME (2026-09-07): Sözleşme Takip raporu artık bu FK'yı kullanıyor.**
+  `internal/payments/sozlesme_takip.go` iki katmanlı: `work_item_id` doluysa
+  (Taşeron Ata ile bağlanmışsa) KESİN eşleşme (`kesin:true`), boşsa eski
+  poz_no string-eşleşmesine (tahmini, `kesin:false`) düşer. Frontend
+  (`SozlesmeTakipPage.tsx`) yeşil/turuncu nokta + "(poz no ile,
+  doğrulanmamış)" etiketiyle ikisini ayırt ediyor.
 - **Otomatik WBS**: `internal/schedule/surveygen.go` — saf `BuildSurveyPlan`
   fonksiyonu keşif kalemlerini `kategori`ye göre gruplar, kategorileri sabit
   bir inşaat-mantığı sırasıyla (Betonarme→Cephe→Çatı→Mimari→Mekanik→
