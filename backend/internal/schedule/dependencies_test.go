@@ -60,3 +60,36 @@ func TestWouldCreateCycle(t *testing.T) {
 		}
 	})
 }
+
+func TestSequentialDependencies(t *testing.T) {
+	a, b, c := uuid.New(), uuid.New(), uuid.New()
+
+	t.Run("tek_kalem_bagimlilik_yok", func(t *testing.T) {
+		if got := sequentialDependencies([]uuid.UUID{a}); got != nil {
+			t.Fatalf("tek kalemde bağımlılık üretilmemeli, got %v", got)
+		}
+	})
+
+	t.Run("bos_liste_bagimlilik_yok", func(t *testing.T) {
+		if got := sequentialDependencies(nil); got != nil {
+			t.Fatalf("boş listede bağımlılık üretilmemeli, got %v", got)
+		}
+	})
+
+	t.Run("art_arda_zincir", func(t *testing.T) {
+		got := sequentialDependencies([]uuid.UUID{a, b, c})
+		want := []Edge{{Predecessor: a, Successor: b}, {Predecessor: b, Successor: c}}
+		if len(got) != len(want) {
+			t.Fatalf("kenar sayısı = %d, beklenen %d", len(got), len(want))
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("kenar[%d] = %+v, beklenen %+v", i, got[i], want[i])
+			}
+		}
+		// zincir döngüsel değil — WouldCreateCycle ile çapraz doğrula.
+		if !WouldCreateCycle(got, c, a) {
+			t.Fatal("üretilen zincire c->a eklemek döngü oluşturmalı (çapraz kontrol)")
+		}
+	})
+}

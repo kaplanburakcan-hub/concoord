@@ -89,6 +89,21 @@ export default function IsProgramiPage() {
     }
   }
 
+  // reloadDeps — load()'un aksine `loading`'i tetiklemez: Gantt'ın
+  // "Bağlantı Modu" içinde bir bağımlılık kurulduğunda tam sayfa
+  // "Yükleniyor…" göstermek GanttView'i unmount edip modun kendisini
+  // kapatırdı — burada yalnızca ilerlemeler de güncel kalsın diye
+  // items'ı da (progress hesaba dahil) sessizce tazeler.
+  async function reloadDeps() {
+    if (!current?.id) return;
+    const [s, d] = await Promise.all([
+      api<{ items: ScheduleItem[] }>(`/projects/${current.id}/schedule`, { projectId: current.id }),
+      api<{ dependencies: Dependency[] }>(`/projects/${current.id}/schedule/dependencies`, { projectId: current.id }),
+    ]);
+    setItems(s.items);
+    setDeps(d.dependencies);
+  }
+
   async function freezeBaseline() {
     if (!current?.id) return;
     const note = window.prompt("Bu revizyona kısa bir not eklemek ister misiniz? (isteğe bağlı)") ?? undefined;
@@ -220,7 +235,11 @@ export default function IsProgramiPage() {
           }}
         />
       ) : tab === "gantt" ? (
-        <GanttView items={items} deps={deps} onItemClick={(it) => setEditingItem(it)} />
+        <GanttView
+          items={items} deps={deps} canEdit={canEdit} projectId={current.id}
+          onItemClick={(it) => setEditingItem(it)}
+          onDependencyCreated={reloadDeps}
+        />
       ) : (
         <SCurveView projectId={current.id} />
       )}
@@ -430,10 +449,39 @@ function TableView({
 // Gantt görünümü (frappe-gantt) — kendi Gantt bileşenimizi yazmıyoruz.
 // ---------------------------------------------------------------------------
 
-function GanttView({ items, deps, onItemClick }: { items: ScheduleItem[]; deps: Dependency[]; onItemClick: (it: ScheduleItem) => void }) {
+function GanttView({ items, deps, canEdit, projectId, onItemClick, onDependencyCreated }: {
+  items: ScheduleItem[]; deps: Dependency[]; canEdit: boolean; projectId: string;
+  onItemClick: (it: ScheduleItem) => void; onDependencyCreated: () => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const withDates = items.filter((it) => (it.baseline_start ?? it.actual_start) && (it.baseline_finish ?? it.actual_finish));
   const withoutDates = items.length - withDates.length;
+
+  const [linkMode, setLinkMode] = useState(false);
+  const [pending, setPending] = useState<ScheduleItem | null>(null);
+  const [linkErr, setLinkErr] = useState<string | null>(null);
+  const [linking, setLinking] = useState(false);
+
+  async function handleBarClick(it: ScheduleItem) {
+    if (!linkMode) { onItemClick(it); return; }
+    setLinkErr(null);
+    if (!pending) { setPending(it); return; }
+    if (pending.id === it.id) { setPending(null); return; } // aynı bara tekrar tıklamak seçimi iptal eder
+    setLinking(true);
+    try {
+      await api(`/projects/${projectId}/schedule/dependencies`, {
+        method: "POST", projectId,
+        body: { predecessor_id: pending.id, successor_id: it.id, dep_type: "FS", lag_days: 0 },
+      });
+      setPending(null);
+      onDependencyCreated();
+    } catch (e: any) {
+      setLinkErr(e?.api?.message || "Bağlanamadı.");
+      setPending(null);
+    } finally {
+      setLinking(false);
+    }
+  }
 
   useEffect(() => {
     if (!ref.current || withDates.length === 0) return;
@@ -451,26 +499,27 @@ function GanttView({ items, deps, onItemClick }: { items: ScheduleItem[]; deps: 
         d.setDate(d.getDate() + 1);
         end = d.toISOString().slice(0, 10);
       }
+      const selected = pending?.id === it.id;
       return {
         id: it.id,
         name: `${it.wbs_code} ${it.name}`,
         start, end,
         progress: Math.round(it.progress),
         dependencies: (depsBySuccessor.get(it.id) ?? []).filter((p) => byId.has(p)).join(","),
-        custom_class: isDelayed(it) ? "gantt-bar-delayed" : isDone(it) ? "gantt-bar-done" : undefined,
+        custom_class: selected ? "gantt-bar-selected" : isDelayed(it) ? "gantt-bar-delayed" : isDone(it) ? "gantt-bar-done" : undefined,
       };
     });
     ref.current.innerHTML = "";
     try {
       new Gantt(ref.current, tasks, {
         view_mode: "Week",
-        on_click: (task) => { const it = byId.get(task.id); if (it) onItemClick(it); },
+        on_click: (task) => { const it = byId.get(task.id); if (it) handleBarClick(it); },
       });
     } catch {
       /* boş/geçersiz tarih kombinasyonu — sessizce atla */
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, deps]);
+  }, [items, deps, pending, linkMode]);
 
   return (
     <div className="mt-4">
@@ -479,7 +528,31 @@ function GanttView({ items, deps, onItemClick }: { items: ScheduleItem[]; deps: 
         .gantt-bar-delayed .bar-progress { fill: #b91c1c !important; }
         .gantt-bar-done .bar { fill: #22c55e !important; }
         .gantt-bar-done .bar-progress { fill: #16a34a !important; }
+        .gantt-bar-selected .bar { fill: #3b82f6 !important; }
+        .gantt-bar-selected .bar-progress { fill: #1d4ed8 !important; }
       `}</style>
+
+      {canEdit && (
+        <div className="mb-2 flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => { setLinkMode((v) => !v); setPending(null); setLinkErr(null); }}
+            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+              linkMode ? "bg-blue-500 text-white" : "border border-beton-700 text-beton-300 hover:bg-beton-800"
+            }`}
+          >
+            {linkMode ? "Bağlantı Modu: Açık" : "Bağlantı Modu"}
+          </button>
+          {linkMode && (
+            <p className="text-xs text-beton-400">
+              {linking ? "Bağlanıyor…" : pending
+                ? <>Önce: <span className="text-blue-400 font-medium">{pending.wbs_code} {pending.name}</span> — şimdi sonra gelen kalemin barına tıklayın (aynı bara tekrar tıklamak iptal eder).</>
+                : "Önce (predecessor) olacak kalemin barına tıklayın."}
+            </p>
+          )}
+          {linkErr && <p className="text-xs text-red-400">{linkErr}</p>}
+        </div>
+      )}
+
       {withoutDates > 0 && (
         <p className="mb-2 text-xs text-beton-400">
           {withoutDates} kalemde başlangıç/bitiş tarihi girilmediği için Gantt'ta gösterilmiyor — Tablo'dan düzenleyin.

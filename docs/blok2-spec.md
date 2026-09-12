@@ -512,6 +512,23 @@ GET  /api/v1/projects/{id}/attendance/export?format=xlsx
   bazlı listelenir (`internal/payments`); bu ek proje çapında tek bir listede
   toplayan `ListAvailablePozlar` (Aşama 1) ile aynı prensip.
 
+**Ek — Gantt'a hazır varsayılan sıralama + tıkla-bağla ekranı (2026-09-12).**
+Frappe Gantt'ın kendisi bar'dan bar'a sürükleyerek bağımlılık çizmeyi
+DESTEKLEMİYOR (kendi belgeleri de bunu doğruluyor — yalnızca tarih
+sürükleme/yeniden boyutlandırma var, bağımlılıklar sadece programatik
+veri alanı). Bunun yerine iki parça uygulandı:
+- `internal/schedule/dependencies.go`'ya saf `sequentialDependencies`
+  fonksiyonu eklendi; `GenerateFromSurvey` artık ardışık kategori kök
+  kalemleri arasına otomatik FS (bitince-başlar) zinciri kuruyor —
+  Gantt ilk açıldığında zaten anlamlı bir akış gösteriyor.
+- `IsProgramiPage.tsx`'in Gantt görünümüne kendi "Bağlantı Modu"
+  etkileşimi eklendi: açıkken bir bara tıkla (predecessor, mavi
+  vurgulanır), ikinci bara tıkla (successor) — bağımlılık anında
+  kurulur, döngü reddi (422) inline gösterilir. Bağlantı kurulduktan
+  sonra tam sayfa yeniden yükleme yerine yalnızca `items`/`deps`
+  sessizce tazelenir (`reloadDeps`) — aksi halde Gantt bileşeni
+  unmount olup Bağlantı Modu her seferinde kapanıyordu.
+
 ---
 
 ## Yapılmayacaklar (kapsam dışı)

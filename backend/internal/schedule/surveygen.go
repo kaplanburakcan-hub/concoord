@@ -176,6 +176,7 @@ func (h *Handler) GenerateFromSurvey(ctx context.Context, projectID, actorID uui
 	defer tx.Rollback(ctx)
 
 	itemCount := 0
+	catIDs := make([]uuid.UUID, 0, len(plan))
 	for catIdx, cat := range plan {
 		wbsCode := strconv.Itoa(catIdx + 1)
 		var catID uuid.UUID
@@ -186,6 +187,7 @@ func (h *Handler) GenerateFromSurvey(ctx context.Context, projectID, actorID uui
 		).Scan(&catID); err != nil {
 			return nil, err
 		}
+		catIDs = append(catIDs, catID)
 
 		for itemIdx, it := range cat.Items {
 			childWbs := wbsCode + "." + strconv.Itoa(itemIdx+1)
@@ -214,6 +216,20 @@ func (h *Handler) GenerateFromSurvey(ctx context.Context, projectID, actorID uui
 		}
 	}
 
+	// Varsayılan sıralama modu: ardışık kategoriler arasına FS (bitince-
+	// başlar) bağımlılığı kur — Gantt ilk açıldığında zaten anlamlı bir
+	// akış göstersin. Döngü riski yok: bu kalemler bu transaction'da yeni
+	// oluşturuldu, önceden hiçbir bağımlılıkları olamaz.
+	depEdges := sequentialDependencies(catIDs)
+	for _, e := range depEdges {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO schedule_dependencies (predecessor_id, successor_id, dep_type, lag_days)
+			VALUES ($1,$2,'FS',0)`, e.Predecessor, e.Successor,
+		); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
@@ -221,8 +237,11 @@ func (h *Handler) GenerateFromSurvey(ctx context.Context, projectID, actorID uui
 	meta := audit.MetaFrom(ctx)
 	h.rec.Record(ctx, audit.Entry{
 		ActorID: actorID.String(), Entity: "schedule_items", EntityID: projectID.String(), Action: audit.ActionInsert,
-		After: map[string]any{"kaynak": "proje_kesfi", "kategori_sayisi": len(plan), "kalem_sayisi": itemCount},
-		IP:    meta.IP, ReqID: meta.ReqID,
+		After: map[string]any{
+			"kaynak": "proje_kesfi", "kategori_sayisi": len(plan), "kalem_sayisi": itemCount,
+			"varsayilan_bagimlilik_sayisi": len(depEdges),
+		},
+		IP: meta.IP, ReqID: meta.ReqID,
 	})
 
 	return h.ListItems(ctx, projectID)

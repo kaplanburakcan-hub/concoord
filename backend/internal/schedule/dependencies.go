@@ -18,6 +18,21 @@ type Edge struct {
 
 var ErrCycle = errors.New("döngüsel bağımlılık")
 
+// sequentialDependencies — saf fonksiyon (DB'siz). Verilen kök kalem
+// ID'lerini (zaten mantık sırasına göre dizilmiş) art arda FS zinciriyle
+// bağlar: rootIDs[0]->rootIDs[1]->rootIDs[2]->... "Keşiften Otomatik
+// Oluştur"un varsayılan sıralama modu için kullanılır.
+func sequentialDependencies(rootIDs []uuid.UUID) []Edge {
+	if len(rootIDs) < 2 {
+		return nil
+	}
+	out := make([]Edge, 0, len(rootIDs)-1)
+	for i := 0; i < len(rootIDs)-1; i++ {
+		out = append(out, Edge{Predecessor: rootIDs[i], Successor: rootIDs[i+1]})
+	}
+	return out
+}
+
 // WouldCreateCycle — saf fonksiyon (DB'siz). Mevcut kenarlara
 // (predecessor→successor) newPred→newSucc eklenirse döngü oluşur mu?
 // newSucc'tan başlayıp mevcut kenarlar üzerinden newPred'e ulaşılabiliyorsa
