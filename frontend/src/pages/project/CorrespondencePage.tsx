@@ -207,8 +207,22 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
 
   async function saveForm() {
     if (!pid) return;
-    setSaving(true);
     setSaveError(null);
+    if (!form.tarih || !form.kurum_kisi.trim() || !form.konu.trim()) {
+      setSaveError(
+        `Zorunlu alanları doldurun: ${[
+          !form.tarih && "Tarih",
+          !form.kurum_kisi.trim() && (direction === "gelen" ? "Kimden" : "Kime"),
+          !form.konu.trim() && "Konu",
+        ].filter(Boolean).join(", ")}.`
+      );
+      return;
+    }
+    if (form.cevap_gerekli && !form.cevap_tarihi) {
+      setSaveError("Cevap gerekli işaretliyse Cevap Süresi (son tarih) zorunludur.");
+      return;
+    }
+    setSaving(true);
     const body = {
       direction,
       karsi_evrak_no: form.karsi_evrak_no || null,
@@ -608,7 +622,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
                 className="rounded-md border border-beton-700 px-4 py-2 text-sm text-beton-300 hover:border-beton-500">
                 İptal
               </button>
-              <button onClick={saveForm} disabled={saving || !form.tarih || !form.kurum_kisi.trim() || !form.konu.trim()}
+              <button onClick={saveForm} disabled={saving}
                 className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50">
                 {saving ? "Kaydediliyor…" : "Kaydet"}
               </button>

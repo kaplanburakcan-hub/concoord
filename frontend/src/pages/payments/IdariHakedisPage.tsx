@@ -401,6 +401,7 @@ export default function IdariHakedisPage() {
   const [liste, setListe] = useState<IdariHakedis[]>([]);
   const [aktifId, setAktifId] = useState<string | "yeni" | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<IdariHakedis | null>(null);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -447,10 +448,11 @@ export default function IdariHakedisPage() {
   }
 
   async function sil(h: IdariHakedis) {
-    if (!pid || !confirm(`Hakediş No ${h.donem_no} silinsin mi?`)) return;
+    if (!pid) return;
     try {
       await api(`/projects/${pid}/idari-hakedisler/${h.id}`, { method: "DELETE", projectId: pid });
       if (aktifId === h.id) setAktifId(null);
+      setConfirmDelete(null);
       await load();
     } catch {
       setErr("Silinemedi.");
@@ -560,7 +562,7 @@ export default function IdariHakedisPage() {
                       Ödeme bekliyor
                     </span>
                   )}
-                  <button onClick={(e) => { e.stopPropagation(); sil(h); }}
+                  <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(h); }}
                     className="text-xs text-red-400 hover:text-red-300">Sil</button>
                 </div>
               </div>
@@ -571,6 +573,24 @@ export default function IdariHakedisPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-sm space-y-4">
+            <p className="text-sm text-beton-200">Hakediş No {confirmDelete.donem_no} silinsin mi? Bu işlem geri alınamaz.</p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmDelete(null)}
+                className="rounded-md border border-beton-700 px-4 py-2 text-sm text-beton-300 hover:border-beton-500">
+                Vazgeç
+              </button>
+              <button onClick={() => sil(confirmDelete)}
+                className="rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white-solid hover:brightness-110">
+                Sil
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

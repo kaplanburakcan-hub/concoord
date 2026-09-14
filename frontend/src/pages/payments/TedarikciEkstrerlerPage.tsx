@@ -79,19 +79,43 @@ function StatementForm({
   initial, onSave, onCancel,
 }: {
   initial: Statement;
-  onSave: (s: Statement) => void;
+  onSave: (s: Statement) => Promise<void>;
   onCancel: () => void;
 }) {
   const [s, setS] = useState<Statement>(initial);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function set<K extends keyof Statement>(k: K, v: Statement[K]) {
     setS((prev) => ({ ...prev, [k]: v }));
+  }
+
+  async function handleSaveClick() {
+    setError(null);
+    const missing = [
+      !s.tedarikci_adi.trim() && "Tedarikçi Adı",
+      !s.ekstre_no.trim() && "Ekstre No",
+      !s.ekstre_tarihi && "Ekstre Tarihi",
+    ].filter(Boolean) as string[];
+    if (missing.length) {
+      setError(`Zorunlu alanları doldurun: ${missing.join(", ")}.`);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(s);
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : "Kaydedilemedi.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const bakiye = s.toplam_tutar - s.odenen_tutar;
 
   return (
     <div className="p-4 border border-beton-700 rounded-lg bg-beton-900/60 mb-4">
+      {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <div className="col-span-2">
           <label className="text-xs text-beton-500 block mb-1">Tedarikçi Adı *</label>
@@ -157,13 +181,13 @@ function StatementForm({
       </div>
       <div className="flex gap-2 mt-3">
         <button
-          onClick={() => onSave(s)}
-          disabled={!s.tedarikci_adi || !s.ekstre_no || !s.ekstre_tarihi}
+          onClick={handleSaveClick}
+          disabled={saving}
           className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm rounded-md disabled:opacity-40"
         >
-          Kaydet
+          {saving ? "Kaydediliyor…" : "Kaydet"}
         </button>
-        <button onClick={onCancel} className="px-3 py-1.5 text-beton-400 hover:text-beton-200 text-sm">
+        <button onClick={onCancel} disabled={saving} className="px-3 py-1.5 text-beton-400 hover:text-beton-200 text-sm disabled:opacity-40">
           İptal
         </button>
       </div>
@@ -287,6 +311,7 @@ export default function TedarikciEkstrerlerPage() {
   const [filterTedarikci, setFilterTedarikci] = useState(() => searchParams.get("tedarikci") ?? "");
   const [filterDurum, setFilterDurum] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Statement | null>(null);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -315,8 +340,8 @@ export default function TedarikciEkstrerlerPage() {
 
   async function handleDelete(s: Statement) {
     if (!pid || !s.id) return;
-    if (!confirm(`"${s.ekstre_no}" silinecek. Onaylıyor musunuz?`)) return;
     await api(`/projects/${pid}/supplier-statements/${s.id}`, { method: "DELETE", projectId: pid });
+    setConfirmDelete(null);
     await load();
   }
 
@@ -482,7 +507,7 @@ export default function TedarikciEkstrerlerPage() {
                           Düzenle
                         </button>
                         <button
-                          onClick={() => handleDelete(s)}
+                          onClick={() => setConfirmDelete(s)}
                           className="text-xs text-red-500 hover:text-red-400"
                         >
                           Sil
@@ -519,6 +544,26 @@ export default function TedarikciEkstrerlerPage() {
               </tr>
             </tfoot>
           </table>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-sm space-y-4">
+            <p className="text-sm text-beton-200">
+              "{confirmDelete.ekstre_no}" ekstresi silinsin mi? Bu işlem geri alınamaz.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmDelete(null)}
+                className="rounded-md border border-beton-700 px-4 py-2 text-sm text-beton-300 hover:border-beton-500">
+                Vazgeç
+              </button>
+              <button onClick={() => handleDelete(confirmDelete)}
+                className="rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white-solid hover:brightness-110">
+                Sil
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

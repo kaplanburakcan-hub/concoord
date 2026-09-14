@@ -266,6 +266,7 @@ export default function ProjePaydaslariPage() {
   const [arama, setArama] = useState("");
   const [taseronlar, setTaseronlar] = useState<Sub[]>([]);
   const [subsBusy, setSubsBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<{ label: string; action: () => Promise<void> } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function loadTaseronlar(p: string) {
@@ -334,7 +335,6 @@ export default function ProjePaydaslariPage() {
   }
 
   async function silSub(subId: string) {
-    if (!confirm("Bu taşeronu ve altındaki personelleri silmek istiyor musunuz?")) return;
     try {
       await api(`/projects/${pid}/subcontractors/${subId}`, { method: "DELETE", projectId: pid });
       await loadTaseronlar(pid);
@@ -355,7 +355,6 @@ export default function ProjePaydaslariPage() {
   }
 
   async function sil(id: string) {
-    if (!confirm("Bu paydaşı silmek istediğinize emin misiniz?")) return;
     try {
       await api(`/projects/${pid}/stakeholders/${id}`, { method: "DELETE", projectId: pid });
       await loadPaydaslar(pid);
@@ -582,7 +581,7 @@ export default function ProjePaydaslariPage() {
                                       + Personel
                                     </button>
                                     <button
-                                      onClick={() => silSub(sub.id)}
+                                      onClick={() => setConfirmDelete({ label: `"${sub.company_name}" taşeronu ve altındaki personelleri`, action: () => silSub(sub.id) })}
                                       className="text-red-400 hover:underline text-xs"
                                     >
                                       Sil
@@ -597,7 +596,7 @@ export default function ProjePaydaslariPage() {
                                     <span className="text-beton-400 text-xs w-28 truncate">{p.telefon}</span>
                                     <div className="flex gap-3 shrink-0">
                                       <button onClick={() => duzenle(p)} className="text-emniyet-500 hover:underline text-xs">Düzenle</button>
-                                      <button onClick={() => sil(p.id)} className="text-red-400 hover:underline text-xs">Sil</button>
+                                      <button onClick={() => setConfirmDelete({ label: `"${p.ad} ${p.soyad}"`, action: () => sil(p.id) })} className="text-red-400 hover:underline text-xs">Sil</button>
                                     </div>
                                   </div>
                                 ))}
@@ -615,7 +614,7 @@ export default function ProjePaydaslariPage() {
                               <span className="text-beton-400 text-xs w-28 truncate">{p.telefon}</span>
                               <div className="flex gap-3 shrink-0">
                                 <button onClick={() => duzenle(p)} className="text-emniyet-500 hover:underline text-xs">Düzenle</button>
-                                <button onClick={() => sil(p.id)} className="text-red-400 hover:underline text-xs">Sil</button>
+                                <button onClick={() => setConfirmDelete({ label: `"${p.ad} ${p.soyad}"`, action: () => sil(p.id) })} className="text-red-400 hover:underline text-xs">Sil</button>
                               </div>
                             </div>
                           ))}
@@ -659,7 +658,7 @@ export default function ProjePaydaslariPage() {
                                 <td className="px-4 py-2 text-beton-400">{p.email}</td>
                                 <td className="px-4 py-2 text-right">
                                   <button onClick={() => duzenle(p)} className="text-emniyet-500 hover:underline text-xs mr-3">Düzenle</button>
-                                  <button onClick={() => sil(p.id)} className="text-red-400 hover:underline text-xs">Sil</button>
+                                  <button onClick={() => setConfirmDelete({ label: p.tip === "firma" ? `"${p.firmaAdi}"` : `"${p.ad} ${p.soyad}"`, action: () => sil(p.id) })} className="text-red-400 hover:underline text-xs">Sil</button>
                                 </td>
                               </tr>
                             ))}
@@ -850,6 +849,24 @@ export default function ProjePaydaslariPage() {
                 className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50"
               >
                 {subsBusy ? "Kaydediliyor…" : duzenleId ? "Güncelle" : "Kaydet"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-sm space-y-4">
+            <p className="text-sm text-beton-200">{confirmDelete.label} silinsin mi? Bu işlem geri alınamaz.</p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmDelete(null)}
+                className="rounded-md border border-beton-700 px-4 py-2 text-sm text-beton-300 hover:border-beton-500">
+                Vazgeç
+              </button>
+              <button onClick={async () => { await confirmDelete.action(); setConfirmDelete(null); }}
+                className="rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white-solid hover:brightness-110">
+                Sil
               </button>
             </div>
           </div>

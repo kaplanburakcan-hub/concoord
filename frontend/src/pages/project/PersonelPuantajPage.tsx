@@ -94,6 +94,7 @@ export default function PersonelPuantajPage() {
   // Personel form
   const [addingPersonel, setAddingPersonel] = useState(false);
   const [editingPersonel, setEditingPersonel] = useState<Personel | null>(null);
+  const [confirmDeletePersonel, setConfirmDeletePersonel] = useState<Personel | null>(null);
   const [personelForm, setPersonelForm] = useState<Personel>({ ad_soyad: "", gorev: "İşçi", firma: "", is_aktif: true, sira: 0 });
 
   const days = useMemo(() => weekDays(weekMon), [weekMon]);
@@ -278,8 +279,8 @@ export default function PersonelPuantajPage() {
 
   async function deletePersonel(p: Personel) {
     if (!pid || !p.id) return;
-    if (!confirm(`"${p.ad_soyad}" silinecek. Onaylıyor musunuz?`)) return;
     await api(`/projects/${pid}/personnel/${p.id}`, { method: "DELETE", projectId: pid });
+    setConfirmDeletePersonel(null);
     await loadPersonel();
   }
 
@@ -569,7 +570,7 @@ export default function PersonelPuantajPage() {
                             Düzenle
                           </button>
                           <button
-                            onClick={() => deletePersonel(p)}
+                            onClick={() => setConfirmDeletePersonel(p)}
                             className="text-xs text-red-500 hover:text-red-400"
                           >
                             Sil
@@ -582,6 +583,24 @@ export default function PersonelPuantajPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {confirmDeletePersonel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-sm space-y-4">
+            <p className="text-sm text-beton-200">"{confirmDeletePersonel.ad_soyad}" silinsin mi? Bu işlem geri alınamaz.</p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmDeletePersonel(null)}
+                className="rounded-md border border-beton-700 px-4 py-2 text-sm text-beton-300 hover:border-beton-500">
+                Vazgeç
+              </button>
+              <button onClick={() => deletePersonel(confirmDeletePersonel)}
+                className="rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white-solid hover:brightness-110">
+                Sil
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -47,6 +47,7 @@ export default function SabitGiderlerPage() {
   const [form, setForm] = useState(bosForm());
   const [olusturuluyor, setOlusturuluyor] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<FixedExpense | null>(null);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -106,9 +107,10 @@ export default function SabitGiderlerPage() {
   }
 
   async function sil(e: FixedExpense) {
-    if (!pid || !confirm(`"${e.label}" silinsin mi?`)) return;
+    if (!pid) return;
     try {
       await api(`/projects/${pid}/fixed-expenses/${e.id}`, { method: "DELETE", projectId: pid });
+      setConfirmDelete(null);
       await load();
     } catch {
       setErr("Silinemedi.");
@@ -174,7 +176,7 @@ export default function SabitGiderlerPage() {
                   </button>
                 </td>
                 <td className="py-2 px-3">
-                  <button onClick={() => sil(e)} className="text-xs text-red-500 hover:text-red-400">Sil</button>
+                  <button onClick={() => setConfirmDelete(e)} className="text-xs text-red-500 hover:text-red-400">Sil</button>
                 </td>
               </tr>
             ))}
@@ -247,6 +249,24 @@ export default function SabitGiderlerPage() {
                 disabled={!form.label.trim() || !form.amount || olusturuluyor}
                 className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50">
                 {olusturuluyor ? "Oluşturuluyor…" : "Oluştur"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-sm space-y-4">
+            <p className="text-sm text-beton-200">"{confirmDelete.label}" silinsin mi? Bu işlem geri alınamaz.</p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmDelete(null)}
+                className="rounded-md border border-beton-700 px-4 py-2 text-sm text-beton-300 hover:border-beton-500">
+                Vazgeç
+              </button>
+              <button onClick={() => sil(confirmDelete)}
+                className="rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white-solid hover:brightness-110">
+                Sil
               </button>
             </div>
           </div>
