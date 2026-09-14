@@ -44,20 +44,25 @@ export default function ChecklistTemplatesPage() {
   async function save() {
     if (!editing) return;
     setErr(null);
-    const body = {
+    const base = {
       name: editing.name.trim(),
       category: editing.category.trim() || "Genel",
       items: editing.items
         .filter((it) => it.text.trim())
         .map((it, i) => ({ no: i + 1, text: it.text.trim(), critical: it.critical || undefined })),
       is_active: editing.is_active,
-      row_version: editing.row_version,
     };
     try {
       if (isNew) {
-        await api(`/ohs/checklist-templates`, { method: "POST", projectId: pid, body });
+        // Oluşturma isteğinde row_version gönderilmemeli — backend'in POST
+        // struct'ı bu alanı tanımıyor ve sıkı JSON decoder (bilinmeyen alan
+        // reddi) "İstek gövdesi çözümlenemedi" hatasıyla isteği tümden
+        // reddediyordu (yalnız PATCH/güncelleme row_version bekliyor).
+        await api(`/ohs/checklist-templates`, { method: "POST", projectId: pid, body: base });
       } else {
-        await api(`/ohs/checklist-templates/${editing.id}`, { method: "PATCH", projectId: pid, body });
+        await api(`/ohs/checklist-templates/${editing.id}`, {
+          method: "PATCH", projectId: pid, body: { ...base, row_version: editing.row_version },
+        });
       }
       setEditing(null);
       load();
