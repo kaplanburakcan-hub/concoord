@@ -91,6 +91,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 		UseSSL:         cfg.S3UseSSL,
 		ClamdAddr:      cfg.ClamdAddr, // Faz 10: opsiyonel antivirüs
 	})
+	if err := store.EnsureBucket(context.Background()); err != nil {
+		log.Error("minio bucket hazırlanamadı", "err", err)
+	}
 	projectH := projects.NewHandler(pool, eval, recorder, log)
 	docH := documents.NewHandler(pool, store, recorder, log)
 

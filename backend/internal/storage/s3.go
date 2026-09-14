@@ -119,6 +119,43 @@ func (c *Client) PutObject(ctx context.Context, key, contentType string, body io
 	return nil
 }
 
+// EnsureBucket — hedef bucket yoksa oluşturur (var olan bir bucket'ta no-op).
+// Yerel geliştirmede docker-compose'daki minio-init servisinin yaptığı işi
+// prod'da (elle `mc mb` çalıştırma imkânı olmayan yönetilen ortamlarda) API
+// açılışında otomatik yapmak için eklendi.
+func (c *Client) EnsureBucket(ctx context.Context) error {
+	bucketURL := c.scheme() + "://" + c.cfg.Endpoint + "/" + c.cfg.Bucket
+	head, err := http.NewRequestWithContext(ctx, http.MethodHead, bucketURL, nil)
+	if err != nil {
+		return err
+	}
+	c.signHeader(head, emptySHA256Hex, []string{"host", "x-amz-content-sha256", "x-amz-date"})
+	res, err := c.http.Do(head)
+	if err != nil {
+		return err
+	}
+	res.Body.Close()
+	if res.StatusCode == http.StatusOK {
+		return nil // zaten var
+	}
+
+	put, err := http.NewRequestWithContext(ctx, http.MethodPut, bucketURL, nil)
+	if err != nil {
+		return err
+	}
+	c.signHeader(put, emptySHA256Hex, []string{"host", "x-amz-content-sha256", "x-amz-date"})
+	res2, err := c.http.Do(put)
+	if err != nil {
+		return err
+	}
+	defer res2.Body.Close()
+	if res2.StatusCode/100 != 2 {
+		b, _ := io.ReadAll(io.LimitReader(res2.Body, 2048))
+		return fmt.Errorf("minio bucket oluşturulamadı %s: %s: %s", c.cfg.Bucket, res2.Status, strings.TrimSpace(string(b)))
+	}
+	return nil
+}
+
 // Object — GetObject sonucu (akış + meta).
 type Object struct {
 	Body        io.ReadCloser
