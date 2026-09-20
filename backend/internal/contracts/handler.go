@@ -49,8 +49,6 @@ type Contract struct {
 	MaxArtisOrani           *float64          `json:"max_artis_orani"`
 	MaxEksilisOrani         *float64          `json:"max_eksilis_orani"`
 	SgkIsYeriNo             string            `json:"sgk_is_yeri_no"`
-	PdfDosyaURL             string            `json:"pdf_dosya_url"`
-	PdfDosyaAdi             string            `json:"pdf_dosya_adi"`
 	UpdatedAt               *string           `json:"updated_at,omitempty"`
 	IsLocked                bool              `json:"is_locked"`
 	UpdatedByName           string            `json:"updated_by_name,omitempty"`
@@ -76,7 +74,6 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		       c.is_suresi_gun, c.gecici_kabul_sonrasi_gun,
 		       c.max_artis_orani, c.max_eksilis_orani,
 		       COALESCE(c.sgk_is_yeri_no,''),
-		       COALESCE(c.pdf_dosya_url,''), COALESCE(c.pdf_dosya_adi,''),
 		       TO_CHAR(c.updated_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
 		       c.is_locked, COALESCE(u.full_name,'')
 		FROM project_main_contracts c
@@ -91,7 +88,6 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 			&c.IsSuresiGun, &c.GeciciKabulSonrasiGun,
 			&c.MaxArtisOrani, &c.MaxEksilisOrani,
 			&c.SgkIsYeriNo,
-			&c.PdfDosyaURL, &c.PdfDosyaAdi,
 			&c.UpdatedAt,
 			&c.IsLocked, &c.UpdatedByName)
 
@@ -167,13 +163,13 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		    sozlesme_tarihi, yer_teslim_tarihi,
 		    is_suresi_gun, gecici_kabul_sonrasi_gun,
 		    max_artis_orani, max_eksilis_orani,
-		    sgk_is_yeri_no, pdf_dosya_url, pdf_dosya_adi,
+		    sgk_is_yeri_no,
 		    created_by, updated_by, is_locked, updated_at
 		) VALUES (
 		    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
 		    $11::date,$12::date,
-		    $13,$14,$15,$16,$17,$18,$19,
-		    $20,$20,TRUE,NOW()
+		    $13,$14,$15,$16,$17,
+		    $18,$18,TRUE,NOW()
 		)
 		ON CONFLICT (project_id) DO UPDATE SET
 		    isveren_adi              = EXCLUDED.isveren_adi,
@@ -192,8 +188,6 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		    max_artis_orani          = EXCLUDED.max_artis_orani,
 		    max_eksilis_orani        = EXCLUDED.max_eksilis_orani,
 		    sgk_is_yeri_no           = EXCLUDED.sgk_is_yeri_no,
-		    pdf_dosya_url            = EXCLUDED.pdf_dosya_url,
-		    pdf_dosya_adi            = EXCLUDED.pdf_dosya_adi,
 		    updated_by               = EXCLUDED.updated_by,
 		    is_locked                = TRUE,
 		    updated_at               = NOW()
@@ -204,7 +198,7 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		nilStr(derefStr(body.SozlesmeTarihi)), nilStr(derefStr(body.YerTeslimTarihi)),
 		body.IsSuresiGun, body.GeciciKabulSonrasiGun,
 		body.MaxArtisOrani, body.MaxEksilisOrani,
-		nilStr(body.SgkIsYeriNo), nilStr(body.PdfDosyaURL), nilStr(body.PdfDosyaAdi),
+		nilStr(body.SgkIsYeriNo),
 		uid,
 	).Scan(&id)
 

@@ -561,7 +561,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 		api.Group(func(pr chi.Router) {
 			pr.Use(mw.Authenticate)
 			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/main-contract", contractH.Get)
-			pr.With(mw.RequirePermission("projects.edit")).Put("/projects/{projectID}/main-contract", contractH.Upsert)
+			pr.With(mw.RequirePermission("contracts.edit_main")).Put("/projects/{projectID}/main-contract", contractH.Upsert)
 			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/kesin-kabul-tarihi", contractH.KesinKabulTarihi)
 		})
 

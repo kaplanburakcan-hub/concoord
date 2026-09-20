@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, RequestError } from "../../api/client";
+import { api, apiDownload, apiUpload, RequestError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 
@@ -40,8 +40,6 @@ type ContractForm = {
   max_artis_orani: string;
   max_eksilis_orani: string;
   sgk_is_yeri_no: string;
-  pdf_dosya_url: string;
-  pdf_dosya_adi: string;
 };
 
 const PARA_BIRIMLERI = ["TRY", "USD", "EUR", "GBP", "CHF", "JPY"];
@@ -106,14 +104,14 @@ export default function AnaSozlesmePage() {
   const { current } = useProjects();
   const { can } = useAuth();
   const pid = current?.id;
-  const canEdit = can("projects.edit");
+  const canEdit = can("contracts.edit_main");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
-  const pdfRef = useRef<HTMLInputElement>(null);
+  const [notFound, setNotFound] = useState(false);
 
   // Kaydet-ve-kilitle akışı: sözleşme kaydedilince otomatik kilitlenir
   // (bkz. backend contracts.Upsert). Kilitliyken "view" — özet gösterilir;
@@ -139,8 +137,6 @@ export default function AnaSozlesmePage() {
     max_artis_orani: "",
     max_eksilis_orani: "",
     sgk_is_yeri_no: "",
-    pdf_dosya_url: "",
-    pdf_dosya_adi: "",
   });
 
   const [form, setForm] = useState<ContractForm>(empty());
@@ -152,8 +148,9 @@ export default function AnaSozlesmePage() {
     try {
       const res = await api<{ contract: any }>(`/projects/${pid}/main-contract`, { projectId: pid });
       const c = res.contract;
+      setNotFound(false);
       setMeta({ isLocked: !!c.is_locked, updatedAt: c.updated_at, updatedByName: c.updated_by_name });
-      setMode(c.is_locked ? "view" : "edit");
+      setMode(c.is_locked || !canEdit ? "view" : "edit");
       setForm({
         isveren_adi: c.isveren_adi ?? "",
         yuklenici_adi: c.yuklenici_adi ?? "",
@@ -176,13 +173,12 @@ export default function AnaSozlesmePage() {
         max_artis_orani: c.max_artis_orani != null ? String(c.max_artis_orani) : "",
         max_eksilis_orani: c.max_eksilis_orani != null ? String(c.max_eksilis_orani) : "",
         sgk_is_yeri_no: c.sgk_is_yeri_no ?? "",
-        pdf_dosya_url: c.pdf_dosya_url ?? "",
-        pdf_dosya_adi: c.pdf_dosya_adi ?? "",
       });
     } catch (e) {
       if (e instanceof RequestError && e.status === 404) {
         setForm(empty());
         setMeta({ isLocked: false });
+        setNotFound(true);
         setMode("edit");
       } else {
         setErr("Sözleşme verileri yüklenemedi.");
@@ -190,7 +186,7 @@ export default function AnaSozlesmePage() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [pid]);
+  }, [pid, canEdit]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -281,8 +277,6 @@ export default function AnaSozlesmePage() {
       max_artis_orani: form.max_artis_orani ? parseFloat(form.max_artis_orani) : null,
       max_eksilis_orani: form.max_eksilis_orani ? parseFloat(form.max_eksilis_orani) : null,
       sgk_is_yeri_no: form.sgk_is_yeri_no,
-      pdf_dosya_url: form.pdf_dosya_url,
-      pdf_dosya_adi: form.pdf_dosya_adi,
     };
 
     try {
@@ -299,18 +293,6 @@ export default function AnaSozlesmePage() {
     } finally {
       setSaving(false);
     }
-  }
-
-  function handlePdfSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.name.endsWith(".pdf")) {
-      setFieldErr(fe => ({ ...fe, pdf: "Yalnızca PDF dosyası kabul edilir." }));
-      return;
-    }
-    set("pdf_dosya_adi", file.name);
-    set("pdf_dosya_url", "");
-    setFieldErr(fe => { const n = { ...fe }; delete n.pdf; return n; });
   }
 
   if (!current) {
@@ -368,8 +350,12 @@ export default function AnaSozlesmePage() {
         </div>
       )}
 
-      {mode === "view" ? (
-        <ContractSummary form={form} meta={meta} />
+      {!canEdit && notFound ? (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 px-5 py-8 text-center">
+          <p className="text-sm text-beton-400">Bu proje için henüz ana sözleşme tanımlanmamış.</p>
+        </div>
+      ) : mode === "view" ? (
+        <ContractSummary form={form} meta={meta} pid={pid} canEdit={canEdit} />
       ) : (
       <>
       {/* ── 0. Taraflar ───────────────────────────────────────────────────── */}
@@ -700,10 +686,9 @@ export default function AnaSozlesmePage() {
         </div>
       </Section>
 
-      {/* ── 7. SGK ve PDF ────────────────────────────────────────────────── */}
+      {/* ── 7. SGK ────────────────────────────────────────────────────────── */}
       <Section title="Diğer Bilgiler">
         <div className="flex flex-col gap-4">
-
           <Field label="SGK İşyeri Numarası (opsiyonel)">
             <input
               type="text"
@@ -714,52 +699,12 @@ export default function AnaSozlesmePage() {
               className={`${inpBase} w-72`}
             />
           </Field>
-
-          <Field label="Sözleşme PDF Eki" error={fieldErr.pdf}>
-            <div className="flex items-center gap-3 flex-wrap">
-              {canEdit && (
-                <>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    ref={pdfRef}
-                    className="hidden"
-                    onChange={handlePdfSelect}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => pdfRef.current?.click()}
-                    className="px-4 py-1.5 rounded border border-beton-700 text-sm
-                               text-beton-400 hover:text-beton-100 hover:border-emniyet-500
-                               transition-colors"
-                  >
-                    PDF Seç…
-                  </button>
-                </>
-              )}
-              {form.pdf_dosya_adi && (
-                <span className="text-sm text-beton-400 flex items-center gap-1.5">
-                  <span className="text-base">📄</span>
-                  {form.pdf_dosya_adi}
-                  {form.pdf_dosya_url && (
-                    <a
-                      href={form.pdf_dosya_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-emniyet-500 underline ml-1 text-xs"
-                    >
-                      Görüntüle
-                    </a>
-                  )}
-                </span>
-              )}
-              {!form.pdf_dosya_adi && !canEdit && (
-                <span className="text-sm text-beton-500">PDF eklenmemiş.</span>
-              )}
-            </div>
-          </Field>
-
         </div>
+      </Section>
+
+      {/* ── 8. Ekler ─────────────────────────────────────────────────────── */}
+      <Section title="Sözleşme Ekleri">
+        {pid && <ContractAttachments pid={pid} canUpload={canEdit} />}
       </Section>
 
       {canEdit && (
@@ -795,9 +740,11 @@ export default function AnaSozlesmePage() {
 // ContractSummary — kilitli sözleşmenin salt okunur özeti ("view" modu).
 // Tüm form yerine sadece kritik alanları gösterir; ayrıntılı değişiklik
 // için "Güncelle / Revize Et" ile tekrar edit moduna geçilir.
-function ContractSummary({ form, meta }: {
+function ContractSummary({ form, meta, pid, canEdit }: {
   form: ContractForm;
   meta: { isLocked: boolean; updatedAt?: string; updatedByName?: string };
+  pid?: string;
+  canEdit: boolean;
 }) {
   const showBirim = form.sozlesme_turu === "birim_fiyat" || form.sozlesme_turu === "karma";
   const showLump = form.sozlesme_turu === "goturu_bedel" || form.sozlesme_turu === "karma";
@@ -875,8 +822,11 @@ function ContractSummary({ form, meta }: {
       <Section title="Diğer Bilgiler">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <SummaryRow label="SGK İşyeri Numarası" value={form.sgk_is_yeri_no || "—"} />
-          <SummaryRow label="Sözleşme PDF Eki" value={form.pdf_dosya_adi || "—"} />
         </div>
+      </Section>
+
+      <Section title="Sözleşme Ekleri">
+        {pid && <ContractAttachments pid={pid} canUpload={canEdit} />}
       </Section>
     </div>
   );
@@ -912,6 +862,98 @@ function Field({ label, error, children }: {
       <label className={labelSm}>{label}</label>
       {children}
       {error && <p className="text-xs text-red-400">{error}</p>}
+    </div>
+  );
+}
+
+// ── Sözleşme Ekleri ──────────────────────────────────────────────────────────
+// Ortak documents motorunu kullanır (entity_type="main_contract",
+// entity_id=proje ID — sözleşme projede tek kayıt olduğundan yeterli).
+// Gerçek yükleme + gerçek indirme: eski pdf_dosya_url/adi alanlarının aksine.
+type ContractDoc = { id: string; title: string; latest_version?: number };
+type ContractDocVersion = { id: string; version_no: number; original_name: string; size_bytes: number };
+
+function ContractAttachments({ pid, canUpload }: { pid: string; canUpload: boolean }) {
+  const [docs, setDocs] = useState<ContractDoc[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const d = await api<{ documents: ContractDoc[] }>(
+        `/projects/${pid}/documents?entity_type=main_contract&entity_id=${pid}`, { projectId: pid }
+      );
+      setDocs(d.documents ?? []);
+    } catch { setDocs([]); }
+  }, [pid]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function upload() {
+    const file = fileRef.current?.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const doc = await api<{ document: { id: string } }>(`/projects/${pid}/documents`, {
+        method: "POST", projectId: pid,
+        body: { title: file.name, doc_category: "AnaSozlesmeEki",
+                entity_type: "main_contract", entity_id: pid },
+      });
+      const fd = new FormData();
+      fd.append("file", file);
+      await apiUpload(`/projects/${pid}/documents/${doc.document.id}/versions`, fd);
+      if (fileRef.current) fileRef.current.value = "";
+      await load();
+    } catch {
+      setErr("Ek yüklenemedi.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function download(d: ContractDoc) {
+    if (!d.latest_version) return;
+    try {
+      const det = await api<{ versions: ContractDocVersion[] }>(`/projects/${pid}/documents/${d.id}`, { projectId: pid });
+      const v = det.versions[0];
+      if (v) await apiDownload(`/projects/${pid}/documents/${d.id}/versions/${v.version_no}/download`, v.original_name);
+    } catch {
+      setErr("İndirme başarısız.");
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {err && <p className="text-xs text-red-400">{err}</p>}
+      {docs.length === 0 ? (
+        <p className="text-sm text-beton-500">Henüz ek dosya yok.</p>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {docs.map(d => (
+            <li key={d.id}>
+              <button onClick={() => download(d)} className="text-sm text-emniyet-500 hover:underline text-left">
+                📎 {d.title}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {canUpload && (
+        <div className="flex items-center gap-2 pt-1">
+          <input ref={fileRef} type="file" className="text-xs text-beton-400 flex-1" />
+          <button
+            type="button"
+            onClick={upload}
+            disabled={busy}
+            className="px-3 py-1.5 rounded border border-beton-700 text-xs text-beton-200
+                       hover:border-emniyet-500 disabled:opacity-50 shrink-0 transition-colors"
+          >
+            {busy ? "Yükleniyor…" : "Ek Yükle"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

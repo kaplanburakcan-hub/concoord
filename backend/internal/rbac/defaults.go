@@ -32,6 +32,7 @@ var AllPermissions = []PermissionDef{
 	{"contracts", "view", "Sözleşmeleri görüntüle"},
 	{"contracts", "upload", "Sözleşme/zeyilname yükle"},
 	{"contracts", "delete", "Sözleşme kaydını sil (soft delete)"},
+	{"contracts", "edit_main", "Ana sözleşmeyi düzenle (varsayılan olarak yalnızca Sistem Yöneticisi alır)"},
 
 	{"progress_payments", "view", "Hakedişleri görüntüle (metraj)"},
 	{"progress_payments", "create_draft", "Hakediş taslağı oluştur"},
