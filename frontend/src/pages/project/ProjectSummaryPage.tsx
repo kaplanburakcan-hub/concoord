@@ -53,18 +53,10 @@ const MS_META: Record<string, { label: string; dot: string }> = {
 };
 
 const ZAMAN_STOPS: ColorStop[] = [{ t: 0, hex: "#22d3ee" }, { t: 0.5, hex: "#2f6fed" }, { t: 1, hex: "#6d5ef8" }];
-const ADAMSAAT_STOPS: ColorStop[] = [{ t: 0, hex: "#f5a800" }, { t: 1, hex: "#fb923c" }];
 const SATINALMA_STOPS: ColorStop[] = [{ t: 0, hex: "#60a5fa" }, { t: 1, hex: "#2f6fed" }];
 const KASA_STOPS: ColorStop[] = [{ t: 0, hex: "#fbbf24" }, { t: 1, hex: "#f59e0b" }];
 const TASERON_STOPS: ColorStop[] = [{ t: 0, hex: "#34d399" }, { t: 1, hex: "#10b981" }];
 const SABIT_STOPS: ColorStop[] = [{ t: 0, hex: "#a78bfa" }, { t: 1, hex: "#8b5cf6" }];
-
-// Adam-Saat Takip — proje genelinde adam-saat verimlilik takibi için henüz
-// bir backend/veri kaynağı yok (bkz. manhour database notu). Gerçek veri
-// bağlanana kadar temsili sabit değerler kullanılır; hesap mantığı
-// (kullanılan/planlanan oranı) gerçek veriyle birebir aynı kalacak.
-const ADAM_SAAT_KULLANILAN = 64200;
-const ADAM_SAAT_PLANLANAN = 121500;
 
 function fmt(n?: number, cur = "TRY") {
   if (n == null) return "—";
@@ -159,8 +151,6 @@ export default function ProjectSummaryPage() {
   ] : [];
   const giderTotal = giderler ? giderler.satinalma + giderler.kasa_harcamalari + giderler.tasaron_hakedis + giderler.sabit_giderler : 0;
 
-  const adamSaatPct = Math.round((ADAM_SAAT_KULLANILAN / ADAM_SAAT_PLANLANAN) * 100);
-
   return (
     <div className="relative">
       {/* Bulanık mor/eflatun ambiyans — yalnızca panelin ARKASINDA/ÇEVRESİNDE
@@ -249,23 +239,8 @@ export default function ProjectSummaryPage() {
             </div>
           </div>
         </PanelCell>
-        <PanelCell title="Adam-Saat Takip" action={
-          <span className="text-[10.5px]" style={{ color: "rgb(var(--panel-ink3))" }}>kullanılan / planlanan</span>
-        }>
-          <div className="flex items-center gap-5">
-            <SolidRing pct={adamSaatPct} colorStops={ADAMSAAT_STOPS} size={116} gradId="ring-adamsaat" />
-            <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-              <MetaRow label="Kullanılan" value={`${ADAM_SAAT_KULLANILAN.toLocaleString("tr-TR")} sa.`} />
-              <MetaRow label="Planlanan" value={`${ADAM_SAAT_PLANLANAN.toLocaleString("tr-TR")} sa.`} />
-              <MetaRow label="Kalan" value={`${(ADAM_SAAT_PLANLANAN - ADAM_SAAT_KULLANILAN).toLocaleString("tr-TR")} sa.`} />
-              <p
-                className="text-[11px] mt-1 font-medium"
-                style={{ color: adamSaatPct < timePct ? "var(--group-accent)" : "#4ade80" }}
-              >
-                {adamSaatPct < timePct ? "Zaman ilerlemesinin gerisinde" : "Zaman ilerlemesiyle uyumlu"}
-              </p>
-            </div>
-          </div>
+        <PanelCell title="Adam-Saat Takip">
+          <p className="text-sm" style={{ color: "rgb(var(--panel-ink2))" }}>Henüz adam-saat verisi girilmemiş.</p>
         </PanelCell>
         <PanelCell title="Giderler" action={
           giderTotal > 0 ? <span className="text-[10.5px]" style={{ color: "rgb(var(--panel-ink3))" }}>toplam</span> : undefined
