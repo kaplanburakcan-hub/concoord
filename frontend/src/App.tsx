@@ -25,6 +25,7 @@ import DailyReportFormPage from "./pages/reports/DailyReportFormPage";
 import WeeklyReportsPage from "./pages/reports/WeeklyReportsPage";
 import MonthlyReportsPage from "./pages/reports/MonthlyReportsPage";
 import PortfolioPage from "./pages/dashboard/PortfolioPage";
+import VerimlilikNormlariPage from "./pages/dashboard/VerimlilikNormlariPage";
 import PurchaseRequestsPage from "./pages/procurement/PurchaseRequestsPage";
 import ProcurementBoardPage from "./pages/procurement/ProcurementBoardPage";
 import ProcurementPlanPage from "./pages/procurement/ProcurementPlanPage";
@@ -110,6 +111,14 @@ export default function App() {
                         element={
                           <RequirePerm perm="projects.view">
                             <PortfolioPage />
+                          </RequirePerm>
+                        }
+                      />
+                      <Route
+                        path="/verimlilik-normlari"
+                        element={
+                          <RequirePerm perm="reports.view">
+                            <VerimlilikNormlariPage />
                           </RequirePerm>
                         }
                       />

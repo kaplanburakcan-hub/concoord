@@ -28,6 +28,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/idarihakedis"
 	"github.com/ipks/ipks/backend/internal/insurance"
 	"github.com/ipks/ipks/backend/internal/machines"
+	"github.com/ipks/ipks/backend/internal/manhour"
 	"github.com/ipks/ipks/backend/internal/materials"
 	"github.com/ipks/ipks/backend/internal/meetings"
 	"github.com/ipks/ipks/backend/internal/notify"
@@ -124,6 +125,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 	// --- Faz 9 bağımlılıkları (dashboard, EVM, aylık yönetim raporu) ---
 	dashH := dashboard.NewHandler(pool, eval, recorder, notifySvc, store, log)
+	manhourH := manhour.NewHandler(pool)
 
 	// --- Faz 18: Ana Sözleşme ---
 	contractH := contracts.NewHandler(pool)
@@ -537,6 +539,10 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 			// Portföy görünümü (Plan §3) — projeler arası özet kartlar.
 			pr.With(mw.RequirePermission("projects.view")).Get("/portfolio", dashH.Portfolio)
+
+			// Verimlilik Normları — firma çapında, projeden bağımsız referans veri.
+			pr.With(mw.RequirePermission("reports.view")).Get("/manhour/norms", manhourH.ListNorms)
+			pr.With(mw.RequirePermission("reports.view")).Get("/manhour/project-history", manhourH.ListProjectHistory)
 
 			// Rol duyarlı proje dashboard'u.
 			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/dashboard", dashH.ProjectDashboard)
