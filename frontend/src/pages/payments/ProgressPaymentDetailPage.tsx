@@ -363,7 +363,10 @@ export default function ProgressPaymentDetailPage() {
                       <span className="text-beton-600">—</span>
                     )}
                   </td>
-                  {canFin && <td className="py-1 pr-2 text-right tabular-nums">{iv?.this_amount?.toLocaleString("tr-TR") ?? "—"}</td>}
+                  {/* Miktar (kümülatif) girilir girilmez birim fiyatla çarpılıp burada
+                      anında görünür — sunucudan gelen iv?.this_amount'ı beklemez,
+                      kaydetmeden önce de doğru tutarı gösterir. */}
+                  {canFin && <td className="py-1 pr-2 text-right tabular-nums">{(thisQty * (w.unit_price ?? 0)).toLocaleString("tr-TR")}</td>}
                 </tr>
               );
             })}
@@ -518,8 +521,14 @@ export default function ProgressPaymentDetailPage() {
           {editable && (
             <div className="mt-3 border-t border-beton-800 pt-3 space-y-2">
               {extras.map((e, i) => (
-                <div key={i} className="grid grid-cols-[1fr_1fr_90px_70px_auto] gap-2 items-center">
-                  {/* Katalogdan kalem seçimi: tür, KDV oranı ve nitelik otomatik gelir */}
+                <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_90px_70px_auto] gap-2 items-center">
+                  {/* Katalogdan kalem seçimi: tür, KDV oranı ve nitelik otomatik gelir.
+                      minmax(0,1fr) şart — düz 1fr kullanılırsa <select>'in en uzun
+                      seçenek metni (ör. "Sözleşmeden doğan ceza kesintisi") grid
+                      sütununun min-width:auto varsayılanı yüzünden container'ı
+                      zorlayıp satırı kart dışına taşırıyordu (Tutar/KDV/Sil alanları
+                      görünmez/tıklanamaz hale geliyordu — bu yüzden "rakam
+                      yazamıyoruz" hatası oluşuyordu). */}
                   <select
                     value={e.catalog_code ?? ""}
                     onChange={(ev) => {
@@ -533,7 +542,7 @@ export default function ProgressPaymentDetailPage() {
                         description: x.description || it?.label || "",
                       } : x))
                     }}
-                    className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100">
+                    className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100">
                     <option value="">— kalem seçin —</option>
                     {catalog.groups.map((g) => (
                       <optgroup key={g.code} label={`${g.label} · ${g.hint}`}>
@@ -545,15 +554,15 @@ export default function ProgressPaymentDetailPage() {
                   </select>
                   <input value={e.description} placeholder="Açıklama / dayanak"
                     onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, description: ev.target.value } : x))}
-                    className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
+                    className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
                   <input value={e.amount} placeholder="Tutar" inputMode="decimal"
                     onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, amount: ev.target.value } : x))}
-                    className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100 text-right" />
+                    className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100 text-right" />
                   <select
                     value={String(e.vat_pct ?? 0)}
                     onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, vat_pct: Number(ev.target.value) } : x))}
                     title="Kesintinin kendi KDV oranı (tutar KDV dahil girilir)"
-                    className="rounded bg-beton-950 border border-beton-800 px-1 py-1 text-sm text-beton-100">
+                    className="min-w-0 rounded bg-beton-950 border border-beton-800 px-1 py-1 text-sm text-beton-100">
                     <option value="0">%0</option>
                     <option value="10">%10</option>
                     <option value="20">%20</option>
