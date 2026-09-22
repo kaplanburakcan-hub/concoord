@@ -22,6 +22,11 @@ export type Project = {
   proje_turu?: string;
   toplam_insaat_alani_m2?: number;
   kat_blok_bilgisi?: string;
+  ulke?: string;
+  il?: string;
+  ilce?: string;
+  enlem?: number;
+  boylam?: number;
   row_version: number;
   created_at: string;
 };

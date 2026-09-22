@@ -95,7 +95,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	if err := store.EnsureBucket(context.Background()); err != nil {
 		log.Error("minio bucket hazırlanamadı", "err", err)
 	}
-	projectH := projects.NewHandler(pool, eval, recorder, log)
+	projectH := projects.NewHandler(pool, store, eval, recorder, log)
 	docH := documents.NewHandler(pool, store, recorder, log)
 
 	// --- Faz 4 bağımlılıkları (görev yönetimi + merkezi bildirim motoru) ---

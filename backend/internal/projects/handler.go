@@ -20,18 +20,20 @@ import (
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/rbac"
+	"github.com/ipks/ipks/backend/internal/storage"
 	"github.com/ipks/ipks/backend/internal/validate"
 )
 
 type Handler struct {
-	pool *pgxpool.Pool
-	eval *rbac.Evaluator
-	rec  *audit.Recorder
-	log  *slog.Logger
+	pool  *pgxpool.Pool
+	store *storage.Client
+	eval  *rbac.Evaluator
+	rec   *audit.Recorder
+	log   *slog.Logger
 }
 
-func NewHandler(pool *pgxpool.Pool, eval *rbac.Evaluator, rec *audit.Recorder, log *slog.Logger) *Handler {
-	return &Handler{pool: pool, eval: eval, rec: rec, log: log}
+func NewHandler(pool *pgxpool.Pool, store *storage.Client, eval *rbac.Evaluator, rec *audit.Recorder, log *slog.Logger) *Handler {
+	return &Handler{pool: pool, store: store, eval: eval, rec: rec, log: log}
 }
 
 // ---------------------------------------------------------------------------
@@ -55,23 +57,34 @@ type projectDTO struct {
 	ClientRepName    *string    `json:"client_rep_name,omitempty"`
 	SiteManagerName  *string    `json:"site_manager_name,omitempty"`
 	// Künye çeşitlendirmesi (Plan: Proje Künyesi genişletme) — üçü de opsiyonel.
-	ProjeTuru           *string   `json:"proje_turu,omitempty"`
-	ToplamInsaatAlaniM2 *float64  `json:"toplam_insaat_alani_m2,omitempty"`
-	KatBlokBilgisi      *string   `json:"kat_blok_bilgisi,omitempty"`
-	RowVersion          int       `json:"row_version"`
-	CreatedAt           time.Time `json:"created_at"`
+	ProjeTuru           *string  `json:"proje_turu,omitempty"`
+	ToplamInsaatAlaniM2 *float64 `json:"toplam_insaat_alani_m2,omitempty"`
+	KatBlokBilgisi      *string  `json:"kat_blok_bilgisi,omitempty"`
+	// Yapısal konum (Ülke/İl/İlçe + opsiyonel koordinat) — Konum/Vaziyet
+	// Planı Görseli'nin manuel yükleme kutusunun yerini alır; koordinat ya
+	// da il/ilçe kaydedilince otomatik statik harita bir kez yakalanır
+	// (bkz. documents kategorisi "KonumHaritasi", locationmap.go).
+	Ulke       *string   `json:"ulke,omitempty"`
+	Il         *string   `json:"il,omitempty"`
+	Ilce       *string   `json:"ilce,omitempty"`
+	Enlem      *float64  `json:"enlem,omitempty"`
+	Boylam     *float64  `json:"boylam,omitempty"`
+	RowVersion int       `json:"row_version"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 const projectCols = `id, code, name, location, client_name, budget_total::float8, contract_amount::float8,
 	currency, start_date, end_date, status, accent_color,
 	site_handover_date, client_rep_name, site_manager_name,
-	proje_turu, toplam_insaat_alani_m2::float8, kat_blok_bilgisi, row_version, created_at`
+	proje_turu, toplam_insaat_alani_m2::float8, kat_blok_bilgisi,
+	ulke, il, ilce, enlem::float8, boylam::float8, row_version, created_at`
 
 func scanProject(row pgx.Row, p *projectDTO) error {
 	return row.Scan(&p.ID, &p.Code, &p.Name, &p.Location, &p.ClientName, &p.BudgetTotal, &p.ContractAmount,
 		&p.Currency, &p.StartDate, &p.EndDate, &p.Status, &p.AccentColor,
 		&p.SiteHandoverDate, &p.ClientRepName, &p.SiteManagerName,
-		&p.ProjeTuru, &p.ToplamInsaatAlaniM2, &p.KatBlokBilgisi, &p.RowVersion, &p.CreatedAt)
+		&p.ProjeTuru, &p.ToplamInsaatAlaniM2, &p.KatBlokBilgisi,
+		&p.Ulke, &p.Il, &p.Ilce, &p.Enlem, &p.Boylam, &p.RowVersion, &p.CreatedAt)
 }
 
 var hexColorRe = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
@@ -257,6 +270,11 @@ type updateProjectReq struct {
 	ProjeTuru           *string  `json:"proje_turu"`
 	ToplamInsaatAlaniM2 *float64 `json:"toplam_insaat_alani_m2"`
 	KatBlokBilgisi      *string  `json:"kat_blok_bilgisi"`
+	Ulke                *string  `json:"ulke"`
+	Il                  *string  `json:"il"`
+	Ilce                *string  `json:"ilce"`
+	Enlem               *float64 `json:"enlem"`
+	Boylam              *float64 `json:"boylam"`
 	RowVersion          int      `json:"row_version"`
 }
 
@@ -378,6 +396,41 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 			katBlok = &trimmed
 		}
 	}
+	ulke := before.Ulke
+	if req.Ulke != nil {
+		trimmed := strings.TrimSpace(*req.Ulke)
+		if trimmed == "" {
+			ulke = nil
+		} else {
+			ulke = &trimmed
+		}
+	}
+	il := before.Il
+	if req.Il != nil {
+		trimmed := strings.TrimSpace(*req.Il)
+		if trimmed == "" {
+			il = nil
+		} else {
+			il = &trimmed
+		}
+	}
+	ilce := before.Ilce
+	if req.Ilce != nil {
+		trimmed := strings.TrimSpace(*req.Ilce)
+		if trimmed == "" {
+			ilce = nil
+		} else {
+			ilce = &trimmed
+		}
+	}
+	enlem := before.Enlem
+	if req.Enlem != nil {
+		enlem = req.Enlem
+	}
+	boylam := before.Boylam
+	if req.Boylam != nil {
+		boylam = req.Boylam
+	}
 
 	var after projectDTO
 	err = scanProject(tx.QueryRow(r.Context(), `
@@ -388,13 +441,15 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 			status=$10, accent_color=$11,
 			site_handover_date=NULLIF($12,'')::date, client_rep_name=NULLIF($13,''), site_manager_name=NULLIF($14,''),
 			proje_turu=$15, toplam_insaat_alani_m2=$16, kat_blok_bilgisi=$17,
+			ulke=$18, il=$19, ilce=$20, enlem=$21, boylam=$22,
 			row_version=row_version+1
 		WHERE id=$1
 		RETURNING `+projectCols,
 		pid, name, location, clientName, budget, contractAmount, currency,
 		strDeref(req.StartDate), strDeref(req.EndDate), status, accentColor,
 		siteHandoverDate, clientRepName, siteManagerName,
-		projeTuru, toplamAlan, katBlok), &after)
+		projeTuru, toplamAlan, katBlok,
+		ulke, il, ilce, enlem, boylam), &after)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -414,6 +469,15 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{"project": after})
+
+	// Konum bu güncellemeyle ilk kez anlamlı hale geldiyse (il ya da
+	// koordinat girildi) ve daha önce yakalanmış bir harita yoksa, statik
+	// harita görüntüsünü arka planda bir kez yakalayıp documents motoruna
+	// kaydeder — istek yanıtını bloklamaz, hata olursa yalnızca loglanır.
+	if after.Il != nil || (after.Enlem != nil && after.Boylam != nil) {
+		uid, _ := auth.UserIDFrom(r.Context())
+		go h.captureLocationMapOnce(pid, after.Il, after.Enlem, after.Boylam, uid)
+	}
 }
 
 func (h *Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {

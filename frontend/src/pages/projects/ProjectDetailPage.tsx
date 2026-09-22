@@ -22,6 +22,25 @@ const PROJE_TURU_KATALOG = [
 ];
 const PROJE_TURU_DIGER = "__diger__";
 
+// Konum: Ülke/İl/İlçe seçimi + opsiyonel koordinat, Konum/Vaziyet Planı
+// Görseli'nin manuel yükleme kutusunun yerini alır (bkz. locationmap.go —
+// il seçilince ya da koordinat girilince statik harita bir kez otomatik
+// yakalanır, sonrasında hep aynı görsel kullanılır).
+const TURKIYE_ILLERI = [
+  "Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Aksaray", "Amasya", "Ankara",
+  "Antalya", "Ardahan", "Artvin", "Aydın", "Balıkesir", "Bartın", "Batman",
+  "Bayburt", "Bilecik", "Bingöl", "Bitlis", "Bolu", "Burdur", "Bursa",
+  "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır", "Düzce", "Edirne",
+  "Elazığ", "Erzincan", "Erzurum", "Eskişehir", "Gaziantep", "Giresun",
+  "Gümüşhane", "Hakkari", "Hatay", "Iğdır", "Isparta", "İstanbul", "İzmir",
+  "Kahramanmaraş", "Karabük", "Karaman", "Kars", "Kastamonu", "Kayseri",
+  "Kırıkkale", "Kırklareli", "Kırşehir", "Kilis", "Kocaeli", "Konya",
+  "Kütahya", "Malatya", "Manisa", "Mardin", "Mersin", "Muğla", "Muş",
+  "Nevşehir", "Niğde", "Ordu", "Osmaniye", "Rize", "Sakarya", "Samsun",
+  "Siirt", "Sinop", "Sivas", "Şanlıurfa", "Şırnak", "Tekirdağ", "Tokat",
+  "Trabzon", "Tunceli", "Uşak", "Van", "Yalova", "Yozgat", "Zonguldak",
+];
+
 type Milestone = {
   id: string;
   name: string;
@@ -104,6 +123,7 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
   const [projeTuruCustom, setProjeTuruCustom] = useState(
     !!project.proje_turu && !PROJE_TURU_KATALOG.includes(project.proje_turu)
   );
+  const [ulkeCustom, setUlkeCustom] = useState(!!project.ulke && project.ulke !== "Türkiye");
 
   const isActive = f.status === "Active";
 
@@ -140,6 +160,11 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
           proje_turu: f.proje_turu ?? "",
           toplam_insaat_alani_m2: f.toplam_insaat_alani_m2 ?? null,
           kat_blok_bilgisi: f.kat_blok_bilgisi ?? "",
+          ulke: f.ulke ?? "",
+          il: f.il ?? "",
+          ilce: f.ilce ?? "",
+          enlem: f.enlem ?? null,
+          boylam: f.boylam ?? null,
           row_version: project.row_version,
         },
       });
@@ -162,6 +187,10 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
     ["Proje Türü", project.proje_turu || "—"],
     ["İşveren", project.client_name || "—"],
     ["Lokasyon", project.location || "—"],
+    ["Ülke / İl / İlçe", [project.ulke, project.il, project.ilce].filter(Boolean).join(" / ") || "—"],
+    ...(project.enlem != null && project.boylam != null ? [
+      ["Koordinat", `${project.enlem.toFixed(6)}, ${project.boylam.toFixed(6)}`] as [string, ReactNode],
+    ] : []),
     ["Toplam İnşaat Alanı", project.toplam_insaat_alani_m2 != null ? `${project.toplam_insaat_alani_m2.toLocaleString("tr-TR")} m²` : "—"],
     ["Kat / Blok Bilgisi", project.kat_blok_bilgisi || "—"],
     ["Para birimi", project.currency],
@@ -194,9 +223,14 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
           />
           <KunyeGorselKutusu
             projectId={project.id}
-            label="Konum / Vaziyet Planı Görseli"
-            category="KonumGorseli"
-            canUpload={canEdit}
+            label="Konum Haritası"
+            category="KonumHaritasi"
+            canUpload={false}
+            linkHint={
+              project.il
+                ? "Harita hazırlanıyor…"
+                : <>Henüz konum girilmedi — {canEdit ? "künyeyi düzenleyip İl seçin." : "İl seçilince otomatik oluşur."}</>
+            }
           />
         </div>
         <div className="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
@@ -256,6 +290,46 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
       </Field>
       <Field label="İşveren"><input className={inp} value={f.client_name || ""} onChange={(e) => setF({ ...f, client_name: e.target.value })} /></Field>
       <Field label="Lokasyon"><input className={inp} value={f.location || ""} onChange={(e) => setF({ ...f, location: e.target.value })} /></Field>
+
+      <Field label="Ülke">
+        <select
+          className={inp}
+          value={ulkeCustom ? "__diger__" : (f.ulke || "Türkiye")}
+          onChange={(e) => {
+            if (e.target.value === "__diger__") { setUlkeCustom(true); setF({ ...f, ulke: "" }); return; }
+            setUlkeCustom(false);
+            setF({ ...f, ulke: e.target.value });
+          }}
+        >
+          <option value="Türkiye">Türkiye</option>
+          <option value="__diger__">Diğer (elle yaz)</option>
+        </select>
+        {ulkeCustom && (
+          <input placeholder="Ülke adı" className={`${inp} mt-1`} value={f.ulke ?? ""}
+            onChange={(e) => setF({ ...f, ulke: e.target.value })} />
+        )}
+      </Field>
+      <Field label="İl">
+        <select className={inp} value={f.il ?? ""} onChange={(e) => setF({ ...f, il: e.target.value })}>
+          <option value="">— Seçin —</option>
+          {TURKIYE_ILLERI.map((i) => <option key={i} value={i}>{i}</option>)}
+        </select>
+      </Field>
+      <Field label="İlçe">
+        <input className={inp} value={f.ilce ?? ""} onChange={(e) => setF({ ...f, ilce: e.target.value })} />
+      </Field>
+      <Field label="Koordinat (opsiyonel)">
+        <div className="flex gap-2">
+          <input type="number" step="any" placeholder="Enlem" className={inp}
+            value={f.enlem ?? ""} onChange={(e) => setF({ ...f, enlem: e.target.value === "" ? undefined : Number(e.target.value) })} />
+          <input type="number" step="any" placeholder="Boylam" className={inp}
+            value={f.boylam ?? ""} onChange={(e) => setF({ ...f, boylam: e.target.value === "" ? undefined : Number(e.target.value) })} />
+        </div>
+        <p className="mt-1 text-[11px] text-beton-500">
+          Zorunlu değil — girilirse harita bu tam noktaya, girilmezse İl merkezine göre oluşur.
+        </p>
+      </Field>
+
       <Field label="Toplam İnşaat Alanı (m²)">
         <input type="number" min={0} className={inp} value={f.toplam_insaat_alani_m2 ?? ""}
           onChange={(e) => setF({ ...f, toplam_insaat_alani_m2: e.target.value === "" ? undefined : Number(e.target.value) })} />

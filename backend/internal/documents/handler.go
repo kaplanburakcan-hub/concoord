@@ -41,7 +41,8 @@ var docCategories = map[string]bool{
 	"IdariHakedisFatura":  true,
 	"IdariHakedisBelgesi": true,
 	"ProjeGorseli":        true,
-	"KonumGorseli":        true,
+	"KonumGorseli":        true, // eski manuel yükleme; artık kullanılmıyor, geriye dönük veri için tutulur
+	"KonumHaritasi":       true, // il/ilçe/koordinattan otomatik yakalanan statik harita (bkz. internal/projects/locationmap.go)
 	"NakliyeIrsaliyesi":   true,
 	"KiralamaSozlesmesi":  true,
 	"AnaSozlesmeEki":      true,
