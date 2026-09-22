@@ -160,7 +160,7 @@ export default function PurchaseOrdersPage() {
               onChange={(e) => {
                 setTedarikciId(e.target.value);
                 const t = tedarikciler.find((x) => x.id === e.target.value);
-                if (t && !supplier.trim()) setSupplier(t.company_name);
+                if (t) setSupplier(t.company_name);
               }}
               className="mt-1 block rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100">
               <option value="">— bağlama —</option>

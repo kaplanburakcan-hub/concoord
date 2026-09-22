@@ -81,6 +81,22 @@ const NATURE_CLS: Record<string, string> = {
   Permanent: "text-beton-400 border-beton-700",
 };
 
+// Kesinti Tutar/% alanları: kullanıcı yazarken binlik ayraçlı gösterim
+// (ör. "200.000"), sunucuya gönderirken/parse ederken ayraçsız sayıya çevrilir.
+// Number("200.000") JS'te noktayı ondalık sanıp 200 döner — bu yüzden ham
+// Number() değil bu iki yardımcı kullanılmalı.
+function formatTRAmount(raw: string): string {
+  const s = raw.replace(/[^\d,]/g, "");
+  const commaIdx = s.indexOf(",");
+  let intPart = commaIdx >= 0 ? s.slice(0, commaIdx) : s;
+  const decPart = commaIdx >= 0 ? s.slice(commaIdx + 1).replace(/,/g, "").slice(0, 2) : undefined;
+  intPart = intPart.replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return decPart !== undefined ? `${intPart || "0"},${decPart}` : intPart;
+}
+function trToNumber(s: string): number {
+  return Number((s || "").replace(/\./g, "").replace(",", ".")) || 0;
+}
+
 export default function ProgressPaymentDetailPage() {
   const { id } = useParams();
   const { current } = useProjects();
@@ -106,7 +122,15 @@ export default function ProgressPaymentDetailPage() {
     source_entity?: string; source_id?: string;
     // Faz 11 — katalog seçimi ve kesintinin kendi KDV oranı
     catalog_code?: string; group_code?: string; vat_pct?: number;
+    // Tutar'a alternatif: sözleşme bedelinin %'si (yalnızca istemci tarafı
+    // yardımcı alan — sunucuya hep hesaplanmış "amount" gönderilir, pct
+    // saklanmaz; sayfa yeniden yüklenince tutar sabit değer olarak kalır).
+    pct?: string;
   }[]>([]);
+  // Yüzde bazlı kesinti hesaplaması için taban: bu taşeronun bu projedeki
+  // sözleşmelerinin toplam bedeli (finansal görüntüleme yetkisi olmayanlara
+  // sunucu zaten null döner).
+  const [contractAmount, setContractAmount] = useState<number | null>(null);
   const [suggestions, setSuggestions] = useState<PenaltySuggestion[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -143,7 +167,7 @@ export default function ProgressPaymentDetailPage() {
       setExtras(r.deductions
         .filter((d) => d.type !== "AdvanceOffset" && d.type !== "Retention")
         .map((d) => ({
-          type: d.type, description: d.description, amount: String(d.amount ?? 0),
+          type: d.type, description: d.description, amount: formatTRAmount(String(d.amount ?? 0)),
           source_entity: d.source_entity, source_id: d.source_id,
         })));
       const wi = await api<{ work_items: WorkItem[] }>(
@@ -157,13 +181,18 @@ export default function ProgressPaymentDetailPage() {
         setOnayliTutanaklar(tt.tutanaklar ?? []);
       } catch { setOnayliTutanaklar([]); }
       // Faz B — sözleşmedeki varsayılan ödeme şekli (formu önceden doldurur).
+      // Aynı sorgu, yüzde bazlı kesinti hesaplaması için taşeronun bu
+      // projedeki toplam sözleşme bedelini de sağlar (birden fazla
+      // sözleşmesi varsa toplamı alınır).
       try {
-        const cs = await api<{ contracts: { default_payment_method?: string | null }[] }>(
+        const cs = await api<{ contracts: { default_payment_method?: string | null; amount?: number | null }[] }>(
           `/projects/${pid}/contracts?subcontractor_id=${r.payment.subcontractor_id}`, { projectId: pid });
         const m = cs.contracts.find((c) => c.default_payment_method)?.default_payment_method ?? null;
         setDefaultMethod(m);
         setDForm((f) => ({ ...f, payment_method: f.payment_method || m || "" }));
-      } catch { /* sözleşme yoksa serbest seçim yine çalışır */ }
+        const total = cs.contracts.reduce((sum, c) => sum + (c.amount ?? 0), 0);
+        setContractAmount(total > 0 ? total : null);
+      } catch { setContractAmount(null); /* sözleşme yoksa serbest seçim yine çalışır */ }
     } catch { setErr("Hakediş yüklenemedi ya da erişim yetkiniz yok."); }
   }, [pid, id]);
 
@@ -245,9 +274,9 @@ export default function ProgressPaymentDetailPage() {
           tutanak_id: tutanakId[w.id] || undefined,
         })),
       deductions: extras
-        .filter((e) => e.type && Number(e.amount))
+        .filter((e) => e.type && trToNumber(e.amount))
         .map((e) => ({
-          type: e.type, description: e.description, amount: Number(e.amount),
+          type: e.type, description: e.description, amount: trToNumber(e.amount),
           source_entity: e.source_entity, source_id: e.source_id,
           catalog_code: e.catalog_code ?? "", group_code: e.group_code ?? "",
           vat_pct: e.vat_pct ?? 0,
@@ -500,7 +529,7 @@ export default function ProgressPaymentDetailPage() {
                         onClick={() => setExtras([...extras, {
                           type: "OHSPenalty",
                           description: `${s.penalty_no} — ${s.violation_type}`,
-                          amount: String(s.amount),
+                          amount: formatTRAmount(String(s.amount)),
                           source_entity: "ohs_penalties",
                           source_id: s.penalty_id,
                         }])}
@@ -520,57 +549,113 @@ export default function ProgressPaymentDetailPage() {
 
           {editable && (
             <div className="mt-3 border-t border-beton-800 pt-3 space-y-2">
-              {extras.map((e, i) => (
-                <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_90px_70px_auto] gap-2 items-center">
+              {extras.map((e, i) => {
+                const pctActive = !!e.pct?.trim();
+                const amountDisabled = pctActive;
+                const pctDisabled = !!e.amount?.trim() && !pctActive;
+                return (
+                <div key={i} className="rounded-md border border-beton-800/70 p-2 space-y-2">
                   {/* Katalogdan kalem seçimi: tür, KDV oranı ve nitelik otomatik gelir.
                       minmax(0,1fr) şart — düz 1fr kullanılırsa <select>'in en uzun
                       seçenek metni (ör. "Sözleşmeden doğan ceza kesintisi") grid
                       sütununun min-width:auto varsayılanı yüzünden container'ı
-                      zorlayıp satırı kart dışına taşırıyordu (Tutar/KDV/Sil alanları
-                      görünmez/tıklanamaz hale geliyordu — bu yüzden "rakam
-                      yazamıyoruz" hatası oluşuyordu). */}
-                  <select
-                    value={e.catalog_code ?? ""}
-                    onChange={(ev) => {
-                      const it = catalog.items.find((c) => c.code === ev.target.value);
-                      setExtras(extras.map((x, j) => j === i ? {
-                        ...x,
-                        catalog_code: it?.code ?? "",
-                        group_code: it?.group_code ?? "",
-                        type: it?.deduction_type ?? x.type,
-                        vat_pct: it?.default_vat_pct ?? 0,
-                        description: it ? it.label : x.description,
-                      } : x))
-                    }}
-                    className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100">
-                    <option value="">— kalem seçin —</option>
-                    {catalog.groups.map((g) => (
-                      <optgroup key={g.code} label={`${g.label} · ${g.hint}`}>
-                        {catalog.items.filter((c) => c.group_code === g.code).map((c) => (
-                          <option key={c.code} value={c.code}>{c.label}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <input value={e.description} placeholder="Açıklama / dayanak"
-                    onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, description: ev.target.value } : x))}
-                    className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
-                  <input value={e.amount} placeholder="Tutar" inputMode="decimal"
-                    onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, amount: ev.target.value } : x))}
-                    className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100 text-right" />
-                  <select
-                    value={String(e.vat_pct ?? 0)}
-                    onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, vat_pct: Number(ev.target.value) } : x))}
-                    title="Kesintinin kendi KDV oranı (tutar KDV dahil girilir)"
-                    className="min-w-0 rounded bg-beton-950 border border-beton-800 px-1 py-1 text-sm text-beton-100">
-                    <option value="0">%0</option>
-                    <option value="10">%10</option>
-                    <option value="20">%20</option>
-                  </select>
-                  <button onClick={() => setExtras(extras.filter((_, j) => j !== i))}
-                    className="text-red-400 hover:text-red-300 text-xs px-1">Sil</button>
+                      zorlayıp satırı kart dışına taşırıyordu. */}
+                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
+                    <select
+                      value={e.catalog_code ?? ""}
+                      onChange={(ev) => {
+                        const it = catalog.items.find((c) => c.code === ev.target.value);
+                        setExtras(extras.map((x, j) => j === i ? {
+                          ...x,
+                          catalog_code: it?.code ?? "",
+                          group_code: it?.group_code ?? "",
+                          type: it?.deduction_type ?? x.type,
+                          vat_pct: it?.default_vat_pct ?? 0,
+                          description: it ? it.label : x.description,
+                        } : x))
+                      }}
+                      className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100">
+                      <option value="">— kalem seçin —</option>
+                      {catalog.groups.map((g) => (
+                        <optgroup key={g.code} label={`${g.label} · ${g.hint}`}>
+                          {catalog.items.filter((c) => c.group_code === g.code).map((c) => (
+                            <option key={c.code} value={c.code}>{c.label}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    <input value={e.description} placeholder="Açıklama / dayanak"
+                      onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, description: ev.target.value } : x))}
+                      className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
+                  </div>
+
+                  {/* Tutar / sözleşme bedelinin %'si: birbirine alternatif iki
+                      ayrı satır. Biri doluyken diğeri kilitlenir (mutual
+                      exclusive) — yüzde girilince taban, taşeronun bu
+                      projedeki toplam sözleşme bedelidir. Sözleşme bedeli
+                      bilinmiyorsa (yok ya da finansal görüntüleme yetkisi
+                      yoksa) yalnızca sabit Tutar alanı gösterilir. */}
+                  {contractAmount ? (
+                    <div className="rounded border border-emerald-800/40 bg-emerald-500/5 p-2 space-y-1.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-500">
+                        Tutar nasıl belirlensin
+                      </p>
+                      <div className="grid grid-cols-[minmax(0,1fr)_100px] gap-2 items-center">
+                        <label className="text-xs text-beton-300">Sabit tutar (TL)</label>
+                        <input value={e.amount} placeholder="0,00" inputMode="decimal"
+                          disabled={amountDisabled}
+                          onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, amount: formatTRAmount(ev.target.value) } : x))}
+                          className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100 text-right disabled:opacity-40 disabled:cursor-not-allowed" />
+                      </div>
+                      <div className="grid grid-cols-[minmax(0,1fr)_100px] gap-2 items-center">
+                        <label className="text-xs text-beton-300">Sözleşme bedelinin %'si</label>
+                        <div className="relative">
+                          <input value={e.pct ?? ""} placeholder="0" inputMode="decimal"
+                            disabled={pctDisabled}
+                            onChange={(ev) => {
+                              const pctRaw = ev.target.value.replace(/[^\d,]/g, "");
+                              const pctNum = trToNumber(pctRaw);
+                              const computed = Math.round((contractAmount * pctNum) / 100);
+                              setExtras(extras.map((x, j) => j === i ? {
+                                ...x, pct: pctRaw, amount: pctRaw ? formatTRAmount(String(computed)) : "",
+                              } : x));
+                            }}
+                            className="min-w-0 w-full rounded bg-beton-950 border border-beton-800 pl-2 pr-5 py-1 text-sm text-beton-100 text-right disabled:opacity-40 disabled:cursor-not-allowed" />
+                          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-beton-500">%</span>
+                        </div>
+                      </div>
+                      {pctActive && (
+                        <p className="text-[10px] text-beton-500">
+                          Sözleşme bedeli ({contractAmount.toLocaleString("tr-TR")} TL) üzerinden hesaplanan tutar:{" "}
+                          <span className="text-beton-300 tabular-nums">{e.amount || "0"} TL</span>
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <input value={e.amount} placeholder="Tutar" inputMode="decimal"
+                      onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, amount: formatTRAmount(ev.target.value) } : x))}
+                      className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100 text-right" />
+                  )}
+
+                  <div className="flex items-end justify-end gap-2">
+                    <label className="text-xs text-beton-400">
+                      <span className="block text-[10px] text-beton-500 mb-0.5">KDV oranı</span>
+                      <select
+                        value={String(e.vat_pct ?? 0)}
+                        onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, vat_pct: Number(ev.target.value) } : x))}
+                        title="Kesintinin kendi KDV oranı (tutar KDV dahil girilir)"
+                        className="min-w-0 rounded bg-beton-950 border border-beton-800 px-1 py-1 text-sm text-beton-100">
+                        <option value="0">%0</option>
+                        <option value="10">%10</option>
+                        <option value="20">%20</option>
+                      </select>
+                    </label>
+                    <button onClick={() => setExtras(extras.filter((_, j) => j !== i))}
+                      className="text-red-400 hover:text-red-300 text-xs px-1 pb-1.5">Sil</button>
+                  </div>
                 </div>
-              ))}
+                );
+              })}
               <button onClick={() => setExtras([...extras, { type: "Other", description: "", amount: "", vat_pct: 0 }])}
                 className="text-emniyet-500 hover:underline text-xs">+ Kesinti satırı ekle</button>
               <p className="text-[10px] text-beton-500">
