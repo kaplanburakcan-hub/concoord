@@ -409,8 +409,18 @@ export default function IdariHakedisPage() {
     try {
       const r = await api<{ idari_hakedisler: IdariHakedis[] }>(`/projects/${pid}/idari-hakedisler`, { projectId: pid });
       setListe(r.idari_hakedisler ?? []);
-    } catch {
-      setErr("İdari hakedişler yüklenemedi ya da erişim yetkiniz yok.");
+    } catch (e) {
+      // "Erişim yetkiniz yok" yalnızca gerçek 403'te gösterilir — 500/ağ
+      // hatası gibi başka sebepleri de aynı metinle "yetki sorunu" gibi
+      // göstermek yanıltıcıydı (kullanıcı admin olduğu halde bu mesajı
+      // görüp gerçek nedeni anlayamıyordu).
+      if (e instanceof RequestError && e.status === 403) {
+        setErr("İdari hakedişler için erişim yetkiniz yok.");
+      } else if (e instanceof RequestError) {
+        setErr(`İdari hakedişler yüklenemedi (${e.message || `HTTP ${e.status}`}).`);
+      } else {
+        setErr("İdari hakedişler yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.");
+      }
     }
   }, [pid]);
 
