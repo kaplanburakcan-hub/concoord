@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, RequestError } from "../../api/client";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { api, apiDownload, apiUpload, RequestError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 
@@ -89,6 +89,9 @@ export default function ProjeKesfiPage() {
   const [openKats, setOpenKats] = useState<Set<string>>(new Set(KATEGORILER));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [assignItem, setAssignItem] = useState<Item | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -237,6 +240,37 @@ export default function ProjeKesfiPage() {
     }
   }
 
+  async function downloadTemplate() {
+    if (!pid) return;
+    try {
+      await apiDownload(`/projects/${pid}/survey-items/template.xlsx`, "proje-kesfi-sablonu.xlsx");
+    } catch {
+      setErr("Şablon indirilemedi.");
+    }
+  }
+
+  async function doImport(file: File) {
+    if (!pid) return;
+    setImporting(true);
+    setImportMsg(null);
+    setErr(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await apiUpload<{ created: number; skipped: string[] }>(
+        `/projects/${pid}/survey-items/import`, fd
+      );
+      let msg = `${res.created} kalem içe aktarıldı.`;
+      if (res.skipped?.length) msg += ` ${res.skipped.length} satır atlandı (${res.skipped.slice(0, 3).join("; ")}${res.skipped.length > 3 ? "…" : ""}).`;
+      setImportMsg(msg);
+      await load();
+    } catch {
+      setErr("İçe aktarma başarısız. .xlsx/.csv ve sütun düzenini kontrol edin (şablonu kullanın).");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   if (!current) return <p className="p-6 text-beton-400">Önce üst bardan bir proje seçin.</p>;
   if (loading) return (
     <div className="p-6 text-beton-400 flex items-center gap-2">
@@ -251,6 +285,23 @@ export default function ProjeKesfiPage() {
         <div>
           <h1 className="text-xl font-semibold text-beton-100">Proje Keşfi</h1>
           <p className="text-sm text-beton-400 mt-0.5">{current.name}</p>
+          {canEdit && (
+            <div className="mt-2 flex items-center gap-3 flex-wrap">
+              <button onClick={downloadTemplate}
+                className="text-xs text-emniyet-500 hover:underline">
+                Şablon indir (.xlsx)
+              </button>
+              <input ref={importRef} type="file" accept=".xlsx,.csv" className="hidden"
+                onChange={(e) => { const file = e.target.files?.[0]; if (file) doImport(file); e.currentTarget.value = ""; }} />
+              <button onClick={() => importRef.current?.click()} disabled={importing}
+                className="text-xs text-emniyet-500 hover:underline disabled:opacity-50">
+                {importing ? "İçe aktarılıyor…" : "İçe aktar"}
+              </button>
+              <span className="text-[11px] text-beton-500">
+                Kategori: Mimari, Betonarme, Cephe, Çatı, Mekanik, Elektrik, Peyzaj, Diğer
+              </span>
+            </div>
+          )}
         </div>
         <div className="text-right">
           <p className="text-xs text-beton-500">Toplam Keşif Bedeli</p>
@@ -264,6 +315,11 @@ export default function ProjeKesfiPage() {
       {err && (
         <div className="rounded-md bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-400">
           {err}
+        </div>
+      )}
+      {importMsg && (
+        <div className="rounded-md bg-emniyet-500/10 border border-emniyet-500/30 px-4 py-3 text-sm text-emniyet-500">
+          {importMsg}
         </div>
       )}
 

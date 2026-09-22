@@ -2,7 +2,10 @@
 package survey
 
 import (
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -11,6 +14,8 @@ import (
 	"github.com/ipks/ipks/backend/internal/audit"
 	"github.com/ipks/ipks/backend/internal/httpx"
 )
+
+const maxImportBytes = 10 << 20 // 10 MB — yalnızca metin/sayı hücreleri içerir, fazlasıyla yeterli
 
 type Handler struct {
 	db  *pgxpool.Pool
@@ -196,4 +201,106 @@ func nilStr(s string) any {
 		return nil
 	}
 	return s
+}
+
+// DownloadTemplate — kullanıcının indirip doldurup ImportItems'a geri
+// yükleyebileceği .xlsx şablonu (bkz. template.go).
+func (h *Handler) DownloadTemplate(w http.ResponseWriter, r *http.Request) {
+	data, err := BuildImportTemplateXLSX()
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", `attachment; filename="proje-kesfi-sablonu.xlsx"`)
+	w.Write(data)
+}
+
+// ImportItems — .xlsx/.csv dosyasından toplu keşif kalemi ekler (bkz.
+// import.go). Her kategori kendi mevcut en yüksek sira'sından devam eder;
+// kategori ya da tanım boş olan satırlar atlanır ve nedeniyle raporlanır.
+func (h *Handler) ImportItems(w http.ResponseWriter, r *http.Request) {
+	pid, err := uuid.Parse(chi.URLParam(r, "projectID"))
+	if err != nil {
+		httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "Geçersiz proje ID.", nil)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxImportBytes)
+	if err := r.ParseMultipartForm(4 << 20); err != nil {
+		httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "Dosya çözümlenemedi (boyut sınırı 10 MB).", nil)
+		return
+	}
+	file, hdr, err := r.FormFile("file")
+	if err != nil {
+		httpx.ValidationFailed(w, r, map[string]string{"file": "dosya alanı zorunlu"})
+		return
+	}
+	defer file.Close()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	rows, err := parseImport(hdr.Filename, data)
+	if err != nil {
+		httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "Dosya okunamadı: "+err.Error(), nil)
+		return
+	}
+
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	nextSira := map[string]int{} // kategori bazında devam eden sıra numarası
+	created := 0
+	var skipped []string
+	for i, row := range rows {
+		kategori := strings.TrimSpace(row.Kategori)
+		tanim := strings.TrimSpace(row.Tanim)
+		if kategori == "" || tanim == "" {
+			skipped = append(skipped, fmt.Sprintf("satır %d: kategori/tanım boş", i+2))
+			continue
+		}
+		if _, ok := nextSira[kategori]; !ok {
+			var maxSira *int
+			if err := tx.QueryRow(r.Context(),
+				`SELECT MAX(sira) FROM project_survey_items WHERE project_id=$1 AND kategori=$2`,
+				pid, kategori).Scan(&maxSira); err != nil {
+				httpx.Internal(w, r)
+				return
+			}
+			if maxSira != nil {
+				nextSira[kategori] = *maxSira + 1
+			}
+		}
+		birim := strings.TrimSpace(row.Birim)
+		if birim == "" {
+			birim = "adet"
+		}
+		paraBirimi := strings.TrimSpace(row.ParaBirimi)
+		if paraBirimi == "" {
+			paraBirimi = "TRY"
+		}
+		if _, err := tx.Exec(r.Context(), `
+			INSERT INTO project_survey_items
+			    (project_id, kategori, poz_no, tanim, birim, miktar, birim_fiyat, para_birimi, aciklama, sira)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+			pid, kategori, nilStr(strings.TrimSpace(row.PozNo)), tanim,
+			birim, row.Miktar, row.BirimFiyat, paraBirimi,
+			nilStr(strings.TrimSpace(row.Aciklama)), nextSira[kategori],
+		); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		nextSira[kategori]++
+		created++
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"created": created, "skipped": skipped})
 }

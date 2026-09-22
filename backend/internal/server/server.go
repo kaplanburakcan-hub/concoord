@@ -584,6 +584,8 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 		api.Group(func(pr chi.Router) {
 			pr.Use(mw.Authenticate)
 			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/survey-items", surveyH.List)
+			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/survey-items/template.xlsx", surveyH.DownloadTemplate)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/survey-items/import", surveyH.ImportItems)
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/survey-items", surveyH.Create)
 			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/survey-items/{id}", surveyH.Update)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/survey-items/{id}", surveyH.Delete)
