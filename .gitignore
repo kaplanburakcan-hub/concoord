@@ -3,6 +3,7 @@
 backend/bin/
 frontend/node_modules/
 frontend/dist/
+frontend/tsconfig.tsbuildinfo
 deploy/backup/out/
 deploy/certbot/
 .DS_Store
