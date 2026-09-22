@@ -1,11 +1,17 @@
 package projects
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -84,27 +90,9 @@ func (h *Handler) captureLocationMapOnce(projectID uuid.UUID, il *string, lat, l
 		return
 	}
 
-	url := fmt.Sprintf(
-		"https://staticmap.openstreetmap.de/staticmap.php?center=%.6f,%.6f&zoom=%d&size=640x400&maptype=mapnik&markers=%.6f,%.6f,red-pushpin",
-		effLat, effLon, zoom, effLat, effLon)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	data, err := fetchLocationMapPNG(ctx, effLat, effLon, zoom)
 	if err != nil {
-		h.log.Error("konum haritası isteği kurulamadı", "err", err)
-		return
-	}
-	res, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
-	if err != nil {
-		h.log.Error("konum haritası çekilemedi", "err", err)
-		return
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		h.log.Error("konum haritası servisi hata döndü", "status", res.StatusCode)
-		return
-	}
-	data, err := io.ReadAll(io.LimitReader(res.Body, 5<<20)) // 5 MB güvenlik sınırı
-	if err != nil || len(data) == 0 {
-		h.log.Error("konum haritası gövdesi okunamadı", "err", err)
+		h.log.Error("konum haritası oluşturulamadı", "err", err)
 		return
 	}
 
@@ -156,4 +144,120 @@ func (h *Handler) captureLocationMapOnce(projectID uuid.UUID, il *string, lat, l
 	if err := tx.Commit(ctx); err != nil {
 		h.log.Error("konum haritası kaydı tamamlanamadı", "err", err)
 	}
+}
+
+const tileSize = 256
+
+// fetchLocationMapPNG — OpenStreetMap'in standart tile sunucusundan (bilinen,
+// gerçekten çözümlenen tek uç nokta) verilen noktanın etrafındaki 3×3 tile'ı
+// çekip birleştirir, tam koordinatın üzerine kırmızı bir işaretçi çizer ve
+// 640×400'e kırpar. "Statik harita" servisleri (staticmap.openstreetmap.de
+// vb.) çoğu zaman artık çözümlenmiyor/kaldırılmış; bu yüzden dış bir sarmalayıcı
+// servise değil, doğrudan tile sunucusuna + standart kütüphane image paketine
+// dayanılıyor.
+func fetchLocationMapPNG(ctx context.Context, lat, lon float64, zoom int) ([]byte, error) {
+	n := math.Exp2(float64(zoom))
+	xf := (lon + 180.0) / 360.0 * n
+	latRad := lat * math.Pi / 180
+	yf := (1 - math.Log(math.Tan(latRad)+1/math.Cos(latRad))/math.Pi) / 2 * n
+
+	centerX := int(math.Floor(xf))
+	centerY := int(math.Floor(yf))
+	nInt := int(n)
+
+	canvas := image.NewRGBA(image.Rect(0, 0, tileSize*3, tileSize*3))
+	for dy := -1; dy <= 1; dy++ {
+		for dx := -1; dx <= 1; dx++ {
+			tx := ((centerX+dx)%nInt + nInt) % nInt // antimeridyende sarma
+			ty := centerY + dy
+			tile := fetchOSMTile(ctx, zoom, tx, ty)
+			dstX, dstY := (dx+1)*tileSize, (dy+1)*tileSize
+			draw.Draw(canvas, image.Rect(dstX, dstY, dstX+tileSize, dstY+tileSize), tile, image.Point{}, draw.Src)
+		}
+	}
+
+	// Kanvasın sol-üst köşesi dünya piksel uzayında (centerX-1, centerY-1)
+	// tile'ının başlangıcına denk gelir; işaretçi bu referansa göre konumlanır.
+	markerX := xf*tileSize - float64(centerX-1)*tileSize
+	markerY := yf*tileSize - float64(centerY-1)*tileSize
+	drawMarker(canvas, int(markerX), int(markerY))
+
+	cropW, cropH := 640, 400
+	x0 := clampInt(int(markerX)-cropW/2, 0, tileSize*3-cropW)
+	y0 := clampInt(int(markerY)-cropH/2, 0, tileSize*3-cropH)
+	cropped := image.NewRGBA(image.Rect(0, 0, cropW, cropH))
+	draw.Draw(cropped, cropped.Bounds(), canvas, image.Point{X: x0, Y: y0}, draw.Src)
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, cropped); err != nil {
+		return nil, fmt.Errorf("harita png kodlanamadı: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+// fetchOSMTile — tek bir OSM raster tile'ı çeker; başarısızsa (ör. geçersiz
+// y aralığı, ağ hatası) boş beyaz bir tile döner — tek bir tile'ın eksik
+// olması tüm haritayı iptal ettirmez.
+func fetchOSMTile(ctx context.Context, z, x, y int) image.Image {
+	blank := image.NewRGBA(image.Rect(0, 0, tileSize, tileSize))
+	draw.Draw(blank, blank.Bounds(), &image.Uniform{C: color.RGBA{0xe8, 0xec, 0xf0, 0xff}}, image.Point{}, draw.Src)
+	if y < 0 {
+		return blank
+	}
+	url := fmt.Sprintf("https://tile.openstreetmap.org/%d/%d/%d.png", z, x, y)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return blank
+	}
+	// OSM tile kullanım politikası tanımlayıcı bir User-Agent ister.
+	req.Header.Set("User-Agent", "ConCoord-IPKS/1.0 (dahili şantiye yönetim sistemi; proje konum önizlemesi)")
+	res, err := (&http.Client{Timeout: 8 * time.Second}).Do(req)
+	if err != nil {
+		return blank
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return blank
+	}
+	body, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	if err != nil {
+		return blank
+	}
+	img, err := png.Decode(bytes.NewReader(body))
+	if err != nil {
+		return blank
+	}
+	return img
+}
+
+// drawMarker — (cx, cy) merkezli, beyaz kenarlıklı dolu kırmızı bir daire çizer.
+func drawMarker(img *image.RGBA, cx, cy int) {
+	const r = 7
+	red := color.RGBA{0xd6, 0x33, 0x2b, 0xff}
+	white := color.RGBA{0xff, 0xff, 0xff, 0xff}
+	for dy := -r - 2; dy <= r+2; dy++ {
+		for dx := -r - 2; dx <= r+2; dx++ {
+			dist2 := dx*dx + dy*dy
+			px, py := cx+dx, cy+dy
+			if px < 0 || py < 0 || px >= img.Bounds().Dx() || py >= img.Bounds().Dy() {
+				continue
+			}
+			switch {
+			case dist2 <= r*r:
+				img.Set(px, py, red)
+			case dist2 <= (r+2)*(r+2):
+				img.Set(px, py, white)
+			}
+		}
+	}
+}
+
+func clampInt(v, min, max int) int {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
 }
