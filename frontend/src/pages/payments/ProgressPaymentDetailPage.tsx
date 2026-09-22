@@ -539,7 +539,7 @@ export default function ProgressPaymentDetailPage() {
                         group_code: it?.group_code ?? "",
                         type: it?.deduction_type ?? x.type,
                         vat_pct: it?.default_vat_pct ?? 0,
-                        description: x.description || it?.label || "",
+                        description: it ? it.label : x.description,
                       } : x))
                     }}
                     className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100">
