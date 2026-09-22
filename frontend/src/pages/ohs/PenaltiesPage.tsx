@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, apiDownload } from "../../api/client";
+import { api, apiDownload, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 
@@ -62,7 +62,7 @@ export default function PenaltiesPage() {
     try {
       const r = await api<{ penalties: Penalty[] }>(`/projects/${pid}/ohs/penalties`, { projectId: pid });
       setList(r.penalties);
-    } catch { setErr("Ceza tutanakları yüklenemedi ya da erişim yetkiniz yok."); }
+    } catch (e) { setErr(describeLoadError(e, "Ceza tutanakları")); }
     try {
       const s = await api<{ subcontractors: Sub[] }>(`/projects/${pid}/subcontractors`, { projectId: pid });
       setSubs(s.subcontractors);

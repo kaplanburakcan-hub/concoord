@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../../api/client";
+import { api, describeLoadError } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 
 // Sözleşme Takip — Proje Keşfi kalemlerinin karşısında, o imalat için
@@ -54,7 +54,7 @@ export default function SozlesmeTakipPage() {
     setErr(null);
     api<{ items: Item[] }>(`/projects/${pid}/sozlesme-takip`, { projectId: pid })
       .then((r) => setItems(r.items ?? []))
-      .catch(() => setErr("Sözleşme takip verisi yüklenemedi ya da erişim yetkiniz yok."))
+      .catch((e) => setErr(describeLoadError(e, "Sözleşme takip verisi")))
       .finally(() => setLoading(false));
   }, [pid]);
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, apiFetchBlob, RequestError } from "../../api/client";
+import { api, apiFetchBlob, RequestError, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../../projects/ProjectContext";
 import { apiWithOfflineFallback } from "../../offline/queue";
@@ -113,8 +113,8 @@ export default function DailyReportFormPage() {
       setEquipment((d.equipment ?? []).map(({ equipment_name, count, working_hours, idle_reason }) => ({ equipment_name, count, working_hours, idle_reason })));
       setEntries((d.work_entries ?? []).map(({ work_item_id, location, description, qty, unit }) => ({ work_item_id, location, description, qty, unit })));
       setCashExpenses((d.cash_expenses ?? []).map(({ description, category, amount, receipt_no }) => ({ description, category, amount, receipt_no })));
-    } catch {
-      setErr("Rapor yüklenemedi ya da erişim yetkiniz yok.");
+    } catch (e) {
+      setErr(describeLoadError(e, "Rapor"));
     }
   }, [pid, id, isNew]);
 

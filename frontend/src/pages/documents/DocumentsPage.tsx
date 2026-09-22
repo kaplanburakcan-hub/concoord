@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { api, apiUpload, apiDownload } from "../../api/client";
+import { api, apiUpload, apiDownload, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 
@@ -53,8 +53,8 @@ export default function DocumentsPage() {
       const query = params.toString() ? `?${params}` : "";
       const d = await api<{ documents: Doc[] }>(`/projects/${pid}/documents${query}`, { projectId: pid });
       setDocs(d.documents);
-    } catch {
-      setErr("Dokümanlar yüklenemedi ya da erişim yetkiniz yok.");
+    } catch (e) {
+      setErr(describeLoadError(e, "Dokümanlar"));
     }
   }, [pid]);
 

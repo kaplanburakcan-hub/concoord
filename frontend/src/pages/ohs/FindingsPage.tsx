@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, apiDownload } from "../../api/client";
+import { api, apiDownload, describeLoadError } from "../../api/client";
 import { apiWithOfflineFallback } from "../../offline/queue";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
@@ -103,7 +103,7 @@ export default function FindingsPage() {
       const r = await api<{ findings: Finding[] }>(
         `/projects/${pid}/ohs/findings${statusFilter ? `?status=${statusFilter}` : ""}`, { projectId: pid });
       setFindings(r.findings);
-    } catch { setErr("Bulgular yüklenemedi ya da erişim yetkiniz yok."); }
+    } catch (e) { setErr(describeLoadError(e, "Bulgular")); }
     try {
       const s = await api<{ subcontractors: Sub[] }>(`/projects/${pid}/subcontractors`, { projectId: pid });
       setSubs(s.subcontractors);

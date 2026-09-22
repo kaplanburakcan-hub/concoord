@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, apiDownload, apiUpload } from "../../api/client";
+import { api, apiDownload, apiUpload, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 import { MAR, MAR_STATUS_LABEL, MAR_STATUS_STYLE } from "./MaterialApprovalsPage";
@@ -35,7 +35,7 @@ export default function MaterialApprovalDetailPage() {
       const d = await api<{ documents: Doc[] }>(
         `/projects/${pid}/documents?entity_type=material_approval&entity_id=${id}`, { projectId: pid });
       setDocs(d.documents);
-    } catch { setErr("MAR yüklenemedi ya da erişim yetkiniz yok."); }
+    } catch (e) { setErr(describeLoadError(e, "MAR")); }
   }, [pid, id]);
 
   useEffect(() => { load(); }, [load]);

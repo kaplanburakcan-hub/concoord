@@ -46,6 +46,19 @@ class RequestError extends Error {
 }
 export { RequestError };
 
+// Liste/detay yükleme catch bloklarında ortak kullanılır: 403'ü gerçek bir
+// yetki hatası olarak gösterir, diğer her şeyi (500, ağ kopması, ...) kendi
+// gerçek nedeniyle — hepsini tek bir "erişim yetkiniz yok" metniyle
+// göstermek yanıltıcıdır (ör. admin bir kullanıcı geçici bir 500'de
+// yetkisi olmadığını sanabilir).
+export function describeLoadError(e: unknown, resource: string): string {
+  if (e instanceof RequestError) {
+    if (e.status === 403) return `${resource} için erişim yetkiniz yok.`;
+    return `${resource} yüklenemedi (${e.message || `HTTP ${e.status}`}).`;
+  }
+  return `${resource} yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.`;
+}
+
 async function refresh(): Promise<boolean> {
   const rt = getRefreshToken();
   if (!rt) return false;

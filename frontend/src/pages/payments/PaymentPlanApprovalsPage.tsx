@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../../api/client";
+import { api, describeLoadError } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 
 // Nakit Akış Faz C — ödeme planı değişikliği onay akışı. Hakediş/ekstre/PO
@@ -40,7 +40,7 @@ export default function PaymentPlanApprovalsPage() {
       const r = await api<{ changes: Change[] }>(
         `/projects/${pid}/payment-plan-changes?status=pending`, { projectId: pid });
       setChanges(r.changes ?? []);
-    } catch { setErr("Bekleyen talepler yüklenemedi ya da erişim yetkiniz yok."); }
+    } catch (e) { setErr(describeLoadError(e, "Bekleyen talepler")); }
   }, [pid]);
 
   useEffect(() => { load(); }, [load]);

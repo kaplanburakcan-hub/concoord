@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../api/client";
+import { api, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 import type { TemplateItem } from "./ChecklistTemplatesPage";
@@ -38,7 +38,7 @@ export default function InspectionsPage() {
       const r = await api<{ inspections: Inspection[] }>(
         `/projects/${pid}/ohs/inspections`, { projectId: pid });
       setList(r.inspections);
-    } catch { setErr("Denetimler yüklenemedi ya da erişim yetkiniz yok."); }
+    } catch (e) { setErr(describeLoadError(e, "Denetimler")); }
   }, [pid]);
 
   useEffect(() => { load(); }, [load]);

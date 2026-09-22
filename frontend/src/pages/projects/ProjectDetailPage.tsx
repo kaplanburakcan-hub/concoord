@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, apiFetchBlob, apiUpload, RequestError } from "../../api/client";
+import { api, apiFetchBlob, apiUpload, RequestError, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects, type Project } from "../ProjectContext";
 import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
@@ -56,8 +56,8 @@ export default function ProjectDetailPage() {
       setProject(p.project);
       const m = await api<{ milestones: Milestone[] }>(`/projects/${id}/milestones`, { projectId: id });
       setMilestones(m.milestones);
-    } catch {
-      setErr("Proje yüklenemedi ya da erişim yetkiniz yok.");
+    } catch (e) {
+      setErr(describeLoadError(e, "Proje"));
     }
   }, [id]);
 

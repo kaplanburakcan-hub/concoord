@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, apiDownload, apiUpload } from "../../api/client";
+import { api, apiDownload, apiUpload, describeLoadError } from "../../api/client";
 import ApprovalChain from "./ApprovalChain";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
@@ -195,7 +195,7 @@ export default function ProgressPaymentDetailPage() {
         const total = cs.contracts.reduce((sum, c) => sum + (c.amount ?? 0), 0);
         setContractAmount(total > 0 ? total : null);
       } catch { setContractAmount(null); /* sözleşme yoksa serbest seçim yine çalışır */ }
-    } catch { setErr("Hakediş yüklenemedi ya da erişim yetkiniz yok."); }
+    } catch (e) { setErr(describeLoadError(e, "Hakediş")); }
   }, [pid, id]);
 
   const loadDisbursements = useCallback(async () => {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, apiFetchBlob } from "../../api/client";
+import { api, apiFetchBlob, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../../projects/ProjectContext";
 import OfflineQueueBanner from "./OfflineQueueBanner";
@@ -60,8 +60,8 @@ export default function DailyReportsPage() {
         { projectId: pid }
       );
       setReports(res.daily_reports);
-    } catch {
-      setErr("Günlük raporlar yüklenemedi ya da erişim yetkiniz yok.");
+    } catch (e) {
+      setErr(describeLoadError(e, "Günlük raporlar"));
     }
   }, [pid]);
 

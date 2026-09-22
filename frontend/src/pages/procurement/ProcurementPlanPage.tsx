@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, apiUpload } from "../../api/client";
+import { api, apiUpload, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 
@@ -73,8 +73,8 @@ export default function ProcurementPlanPage() {
     try {
       const r = await api<{ items: PlanItem[] }>(`/projects/${pid}/procurement/plan`, { projectId: pid });
       setItems(r.items ?? []);
-    } catch {
-      setErr("Tedarik planı yüklenemedi ya da erişim yetkiniz yok.");
+    } catch (e) {
+      setErr(describeLoadError(e, "Tedarik planı"));
     }
   }, [pid]);
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api } from "../../api/client";
+import { api, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 import RetentionPanel from "./RetentionPanel";
@@ -46,7 +46,7 @@ export default function ProgressPaymentsPage() {
       const q = subFilter ? `?subcontractor_id=${subFilter}` : "";
       const p = await api<{ payments: Payment[] }>(`/projects/${pid}/payments${q}`, { projectId: pid });
       setPayments(p.payments);
-    } catch { setErr("Hakedişler yüklenemedi ya da erişim yetkiniz yok."); }
+    } catch (e) { setErr(describeLoadError(e, "Hakedişler")); }
   }, [pid, subFilter]);
 
   useEffect(() => { load(); }, [load]);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../../api/client";
+import { api, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 
@@ -28,7 +28,7 @@ export default function ChecklistTemplatesPage() {
     try {
       const r = await api<{ templates: Template[] }>(`/ohs/checklist-templates`, { projectId: pid });
       setTemplates(r.templates);
-    } catch { setErr("Şablonlar yüklenemedi ya da erişim yetkiniz yok."); }
+    } catch (e) { setErr(describeLoadError(e, "Şablonlar")); }
   }, [pid]);
 
   useEffect(() => { load(); }, [load]);

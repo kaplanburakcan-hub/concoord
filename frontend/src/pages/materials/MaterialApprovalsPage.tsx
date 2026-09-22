@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, apiDownload } from "../../api/client";
+import { api, apiDownload, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 
@@ -50,7 +50,7 @@ export default function MaterialApprovalsPage() {
     try {
       const res = await api<{ material_approvals: MAR[] }>(`/projects/${pid}/materials`, { projectId: pid });
       setMars(res.material_approvals);
-    } catch { setErr("Malzeme onayları yüklenemedi ya da erişim yetkiniz yok."); }
+    } catch (e) { setErr(describeLoadError(e, "Malzeme onayları")); }
     try {
       const s = await api<{ subcontractors: Sub[] }>(`/projects/${pid}/subcontractors`, { projectId: pid });
       setSubs(s.subcontractors);

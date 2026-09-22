@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../api/client";
+import { api, describeLoadError } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 
 // Nakit Akış Faz F — hakediş/ekstre/PO ödeme planları + idari hakediş
@@ -55,8 +55,8 @@ export default function OdemePlanlariPage() {
       const r = await api<{ payments: Payment[] }>(
         `/projects/${pid}/payment-plans?from=${from}&to=${to}`, { projectId: pid });
       setListe(r.payments ?? []);
-    } catch {
-      setErr("Ödeme planları yüklenemedi ya da erişim yetkiniz yok.");
+    } catch (e) {
+      setErr(describeLoadError(e, "Ödeme planları"));
     }
   }, [pid, from, to]);
 

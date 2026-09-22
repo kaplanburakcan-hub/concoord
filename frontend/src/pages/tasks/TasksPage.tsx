@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api } from "../../api/client";
+import { api, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../../projects/ProjectContext";
 import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
@@ -66,8 +66,8 @@ export default function TasksPage() {
       const m = await api<{ users: Assignee[] }>(
         `/projects/${pid}/assignable-users`, { projectId: pid });
       setMembers(m.users);
-    } catch {
-      setErr("Görevler yüklenemedi ya da erişim yetkiniz yok.");
+    } catch (e) {
+      setErr(describeLoadError(e, "Görevler"));
     }
   }, [pid]);
 

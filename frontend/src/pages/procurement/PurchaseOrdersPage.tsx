@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { api } from "../../api/client";
+import { api, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
@@ -75,7 +75,7 @@ export default function PurchaseOrdersPage() {
       setPos(res.purchase_orders);
       const b = await api<Board>(`/projects/${pid}/procurement/board`, { projectId: pid });
       setBoard(b);
-    } catch { setErr("Siparişler yüklenemedi ya da erişim yetkiniz yok."); }
+    } catch (e) { setErr(describeLoadError(e, "Siparişler")); }
   }, [pid]);
 
   useEffect(() => { load(); }, [load]);

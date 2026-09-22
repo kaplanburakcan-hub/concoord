@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { api, apiFetchBlob, apiUpload } from "../../api/client";
+import { api, apiFetchBlob, apiUpload, describeLoadError } from "../../api/client";
 import { useProjects } from "../../projects/ProjectContext";
 import { useAuth } from "../../auth/AuthContext";
 import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
@@ -151,8 +151,8 @@ export default function SahaTutanaklariPage() {
       setTutanaklar(t.tutanaklar ?? []);
       setSubs(s.subcontractors ?? []);
       setPersoneller((p.personnel ?? []).filter((x) => x.is_aktif));
-    } catch {
-      setErr("Tutanaklar yüklenemedi ya da erişim yetkiniz yok.");
+    } catch (e) {
+      setErr(describeLoadError(e, "Tutanaklar"));
     }
   }, [pid]);
 

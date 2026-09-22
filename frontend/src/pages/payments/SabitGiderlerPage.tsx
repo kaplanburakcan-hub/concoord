@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../../api/client";
+import { api, describeLoadError } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 
 // Nakit Akış Faz E — Sabit Giderler: araç kiraları, endirekt personel,
@@ -56,8 +56,8 @@ export default function SabitGiderlerPage() {
       const r = await api<{ fixed_expenses: FixedExpense[] }>(
         `/projects/${pid}/fixed-expenses`, { projectId: pid });
       setListe(r.fixed_expenses ?? []);
-    } catch {
-      setErr("Sabit giderler yüklenemedi ya da erişim yetkiniz yok.");
+    } catch (e) {
+      setErr(describeLoadError(e, "Sabit giderler"));
     }
   }, [pid]);
 

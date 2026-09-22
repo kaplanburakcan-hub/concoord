@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, apiUpload } from "../../api/client";
+import { api, apiUpload, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 import ContractPanel from "./ContractPanel";
@@ -41,8 +41,8 @@ export default function SubcontractorsPage() {
       const r = await api<{ subcontractors: Sub[] }>(`/projects/${pid}/subcontractors`, { projectId: pid });
       setSubs(r.subcontractors);
       if (activeType === "taseron" && !sel && r.subcontractors.length) setSel(r.subcontractors[0].id);
-    } catch {
-      setErr("Taşeronlar yüklenemedi ya da erişim yetkiniz yok.");
+    } catch (e) {
+      setErr(describeLoadError(e, "Taşeronlar"));
     }
     try {
       const r = await api<{ tedarikciler: Tedarikci[] }>(`/projects/${pid}/tedarikciler`, { projectId: pid });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, apiDownload, apiUpload, RequestError } from "../../api/client";
+import { api, apiDownload, apiUpload, RequestError, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
@@ -161,8 +161,8 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
         `/projects/${pid}/correspondences?${q.toString()}`, { projectId: pid }
       );
       setList(res.correspondences ?? []);
-    } catch {
-      setErr("Yazışmalar yüklenemedi ya da erişim yetkiniz yok.");
+    } catch (e) {
+      setErr(describeLoadError(e, "Yazışmalar"));
     } finally {
       setBusy(false);
     }

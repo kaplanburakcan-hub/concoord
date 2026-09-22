@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, apiFetchBlob, apiUpload } from "../../api/client";
+import { api, apiFetchBlob, apiUpload, describeLoadError } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 
 // Makine/Ekipman/Araç Envanteri Faz B — proje-arası transfer talebi onayı.
@@ -60,7 +60,7 @@ export default function TransferTalepleriPage() {
         `/projects/${pid}/equipment-transfers?status=pending`, { projectId: pid });
       setTransfers(r.transfers ?? []);
       for (const t of r.transfers ?? []) loadIrsaliye(t.id);
-    } catch { setErr("Bekleyen talepler yüklenemedi ya da erişim yetkiniz yok."); }
+    } catch (e) { setErr(describeLoadError(e, "Bekleyen talepler")); }
   }, [pid]);
 
   useEffect(() => { load(); }, [load]);

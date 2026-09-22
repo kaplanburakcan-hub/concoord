@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { api } from "../../api/client";
+import { api, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
@@ -52,7 +52,7 @@ export default function PurchaseRequestsPage() {
       const res = await api<{ purchase_requests: PR[] }>(
         `/projects/${pid}/purchase-requests`, { projectId: pid });
       setPrs(res.purchase_requests);
-    } catch { setErr("Satınalma talepleri yüklenemedi ya da erişim yetkiniz yok."); }
+    } catch (e) { setErr(describeLoadError(e, "Satınalma talepleri")); }
   }, [pid]);
 
   useEffect(() => { load(); }, [load]);

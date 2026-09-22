@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../../api/client";
+import { api, describeLoadError } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 import CashFlowChart, { type CashFlowPeriod } from "./CashFlowChart";
 
@@ -43,8 +43,8 @@ export default function NakitAkisPage() {
       const r = await api<Resp>(
         `/projects/${pid}/cash-flow?from=${from}&to=${to}&group=${group}`, { projectId: pid });
       setData(r);
-    } catch {
-      setErr("Nakit akış raporu yüklenemedi ya da erişim yetkiniz yok.");
+    } catch (e) {
+      setErr(describeLoadError(e, "Nakit akış raporu"));
     }
   }, [pid, from, to, group]);
 
