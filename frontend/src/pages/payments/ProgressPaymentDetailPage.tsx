@@ -86,12 +86,14 @@ const NATURE_CLS: Record<string, string> = {
 // Number("200.000") JS'te noktayı ondalık sanıp 200 döner — bu yüzden ham
 // Number() değil bu iki yardımcı kullanılmalı.
 function formatTRAmount(raw: string): string {
+  const neg = /^\s*-/.test(raw) ? "-" : "";
   const s = raw.replace(/[^\d,]/g, "");
   const commaIdx = s.indexOf(",");
   let intPart = commaIdx >= 0 ? s.slice(0, commaIdx) : s;
   const decPart = commaIdx >= 0 ? s.slice(commaIdx + 1).replace(/,/g, "").slice(0, 2) : undefined;
   intPart = intPart.replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return decPart !== undefined ? `${intPart || "0"},${decPart}` : intPart;
+  if (!intPart && !decPart) return "";
+  return neg + (decPart !== undefined ? `${intPart || "0"},${decPart}` : intPart);
 }
 function trToNumber(s: string): number {
   return Number((s || "").replace(/\./g, "").replace(",", ".")) || 0;
