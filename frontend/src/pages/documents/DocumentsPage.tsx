@@ -245,7 +245,8 @@ function DocPanel({ projectId, folderId, docs, catFilter, canUpload, canDelete, 
         </div>
       )}
 
-      <div className="mt-3 border border-beton-800 rounded-lg divide-y divide-beton-800">
+      <div className={"mt-3 border border-beton-800 rounded-lg divide-y divide-beton-800" +
+        (docs.length === 0 ? " min-h-[320px] flex items-center justify-center" : "")}>
         {docs.length === 0 ? (
           <p className="px-4 py-6 text-center text-beton-400 text-sm">Bu kapsamda doküman yok.</p>
         ) : (

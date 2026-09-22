@@ -870,6 +870,9 @@ function Field({ label, error, children }: {
 // Ortak documents motorunu kullanır (entity_type="main_contract",
 // entity_id=proje ID — sözleşme projede tek kayıt olduğundan yeterli).
 // Gerçek yükleme + gerçek indirme: eski pdf_dosya_url/adi alanlarının aksine.
+// doc_category="Contract" — Dokümanlar sayfasındaki "Sözleşme" filtresiyle
+// aynı kategori (önceden ayrı "AnaSozlesmeEki" kategorisi kullanılıyordu,
+// bu yüzden buradan yüklenen ekler Dokümanlar > Sözleşme'de görünmüyordu).
 type ContractDoc = { id: string; title: string; latest_version?: number };
 type ContractDocVersion = { id: string; version_no: number; original_name: string; size_bytes: number };
 
@@ -898,7 +901,7 @@ function ContractAttachments({ pid, canUpload }: { pid: string; canUpload: boole
     try {
       const doc = await api<{ document: { id: string } }>(`/projects/${pid}/documents`, {
         method: "POST", projectId: pid,
-        body: { title: file.name, doc_category: "AnaSozlesmeEki",
+        body: { title: file.name, doc_category: "Contract",
                 entity_type: "main_contract", entity_id: pid },
       });
       const fd = new FormData();
