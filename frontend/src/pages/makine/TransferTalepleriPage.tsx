@@ -69,7 +69,7 @@ export default function TransferTalepleriPage() {
     if (!pid) return;
     try {
       const d = await api<{ documents: { id: string; title: string; latest_version?: number }[] }>(
-        `/projects/${pid}/documents?entity_type=equipment_transfer_requests&entity_id=${transferId}&category=NakliyeIrsaliyesi`,
+        `/projects/${pid}/documents?entity_type=equipment_transfer_requests&entity_id=${transferId}&category=Delivery`,
         { projectId: pid });
       const withUrls = await Promise.all(
         (d.documents ?? []).filter(x => x.latest_version).map(async (doc) => {
@@ -89,7 +89,7 @@ export default function TransferTalepleriPage() {
         if (file.size > 20 * 1024 * 1024) { alert(`${file.name} 20MB sınırını aşıyor.`); continue; }
         const doc = await api<{ document: { id: string } }>(`/projects/${pid}/documents`, {
           method: "POST", projectId: pid,
-          body: { title: file.name, doc_category: "NakliyeIrsaliyesi", entity_type: "equipment_transfer_requests", entity_id: transferId },
+          body: { title: file.name, doc_category: "Delivery", entity_type: "equipment_transfer_requests", entity_id: transferId },
         });
         const fd = new FormData();
         fd.append("file", file);

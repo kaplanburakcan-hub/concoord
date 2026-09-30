@@ -455,7 +455,7 @@ export default function MachinePage({
     if (!pid) return;
     try {
       const d = await api<{ documents: { id: string; title: string; latest_version?: number }[] }>(
-        `/projects/${pid}/documents?entity_type=company_equipment&entity_id=${equipmentId}&category=KiralamaSozlesmesi`,
+        `/projects/${pid}/documents?entity_type=company_equipment&entity_id=${equipmentId}&category=Contract`,
         { projectId: pid });
       const withUrls = await Promise.all(
         (d.documents ?? []).filter(x => x.latest_version).map(async (doc) => {
@@ -477,7 +477,7 @@ export default function MachinePage({
         if (file.size > 20 * 1024 * 1024) { alert(`${file.name} 20MB sınırını aşıyor.`); continue; }
         const doc = await api<{ document: { id: string } }>(`/projects/${pid}/documents`, {
           method: "POST", projectId: pid,
-          body: { title: file.name, doc_category: "KiralamaSozlesmesi", entity_type: "company_equipment", entity_id: equipmentId },
+          body: { title: file.name, doc_category: "Contract", entity_type: "company_equipment", entity_id: equipmentId },
         });
         const fd = new FormData();
         fd.append("file", file);
