@@ -13,8 +13,8 @@ func TestValidateDaily(t *testing.T) {
 	ok := dailyInput{
 		ReportDate: "2026-07-06",
 		TempMin:    f(12), TempMax: f(24),
-		Manpower:  []manpowerDTO{{Trade: "Kalıpçı", Headcount: 8}},
-		Equipment: []equipmentDTO{{EquipmentName: "Kule vinç", Count: 1, WorkingHours: f(9)}},
+		Manpower:    []manpowerDTO{{Trade: "Kalıpçı", Headcount: 8}},
+		Equipment:   []equipmentDTO{{EquipmentName: "Kule vinç", Count: 1, WorkingHours: f(9)}},
 		WorkEntries: []workEntryDTO{{Description: "B blok 3. kat perde betonu", Qty: f(42.5)}},
 	}
 	if fields := validateDaily(ok); len(fields) != 0 {
@@ -61,15 +61,15 @@ func TestWeeklyPDFFromSnapshot(t *testing.T) {
 		WeekNo: 27, PeriodStart: "2026-06-29", PeriodEnd: "2026-07-05",
 		Days: []SnapDay{
 			{Date: "2026-06-29", RevisionNo: 1, Status: "Submitted", ManpowerTotal: 14,
-				Manpower:  []manpowerDTO{{Trade: "Demirci", Headcount: 14, SubcontractorName: &sub}},
-				Equipment: []equipmentDTO{{EquipmentName: "Beton pompası", Count: 2, WorkingHours: f(7.5)}},
+				Manpower:    []manpowerDTO{{Trade: "Demirci", Headcount: 14, SubcontractorName: &sub}},
+				Equipment:   []equipmentDTO{{EquipmentName: "Beton pompası", Count: 2, WorkingHours: f(7.5)}},
 				WorkEntries: []workEntryDTO{{Description: "A blok temel demir bağlama", Qty: f(1250)}},
 			},
 			{Date: "2026-06-30", RevisionNo: 2, Status: "Submitted", ManpowerTotal: 9},
 		},
-		Totals: SnapTotals{DaysReported: 2, ManpowerDays: 23, EquipmentHours: 7.5, WorkEntryCount: 1},
+		Totals:          SnapTotals{DaysReported: 2, ManpowerDays: 23, EquipmentHours: 7.5, WorkEntryCount: 1},
 		PendingPayments: []SnapPayment{{Subcontractor: "Yılmaz İnşaat", PeriodNo: 3, Status: "Submitted"}},
-		OpenTasks: 5, TasksDueWeek: 2, PendingMARs: 1,
+		OpenTasks:       5, TasksDueWeek: 2, PendingMARs: 1,
 	}
 
 	pdf := BuildWeeklyPDF(sn)

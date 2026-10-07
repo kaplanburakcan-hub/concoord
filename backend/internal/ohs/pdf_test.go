@@ -11,7 +11,7 @@ func TestBuildPenaltyPDF(t *testing.T) {
 		PenaltyNo: "ISG-007", ProjectName: "Konut Projesi", ProjectCode: "KNT-01",
 		Subcontractor: "Yılmaz İnşaat", ViolationType: "Baretsiz çalışma",
 		PenaltyLevel: "Fine", Amount: &amt,
-		Note: "B blok 3. kat kalıp ekibinde iki işçi baretsiz tespit edildi.",
+		Note:     "B blok 3. kat kalıp ekibinde iki işçi baretsiz tespit edildi.",
 		IssuedBy: "Ayşe Şahin", IssuedAt: "07.07.2026 14:30", HasEvidence: true,
 	})
 	if !bytes.HasPrefix(pdf, []byte("%PDF-1.4")) {

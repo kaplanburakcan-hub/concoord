@@ -46,11 +46,11 @@ var allowedExt = map[string][]string{
 
 // tehlikeli sniff sonuçları — uzantı ne olursa olsun kesin ret.
 var deniedSniff = map[string]bool{
-	"application/x-msdownload":        true, // .exe / .dll
-	"application/x-mach-binary":       true,
-	"application/x-elf":               true,
-	"application/x-executable":        true,
-	"application/x-sharedlib":         true,
+	"application/x-msdownload":                      true, // .exe / .dll
+	"application/x-mach-binary":                     true,
+	"application/x-elf":                             true,
+	"application/x-executable":                      true,
+	"application/x-sharedlib":                       true,
 	"application/vnd.microsoft.portable-executable": true,
 }
 

@@ -80,10 +80,10 @@ type Config struct {
 
 func Load() (*Config, error) {
 	c := &Config{
-		Env:         getenv("IPKS_ENV", "development"),
-		HTTPAddr:    getenv("IPKS_HTTP_ADDR", ":8080"),
-		LogLevel:    getenv("IPKS_LOG_LEVEL", "info"),
-		DBDSN:       os.Getenv("IPKS_DB_DSN"),
+		Env:              getenv("IPKS_ENV", "development"),
+		HTTPAddr:         getenv("IPKS_HTTP_ADDR", ":8080"),
+		LogLevel:         getenv("IPKS_LOG_LEVEL", "info"),
+		DBDSN:            os.Getenv("IPKS_DB_DSN"),
 		S3Endpoint:       getenv("IPKS_S3_ENDPOINT", "minio:9000"),
 		S3PublicEndpoint: os.Getenv("IPKS_S3_PUBLIC_ENDPOINT"), // boşsa S3Endpoint kullanılır
 		S3AccessKey:      os.Getenv("IPKS_S3_ACCESS_KEY"),

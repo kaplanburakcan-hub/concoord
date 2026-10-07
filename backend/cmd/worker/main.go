@@ -296,8 +296,8 @@ func (w *worker) remindDeadlines(ctx context.Context) {
 		pid := d.pid
 		w.nt.Send(ctx, notify.Input{
 			UserIDs: recipients, Type: notify.TypeTaskDeadline,
-			Title: "Görev termini " + verb + ": " + d.title,
-			Body:  "Termin: " + d.dueDate.Format("02.01.2006"),
+			Title:      "Görev termini " + verb + ": " + d.title,
+			Body:       "Termin: " + d.dueDate.Format("02.01.2006"),
 			EntityType: "tasks", EntityID: &taskID, ProjectID: &pid,
 		})
 		if _, err := w.pool.Exec(ctx,

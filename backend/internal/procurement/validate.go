@@ -91,14 +91,14 @@ func validatePO(req poReq) (*time.Time, map[string]string) {
 }
 
 type deliveryItemReq struct {
-	PRItemID     *string `json:"pr_item_id"`
-	MaterialName string  `json:"material_name"`
-	Unit         string  `json:"unit"`
+	PRItemID     *string  `json:"pr_item_id"`
+	MaterialName string   `json:"material_name"`
+	Unit         string   `json:"unit"`
 	OrderedQty   *float64 `json:"ordered_qty"`
-	ReceivedQty  float64 `json:"received_qty"`
-	AcceptedQty  float64 `json:"accepted_qty"`
-	RejectedQty  float64 `json:"rejected_qty"`
-	Note         *string `json:"note"`
+	ReceivedQty  float64  `json:"received_qty"`
+	AcceptedQty  float64  `json:"accepted_qty"`
+	RejectedQty  float64  `json:"rejected_qty"`
+	Note         *string  `json:"note"`
 }
 
 type deliveryReq struct {
@@ -109,13 +109,13 @@ type deliveryReq struct {
 	MarkDelivered  bool    `json:"mark_delivered"` // bu teslimat siparişi kapatır
 
 	// Faz 11 — mal kabul detayı
-	ReceiptType      string  `json:"receipt_type"`       // Warehouse | Site | DirectToSubcontractor
-	LocationNote     *string `json:"location_note"`      // depo adı / blok-kat / taşeron
-	Condition        string  `json:"condition"`          // Complete | Short | Damaged | Defective | Rejected
-	DiscrepancyNote  *string `json:"discrepancy_note"`   // uygunsuzlukta ZORUNLU
-	PhotoDocumentID         *string `json:"photo_document_id"`          // uygunsuzluk ek fotoğrafı (opsiyonel)
-	MaterialPhotoDocumentID *string `json:"material_photo_document_id"` // malzeme fotoğrafı (ZORUNLU)
-	Items            []deliveryItemReq `json:"items"`
+	ReceiptType             string            `json:"receipt_type"`               // Warehouse | Site | DirectToSubcontractor
+	LocationNote            *string           `json:"location_note"`              // depo adı / blok-kat / taşeron
+	Condition               string            `json:"condition"`                  // Complete | Short | Damaged | Defective | Rejected
+	DiscrepancyNote         *string           `json:"discrepancy_note"`           // uygunsuzlukta ZORUNLU
+	PhotoDocumentID         *string           `json:"photo_document_id"`          // uygunsuzluk ek fotoğrafı (opsiyonel)
+	MaterialPhotoDocumentID *string           `json:"material_photo_document_id"` // malzeme fotoğrafı (ZORUNLU)
+	Items                   []deliveryItemReq `json:"items"`
 }
 
 // Geçerli mal kabul değerleri (şema CHECK'leriyle aynı).

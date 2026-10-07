@@ -140,10 +140,10 @@ type dashboardDTO struct {
 
 	// Dashboard v2 — kullanıcının paylaştığı örnek panelden ilham alınan,
 	// birebir değil KONSEPT olarak uyarlanan yeni widget'lar.
-	CostBreakdown    *costBreakdownDTO           `json:"cost_breakdown,omitempty"` // finansal izinle (evm ile aynı kapı)
-	Giderler         *giderlerDTO                `json:"giderler,omitempty"`       // Proje Özet: 4 ayrı kalem (finansal izinle)
-	DocumentStatus   *documentStatusDTO          `json:"document_status,omitempty"`
-	CoverImage       *coverImageDTO              `json:"cover_image,omitempty"`
+	CostBreakdown    *costBreakdownDTO            `json:"cost_breakdown,omitempty"` // finansal izinle (evm ile aynı kapı)
+	Giderler         *giderlerDTO                 `json:"giderler,omitempty"`       // Proje Özet: 4 ayrı kalem (finansal izinle)
+	DocumentStatus   *documentStatusDTO           `json:"document_status,omitempty"`
+	CoverImage       *coverImageDTO               `json:"cover_image,omitempty"`
 	AccidentFreeDays ohsaccidents.FreeDaysSummary `json:"accident_free_days"`
 
 	SubcontractorScoped bool `json:"subcontractor_scoped"`
@@ -437,16 +437,16 @@ func (h *Handler) ProjectDashboard(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 type portfolioCardDTO struct {
-	ProjectID    uuid.UUID  `json:"project_id"`
-	Code         string     `json:"code"`
-	Name         string     `json:"name"`
-	Status       string     `json:"status"`
-	Currency     string     `json:"currency"`
-	ProgressPct  float64    `json:"progress_pct"` // fiziki ilerleme (EV/BAC) — herkese açık
-	SPI          *float64   `json:"spi,omitempty"` // yalnızca finansal izinle
-	CPI          *float64   `json:"cpi,omitempty"`
-	OpenFindings int        `json:"open_findings"`
-	Pending      int        `json:"pending_approvals"` // hakediş+MAR+PR
+	ProjectID     uuid.UUID `json:"project_id"`
+	Code          string    `json:"code"`
+	Name          string    `json:"name"`
+	Status        string    `json:"status"`
+	Currency      string    `json:"currency"`
+	ProgressPct   float64   `json:"progress_pct"`  // fiziki ilerleme (EV/BAC) — herkese açık
+	SPI           *float64  `json:"spi,omitempty"` // yalnızca finansal izinle
+	CPI           *float64  `json:"cpi,omitempty"`
+	OpenFindings  int       `json:"open_findings"`
+	Pending       int       `json:"pending_approvals"` // hakediş+MAR+PR
 	NetPayableCum *float64  `json:"net_payable_cum,omitempty"`
 
 	// Zamansal ilerleme — künye tarihleri varsa herkese açık (parasal

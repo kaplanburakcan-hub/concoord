@@ -7,10 +7,11 @@
 // birebir tutuyor"). DB'den veri toplama evm_db.go'dadır.
 //
 // Tanımlar (Plan §7):
-//   PV = planlanmış S-eğrisi (aylık dağılım girişi → milestone ağırlıkları →
-//        doğrusal dağılım öncelik sırasıyla türetilir) × BAC
-//   EV = kesinleşmiş hakediş brütlerinin sözleşme toplamına oranı × BAC
-//   AC = kesinleşen hakediş net tutarları + teslim alınmış PO tutarları
+//
+//	PV = planlanmış S-eğrisi (aylık dağılım girişi → milestone ağırlıkları →
+//	     doğrusal dağılım öncelik sırasıyla türetilir) × BAC
+//	EV = kesinleşmiş hakediş brütlerinin sözleşme toplamına oranı × BAC
+//	AC = kesinleşen hakediş net tutarları + teslim alınmış PO tutarları
 package dashboard
 
 import (

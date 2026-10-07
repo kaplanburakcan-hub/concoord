@@ -73,9 +73,9 @@ type xlsxSST struct {
 type xlsxSheet struct {
 	Rows []struct {
 		Cells []struct {
-			R string `xml:"r,attr"` // hücre referansı, ör. "B3"
-			T string `xml:"t,attr"` // tip: "s"=shared string, "str", "inlineStr", boş=sayı
-			V string `xml:"v"`
+			R  string `xml:"r,attr"` // hücre referansı, ör. "B3"
+			T  string `xml:"t,attr"` // tip: "s"=shared string, "str", "inlineStr", boş=sayı
+			V  string `xml:"v"`
 			IS struct {
 				T string `xml:"t"`
 			} `xml:"is"`

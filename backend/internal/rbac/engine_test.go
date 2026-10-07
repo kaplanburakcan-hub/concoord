@@ -74,16 +74,16 @@ func TestAdminHasEverything(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 var criticalEndpoints = map[string]string{
-	"POST   /admin/users":                          "admin.manage_users",
-	"PUT    /admin/users/{id}/permissions/{code}":  "admin.manage_permissions",
-	"GET    /admin/audit-logs":                     "admin.view_audit_log",
-	"POST   /projects/{id}/progress-payments":      "progress_payments.create_draft",
-	"POST   /progress-payments/{id}/approve":       "progress_payments.approve",
-	"POST   /progress-payments/{id}/finalize":      "progress_payments.finalize",
-	"GET    /progress-payments/{id}/financials":    "progress_payments.view_financials",
-	"POST   /ohs/penalties":                        "ohs.issue_penalty",
-	"POST   /material-approvals/{id}/decide":       "material_approvals.decide",
-	"POST   /procurement/purchase-orders":          "procurement.manage_po",
+	"POST   /admin/users":                         "admin.manage_users",
+	"PUT    /admin/users/{id}/permissions/{code}": "admin.manage_permissions",
+	"GET    /admin/audit-logs":                    "admin.view_audit_log",
+	"POST   /projects/{id}/progress-payments":     "progress_payments.create_draft",
+	"POST   /progress-payments/{id}/approve":      "progress_payments.approve",
+	"POST   /progress-payments/{id}/finalize":     "progress_payments.finalize",
+	"GET    /progress-payments/{id}/financials":   "progress_payments.view_financials",
+	"POST   /ohs/penalties":                       "ohs.issue_penalty",
+	"POST   /material-approvals/{id}/decide":      "material_approvals.decide",
+	"POST   /procurement/purchase-orders":         "procurement.manage_po",
 }
 
 func TestRoleEndpointAuthorizationMatrix(t *testing.T) {

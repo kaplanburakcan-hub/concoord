@@ -36,12 +36,12 @@ func NewHandler(pool *pgxpool.Pool, rec *audit.Recorder, nt *notify.Service) *Ha
 }
 
 type decisionDTO struct {
-	StepOrder  int    `json:"step_order"`
-	RoleName   string `json:"role_name"`
-	DecidedBy  string `json:"decided_by_name"`
-	Decision   string `json:"decision"`
-	Note       string `json:"note,omitempty"`
-	DecidedAt  string `json:"decided_at"`
+	StepOrder int    `json:"step_order"`
+	RoleName  string `json:"role_name"`
+	DecidedBy string `json:"decided_by_name"`
+	Decision  string `json:"decision"`
+	Note      string `json:"note,omitempty"`
+	DecidedAt string `json:"decided_at"`
 }
 
 type transferDTO struct {

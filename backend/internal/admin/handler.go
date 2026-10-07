@@ -473,12 +473,12 @@ func (h *Handler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 	type member struct {
-		ID             uuid.UUID  `json:"id"`
-		UserID         uuid.UUID  `json:"user_id"`
-		FullName       string     `json:"full_name"`
-		Email          string     `json:"email"`
-		RoleCode       string     `json:"role_code"`
-		RoleName       string     `json:"role_name"`
+		ID              uuid.UUID  `json:"id"`
+		UserID          uuid.UUID  `json:"user_id"`
+		FullName        string     `json:"full_name"`
+		Email           string     `json:"email"`
+		RoleCode        string     `json:"role_code"`
+		RoleName        string     `json:"role_name"`
 		SubcontractorID *uuid.UUID `json:"subcontractor_id,omitempty"`
 	}
 	out := []member{}
@@ -610,17 +610,17 @@ func (h *Handler) ListAuditLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 	type entry struct {
-		ID        uuid.UUID       `json:"id"`
-		ActorID   *uuid.UUID      `json:"actor_id,omitempty"`
-		ActorName *string         `json:"actor_name,omitempty"`
-		Entity    string          `json:"entity"`
-		EntityID  *uuid.UUID      `json:"entity_id,omitempty"`
-		Action    string          `json:"action"`
-		Before    map[string]any  `json:"before,omitempty"`
-		After     map[string]any  `json:"after,omitempty"`
-		IP        *string         `json:"ip,omitempty"`
-		RequestID *string         `json:"request_id,omitempty"`
-		At        time.Time       `json:"at"`
+		ID        uuid.UUID      `json:"id"`
+		ActorID   *uuid.UUID     `json:"actor_id,omitempty"`
+		ActorName *string        `json:"actor_name,omitempty"`
+		Entity    string         `json:"entity"`
+		EntityID  *uuid.UUID     `json:"entity_id,omitempty"`
+		Action    string         `json:"action"`
+		Before    map[string]any `json:"before,omitempty"`
+		After     map[string]any `json:"after,omitempty"`
+		IP        *string        `json:"ip,omitempty"`
+		RequestID *string        `json:"request_id,omitempty"`
+		At        time.Time      `json:"at"`
 	}
 	out := []entry{}
 	for rows.Next() {
@@ -658,4 +658,3 @@ func sqlState(err error) string {
 	}
 	return ""
 }
-

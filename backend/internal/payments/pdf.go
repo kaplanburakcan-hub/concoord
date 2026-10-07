@@ -14,27 +14,27 @@ import (
 
 // PDFData — özet PDF'i için düzleştirilmiş görünüm modeli.
 type PDFData struct {
-	ProjectName    string
-	ProjectCode    string
-	Subcontractor  string
-	ContractNo     string
-	PeriodNo       int
-	PeriodStart    string
-	PeriodEnd      string
-	Status         string
-	Currency       string
-	Lines          []CalcLine
-	GrossCum       float64
-	GrossPrev      float64
-	GrossThis      float64
-	Deductions     []DeductionLine
+	ProjectName     string
+	ProjectCode     string
+	Subcontractor   string
+	ContractNo      string
+	PeriodNo        int
+	PeriodStart     string
+	PeriodEnd       string
+	Status          string
+	Currency        string
+	Lines           []CalcLine
+	GrossCum        float64
+	GrossPrev       float64
+	GrossThis       float64
+	Deductions      []DeductionLine
 	TotalDeductions float64
-	NetPayable     float64 // yükleniciye ödenecek nihai tutar
-	VatPct         float64
-	VatAmount      float64 // hesaplanan KDV (dönem brütü üzerinden)
-	VatWithheld    float64 // tevkif edilen KDV (vergi dairesine)
-	VatCollected   float64 // tahsil edilen KDV (ödemeye eklenen)
-	PayableGross   float64 // brüt + tahsil edilen KDV
+	NetPayable      float64 // yükleniciye ödenecek nihai tutar
+	VatPct          float64
+	VatAmount       float64 // hesaplanan KDV (dönem brütü üzerinden)
+	VatWithheld     float64 // tevkif edilen KDV (vergi dairesine)
+	VatCollected    float64 // tahsil edilen KDV (ödemeye eklenen)
+	PayableGross    float64 // brüt + tahsil edilen KDV
 }
 
 // BuildSummaryPDF — tek/çok sayfalı özet PDF baytları döner.

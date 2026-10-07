@@ -513,10 +513,10 @@ func ProcessMonthlyPDF(ctx context.Context, pool *pgxpool.Pool, store *storage.C
 	}
 
 	nt.Send(ctx, notify.Input{
-		UserIDs: []uuid.UUID{genBy},
-		Type:    notify.TypeMonthlyReportReady,
-		Title:   fmt.Sprintf("Aylık yönetim raporu hazır: %s / %04d-%02d", sn.ProjectCode, sn.Year, sn.Month),
-		Body:    fmt.Sprintf("SPI %.3f · CPI %.3f — PDF indirilebilir.", sn.EVM.SPI, sn.EVM.CPI),
+		UserIDs:    []uuid.UUID{genBy},
+		Type:       notify.TypeMonthlyReportReady,
+		Title:      fmt.Sprintf("Aylık yönetim raporu hazır: %s / %04d-%02d", sn.ProjectCode, sn.Year, sn.Month),
+		Body:       fmt.Sprintf("SPI %.3f · CPI %.3f — PDF indirilebilir.", sn.EVM.SPI, sn.EVM.CPI),
 		EntityType: "monthly_reports", EntityID: &id, ProjectID: &pid,
 	})
 	log.Info("aylık PDF üretildi", "monthly", id, "bytes", len(pdf))
@@ -531,10 +531,10 @@ func markMonthlyFailed(ctx context.Context, pool *pgxpool.Pool, nt *notify.Servi
 		log.Error("aylık rapor Failed işaretlenemedi", "id", id, "err", err)
 	}
 	nt.Send(ctx, notify.Input{
-		UserIDs: []uuid.UUID{genBy},
-		Type:    notify.TypeMonthlyReportFailed,
-		Title:   "Aylık yönetim raporu üretilemedi",
-		Body:    reason,
+		UserIDs:    []uuid.UUID{genBy},
+		Type:       notify.TypeMonthlyReportFailed,
+		Title:      "Aylık yönetim raporu üretilemedi",
+		Body:       reason,
 		EntityType: "monthly_reports", EntityID: &id, ProjectID: &pid,
 	})
 }

@@ -377,11 +377,11 @@ type contractReq struct {
 	// Faz 11 — yıllara sari inşaat işi (GVK 42-44). true ise bu sözleşmenin
 	// hakedişlerinde stopaj varsayılan olarak uygulanır (hakediş bazında
 	// elle geçersiz kılınabilir).
-	StartDate        *string  `json:"start_date"`
-	EndDate          *string  `json:"end_date"`
-	RevisedEndDate   *string  `json:"revised_end_date"`
-	IsMultiYear      *bool    `json:"is_multi_year"`
-	WithholdingPct   *float64 `json:"withholding_pct"`
+	StartDate      *string  `json:"start_date"`
+	EndDate        *string  `json:"end_date"`
+	RevisedEndDate *string  `json:"revised_end_date"`
+	IsMultiYear    *bool    `json:"is_multi_year"`
+	WithholdingPct *float64 `json:"withholding_pct"`
 	// DefaultPaymentMethod — Nakit Akış Faz A (nakit|havale|cek).
 	DefaultPaymentMethod *string `json:"default_payment_method"`
 	RowVersion           int     `json:"row_version"`
@@ -1040,4 +1040,3 @@ func (h *Handler) ImportWorkItems(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{"processed": inserted, "skipped": skipped, "total": len(rowsIn)})
 }
-

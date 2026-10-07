@@ -1,7 +1,9 @@
 // Package materials — Faz 5: Malzeme Onay Süreci (Submittals / MAR).
 //
 // Plan §6.5 + §8 (Faz 5). Yaşam döngüsü:
-//   Submitted → UnderReview → Approved | ConditionallyApproved | Rejected
+//
+//	Submitted → UnderReview → Approved | ConditionallyApproved | Rejected
+//
 // Karar notu karar anında ZORUNLUDUR. Doküman ekleri Faz 2 polimorfik doküman
 // motoruna 'material_approval' entity_type ile bağlanır. Her statü geçişi
 // workflow_transitions'a yazılır (Plan §5.1); bildirimler merkezi notify
@@ -50,24 +52,24 @@ func NewHandler(pool *pgxpool.Pool, eval *rbac.Evaluator, rec *audit.Recorder, n
 // ---------------------------------------------------------------------------
 
 type marDTO struct {
-	ID               uuid.UUID  `json:"id"`
-	ProjectID        uuid.UUID  `json:"project_id"`
-	SubcontractorID  *uuid.UUID `json:"subcontractor_id,omitempty"`
-	MARNo            string     `json:"mar_no"`
-	MaterialName     string     `json:"material_name"`
-	SpecRef          *string    `json:"spec_ref,omitempty"`
-	Manufacturer     *string    `json:"manufacturer,omitempty"`
-	Status           string     `json:"status"`
-	DecisionNote     *string    `json:"decision_note,omitempty"`
-	DecidedBy        *uuid.UUID `json:"decided_by,omitempty"`
-	DecidedByName    *string    `json:"decided_by_name,omitempty"`
-	DecidedAt        *time.Time `json:"decided_at,omitempty"`
-	CreatedBy        uuid.UUID  `json:"created_by"`
-	CreatedByName    string     `json:"created_by_name"`
-	SubcontractorName *string   `json:"subcontractor_name,omitempty"`
-	AttachmentCount  int        `json:"attachment_count"`
-	RowVersion       int        `json:"row_version"`
-	CreatedAt        time.Time  `json:"created_at"`
+	ID                uuid.UUID  `json:"id"`
+	ProjectID         uuid.UUID  `json:"project_id"`
+	SubcontractorID   *uuid.UUID `json:"subcontractor_id,omitempty"`
+	MARNo             string     `json:"mar_no"`
+	MaterialName      string     `json:"material_name"`
+	SpecRef           *string    `json:"spec_ref,omitempty"`
+	Manufacturer      *string    `json:"manufacturer,omitempty"`
+	Status            string     `json:"status"`
+	DecisionNote      *string    `json:"decision_note,omitempty"`
+	DecidedBy         *uuid.UUID `json:"decided_by,omitempty"`
+	DecidedByName     *string    `json:"decided_by_name,omitempty"`
+	DecidedAt         *time.Time `json:"decided_at,omitempty"`
+	CreatedBy         uuid.UUID  `json:"created_by"`
+	CreatedByName     string     `json:"created_by_name"`
+	SubcontractorName *string    `json:"subcontractor_name,omitempty"`
+	AttachmentCount   int        `json:"attachment_count"`
+	RowVersion        int        `json:"row_version"`
+	CreatedAt         time.Time  `json:"created_at"`
 }
 
 const marSelect = `
@@ -106,9 +108,9 @@ func parseID(w http.ResponseWriter, r *http.Request, param string) (uuid.UUID, b
 
 // scope — istek sahibinin satır seviyesi görünürlük kapsamı.
 type scope struct {
-	uid            uuid.UUID
-	sub            *uuid.UUID // SubcontractorRep ise firması; nil = kısıtsız
-	clientLimited  bool       // Client rolü: yalnızca kendisine sunulanlar
+	uid           uuid.UUID
+	sub           *uuid.UUID // SubcontractorRep ise firması; nil = kısıtsız
+	clientLimited bool       // Client rolü: yalnızca kendisine sunulanlar
 }
 
 // resolveScope — project_members'tan taşeron bağını ve rol kodunu çözer.
@@ -325,9 +327,9 @@ func (h *Handler) CreateMAR(w http.ResponseWriter, r *http.Request) {
 
 	// Bildirim: inceleme yetkisi olan (Client hariç — henüz sunulmadı) üyeler.
 	h.notifyByCapability(r.Context(), pid, "material_approvals.review", false, sc.uid, notify.Input{
-		Type:  notify.TypeMARSubmitted,
-		Title: marNo + " — yeni malzeme onay talebi",
-		Body:  req.MaterialName,
+		Type:       notify.TypeMARSubmitted,
+		Title:      marNo + " — yeni malzeme onay talebi",
+		Body:       req.MaterialName,
 		EntityType: "material_approvals", EntityID: &id, ProjectID: &pid,
 	})
 
@@ -499,18 +501,18 @@ func (h *Handler) transition(w http.ResponseWriter, r *http.Request, from, to, n
 			targets = append(targets, h.subcontractorUsers(r.Context(), pid, *cur.SubcontractorID)...)
 		}
 		h.nt.Send(r.Context(), notify.Input{
-			UserIDs: targets,
-			Type:    notify.TypeMARDecided,
-			Title:   cur.MARNo + " kararı: " + statusLabel(to),
-			Body:    note,
+			UserIDs:    targets,
+			Type:       notify.TypeMARDecided,
+			Title:      cur.MARNo + " kararı: " + statusLabel(to),
+			Body:       note,
 			EntityType: "material_approvals", EntityID: &id, ProjectID: &pid,
 		})
 	} else {
 		// Karara sunuldu: karar verme yetkisi olanlara (Client dahil) bildir.
 		h.notifyByCapability(r.Context(), pid, "material_approvals.decide", true, sc.uid, notify.Input{
-			Type:  notify.TypeMARUnderReview,
-			Title: cur.MARNo + " kararınıza sunuldu",
-			Body:  cur.MaterialName,
+			Type:       notify.TypeMARUnderReview,
+			Title:      cur.MARNo + " kararınıza sunuldu",
+			Body:       cur.MaterialName,
 			EntityType: "material_approvals", EntityID: &id, ProjectID: &pid,
 		})
 	}

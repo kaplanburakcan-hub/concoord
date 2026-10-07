@@ -1,4 +1,4 @@
-﻿package payments
+package payments
 
 // Faz 11 — Teminat (geçici kesinti) bakiyesi ve iade akışı.
 //
@@ -34,16 +34,16 @@ type retentionBalanceDTO struct {
 }
 
 type refundDTO struct {
-	ID          string   `json:"id"`
-	Description string   `json:"description"`
-	Amount      float64  `json:"amount"`
-	Stage       string   `json:"stage"`
-	CatalogCode *string  `json:"catalog_code,omitempty"`
-	DocumentID  *string  `json:"document_id,omitempty"`
-	PaymentID   *string  `json:"progress_payment_id,omitempty"`
-	Note        *string  `json:"note,omitempty"`
-	CreatedBy   string   `json:"created_by_name"`
-	CreatedAt   string   `json:"created_at"`
+	ID          string  `json:"id"`
+	Description string  `json:"description"`
+	Amount      float64 `json:"amount"`
+	Stage       string  `json:"stage"`
+	CatalogCode *string `json:"catalog_code,omitempty"`
+	DocumentID  *string `json:"document_id,omitempty"`
+	PaymentID   *string `json:"progress_payment_id,omitempty"`
+	Note        *string `json:"note,omitempty"`
+	CreatedBy   string  `json:"created_by_name"`
+	CreatedAt   string  `json:"created_at"`
 }
 
 // İade aşamaları — katalogdaki refund_stage ile aynı dil.
@@ -241,4 +241,3 @@ func (h *Handler) CreateRefund(w http.ResponseWriter, r *http.Request) {
 		"id": id.String(), "amount": req.Amount, "stage": req.Stage,
 	})
 }
-

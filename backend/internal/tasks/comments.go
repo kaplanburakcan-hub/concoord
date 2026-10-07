@@ -168,14 +168,14 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	}
 	h.nt.Send(r.Context(), notify.Input{
 		UserIDs: mentionTargets, Type: notify.TypeTaskMention,
-		Title: "Bir yorumda sizden bahsedildi: " + task.Title,
-		Body:  c.AuthorName + ": " + truncate(body, 200),
+		Title:      "Bir yorumda sizden bahsedildi: " + task.Title,
+		Body:       c.AuthorName + ": " + truncate(body, 200),
 		EntityType: "tasks", EntityID: &id, ProjectID: &pid,
 	})
 	h.nt.Send(r.Context(), notify.Input{
 		UserIDs: commentTargets, Type: notify.TypeTaskComment,
-		Title: "Göreve yeni yorum: " + task.Title,
-		Body:  c.AuthorName + ": " + truncate(body, 200),
+		Title:      "Göreve yeni yorum: " + task.Title,
+		Body:       c.AuthorName + ": " + truncate(body, 200),
 		EntityType: "tasks", EntityID: &id, ProjectID: &pid,
 	})
 
