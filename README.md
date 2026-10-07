@@ -1,5 +1,10 @@
 # İPKS — Faz 0: Temel Altyapı
 
+> **Kalite kapısı:** Her PR'da GitHub Actions; backend testleri (`-race`), frontend
+> typecheck/lint/test/build, migration up→down→up round-trip, API smoke testleri ve
+> Docker build'ini çalıştırır. Yerelde: `make ci`. Ayrıntılar ve branch protection
+> kurulumu için `docs/kalite-kapisi.md`. Yol haritası: `docs/gelistirme-plani.md`.
+
 İnşaat Proje Koordinasyon ve Saha Takip Platformu monorepo iskeleti.
 Plan referansı: `insaat-pys-program-plani-v1_1.md` (Bölüm 8, Faz 0).
 

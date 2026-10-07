@@ -1,6 +1,6 @@
 COMPOSE=docker compose -f deploy/docker-compose.yml --env-file .env
 
-.PHONY: up down logs build migrate-up migrate-down migrate-new seed demo-data test backup restore-test dr-drill loadtest smoke psql
+.PHONY: up down logs build migrate-up migrate-down migrate-new seed demo-data test test-race fmt-check lint-frontend test-frontend migrate-smoke api-smoke ci backup restore-test dr-drill loadtest smoke psql
 
 up: ## Geliştirme ortamını ayağa kaldır
 	$(COMPOSE) up -d --build
@@ -28,6 +28,30 @@ demo-data: ## Gerçekçi DEMO-01 test verisi yükle (EVM/S-eğrisi, İSG, MAR, g
 
 test: ## Backend birim testleri (auth, JWT, RBAC yetki matrisi)
 	cd backend && go test ./...
+
+# --- Kalite kapısı (CI ile aynı kontroller; bkz. docs/kalite-kapisi.md) ---
+
+test-race: ## Backend testleri race detector ile
+	cd backend && go test -race -count=1 ./...
+
+fmt-check: ## gofmt + go vet
+	@cd backend && test -z "$$(gofmt -l .)" || (echo "gofmt gerekli: cd backend && gofmt -w ." && gofmt -l . && exit 1)
+	cd backend && go vet ./...
+
+lint-frontend: ## Frontend type-check + ESLint
+	cd frontend && npm run typecheck && npm run lint
+
+test-frontend: ## Frontend birim/bileşen testleri (Vitest)
+	cd frontend && npm test
+
+migrate-smoke: ## Temiz DB'de migration up→down→up (IPKS_DB_DSN boş bir DB'ye işaret etmeli)
+	bash deploy/ci/migration-smoke.sh
+
+api-smoke: ## Çalışan API'ye karşı smoke/kontrat testleri (BASE_URL, ADMIN_EMAIL, ADMIN_PASS)
+	bash deploy/ci/api-smoke.sh
+
+ci: fmt-check test-race lint-frontend test-frontend ## DB gerektirmeyen CI kontrollerini yerelde çalıştır
+	cd frontend && npm run build
 
 backup: ## Manuel yedek al (offsite dahil)
 	bash deploy/backup/backup.sh

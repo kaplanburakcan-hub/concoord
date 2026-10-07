@@ -492,7 +492,7 @@ function GanttView({ items, deps, canEdit, projectId, onItemClick, onDependencyC
     }
     const byId = new Map(items.map((it) => [it.id, it]));
     const tasks = withDates.map((it) => {
-      let start = (it.baseline_start ?? it.actual_start)!;
+      const start = (it.baseline_start ?? it.actual_start)!;
       let end = (it.baseline_finish ?? it.actual_finish)!;
       if (start === end) {
         const d = new Date(end);

@@ -14,7 +14,7 @@ const GAP_DEG = 6;
 // sığması için kısaltılmış gösterim (₺13,9M) — legend'deki tam değerler
 // (formatValue) bundan etkilenmez, yalnızca halka merkezindeki toplam.
 function compactCenter(full: string, raw: number): string {
-  const symbolMatch = full.match(/^[^\d\-]+/);
+  const symbolMatch = full.match(/^[^\d-]+/);
   const symbol = symbolMatch ? symbolMatch[0] : "";
   const abs = Math.abs(raw);
   let num: string;
