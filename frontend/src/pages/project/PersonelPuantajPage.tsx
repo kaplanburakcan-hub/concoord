@@ -8,6 +8,7 @@ type Personel = {
   ad_soyad: string;
   gorev: string;
   firma: string;
+  subcontractor_id?: string | null; // null/yok = ana yüklenici
   is_aktif: boolean;
   sira: number;
 };
@@ -24,13 +25,13 @@ type PuantajEntry = {
 // ── Sabitler ─────────────────────────────────────────────────────────────────
 const GOREVLER = ["İşçi", "Formen", "Teknisyen", "Mühendis", "Şef", "Yönetici", "Alt Yüklenici"];
 
-const DURUM_META: Record<string, { label: string; short: string; cls: string; cellCls: string }> = {
+export const DURUM_META: Record<string, { label: string; short: string; cls: string; cellCls: string }> = {
   mevcut:   { label: "Mevcut",   short: "M", cls: "bg-green-500/15 text-green-300 border-green-500/40",   cellCls: "bg-green-900/40 text-green-300 font-bold" },
   devamsiz: { label: "Devamsız", short: "D", cls: "bg-red-500/15 text-red-300 border-red-500/40",         cellCls: "bg-red-900/40 text-red-300 font-bold" },
   izinli:   { label: "İzinli",   short: "İ", cls: "bg-yellow-500/15 text-yellow-300 border-yellow-500/40", cellCls: "bg-yellow-900/40 text-yellow-300 font-bold" },
   raporlu:  { label: "Raporlu",  short: "R", cls: "bg-blue-500/15 text-blue-300 border-blue-500/40",       cellCls: "bg-blue-900/40 text-blue-300 font-bold" },
 };
-const DURUM_SIRA = ["mevcut", "devamsiz", "izinli", "raporlu"];
+export const DURUM_SIRA = ["mevcut", "devamsiz", "izinli", "raporlu"];
 
 const inpBase =
   "rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-200 " +
@@ -174,6 +175,14 @@ export default function PersonelPuantajPage() {
     }
   }, [pid, fromISO, toISO2]);
 
+  const [subs, setSubs] = useState<{ id: string; company_name: string }[]>([]);
+  useEffect(() => {
+    if (!pid) return;
+    api<{ subcontractors: { id: string; company_name: string }[] }>(
+      `/projects/${pid}/subcontractors`, { projectId: pid })
+      .then((r) => setSubs(r.subcontractors ?? []))
+      .catch(() => setSubs([]));
+  }, [pid]);
   useEffect(() => { loadPersonel(); }, [loadPersonel]);
   useEffect(() => { loadPuantaj(); }, [loadPuantaj]);
   useEffect(() => { loadSubmittedDates(); }, [loadSubmittedDates]);
@@ -267,10 +276,13 @@ export default function PersonelPuantajPage() {
 
   async function savePersonel() {
     if (!pid || !personelForm.ad_soyad) return;
+    // Taşeron seçilmediyse personel ana yükleniciye bağlıdır; eski serbest
+    // firma metni temizlenir (bağ artık subcontractor_id ile tutulur).
+    const body = personelForm.subcontractor_id ? personelForm : { ...personelForm, firma: "" };
     if (editingPersonel?.id) {
-      await api(`/projects/${pid}/personnel/${editingPersonel.id}`, { method: "PATCH", body: personelForm, projectId: pid });
+      await api(`/projects/${pid}/personnel/${editingPersonel.id}`, { method: "PATCH", body, projectId: pid });
     } else {
-      await api(`/projects/${pid}/personnel`, { method: "POST", body: personelForm, projectId: pid });
+      await api(`/projects/${pid}/personnel`, { method: "POST", body, projectId: pid });
     }
     setAddingPersonel(false);
     setEditingPersonel(null);
@@ -498,12 +510,23 @@ export default function PersonelPuantajPage() {
                 </div>
                 <div>
                   <label className="text-xs text-beton-500 block mb-1">Firma</label>
-                  <input
+                  <select
                     className={`${inpBase} w-full`}
-                    placeholder="Ana yüklenici"
-                    value={personelForm.firma}
-                    onChange={(e) => setPersonelForm((f) => ({ ...f, firma: e.target.value }))}
-                  />
+                    value={personelForm.subcontractor_id ?? ""}
+                    onChange={(e) => {
+                      const sid = e.target.value || null;
+                      const sub = subs.find((s) => s.id === sid);
+                      setPersonelForm((f) => ({ ...f, subcontractor_id: sid, firma: sub?.company_name ?? "" }));
+                    }}
+                  >
+                    <option value="">Ana yüklenici</option>
+                    {subs.map((s) => <option key={s.id} value={s.id}>{s.company_name}</option>)}
+                  </select>
+                  {!personelForm.subcontractor_id && personelForm.firma.trim() && (
+                    <p className="mt-1 text-[11px] text-yellow-400">
+                      Kayıtlı firma metni "{personelForm.firma}" bir taşeronla eşleşmiyor — taşeron seçin ya da Ana yüklenici olarak kaydedin.
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-4 mt-3">

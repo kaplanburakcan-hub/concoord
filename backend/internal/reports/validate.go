@@ -34,6 +34,19 @@ func validateDaily(in dailyInput) map[string]string {
 			fields[fmt.Sprintf("manpower[%d].headcount", i)] = "kişi sayısı negatif olamaz"
 		}
 	}
+	for i, s := range in.Staff {
+		if strings.TrimSpace(s.AdSoyad) == "" {
+			fields[fmt.Sprintf("staff[%d].ad_soyad", i)] = "ad soyad zorunlu"
+		}
+		if s.Grup != "yuklenici" && s.Grup != "musavir" {
+			fields[fmt.Sprintf("staff[%d].grup", i)] = "geçersiz grup (yuklenici/musavir)"
+		}
+		switch s.Durum {
+		case "", "mevcut", "devamsiz", "izinli", "raporlu":
+		default:
+			fields[fmt.Sprintf("staff[%d].durum", i)] = "geçersiz durum"
+		}
+	}
 	for i, e := range in.Equipment {
 		if strings.TrimSpace(e.EquipmentName) == "" {
 			fields[fmt.Sprintf("equipment[%d].equipment_name", i)] = "ekipman adı zorunlu"

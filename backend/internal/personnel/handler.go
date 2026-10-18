@@ -26,8 +26,36 @@ type Personel struct {
 	AdSoyad   string `json:"ad_soyad"`
 	Gorev     string `json:"gorev"`
 	Firma     string `json:"firma"`
-	IsAktif   bool   `json:"is_aktif"`
-	Sira      int    `json:"sira"`
+	// SubcontractorID: personelin bağlı olduğu taşeron; nil = ana yüklenici.
+	// Seçilirse firma metni taşeronun adından sunucuda türetilir.
+	SubcontractorID *string `json:"subcontractor_id"`
+	IsAktif         bool    `json:"is_aktif"`
+	Sira            int     `json:"sira"`
+}
+
+// resolveFirma — subcontractor_id verilmişse taşeronun projeye ait olduğunu
+// doğrular ve firma metnini adından türetir.
+func (h *Handler) resolveFirma(r *http.Request, pid uuid.UUID, p *Personel) (map[string]string, error) {
+	if p.SubcontractorID == nil || *p.SubcontractorID == "" {
+		p.SubcontractorID = nil
+		return nil, nil
+	}
+	sid, err := uuid.Parse(*p.SubcontractorID)
+	if err != nil {
+		return map[string]string{"subcontractor_id": "geçersiz UUID"}, nil
+	}
+	var name string
+	err = h.db.QueryRow(r.Context(),
+		`SELECT company_name FROM subcontractors WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`,
+		sid, pid).Scan(&name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return map[string]string{"subcontractor_id": "taşeron bu projeye ait değil"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	p.Firma = name
+	return nil, nil
 }
 
 func (h *Handler) ListPersonel(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +66,7 @@ func (h *Handler) ListPersonel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.db.Query(r.Context(), `
-		SELECT id, project_id, ad_soyad, gorev, COALESCE(firma,''), is_aktif, sira
+		SELECT id, project_id, ad_soyad, gorev, COALESCE(firma,''), subcontractor_id::text, is_aktif, sira
 		FROM project_personnel
 		WHERE project_id=$1
 		ORDER BY sira, ad_soyad`, pid)
@@ -51,7 +79,7 @@ func (h *Handler) ListPersonel(w http.ResponseWriter, r *http.Request) {
 	list := []Personel{}
 	for rows.Next() {
 		var p Personel
-		if err := rows.Scan(&p.ID, &p.ProjectID, &p.AdSoyad, &p.Gorev, &p.Firma, &p.IsAktif, &p.Sira); err != nil {
+		if err := rows.Scan(&p.ID, &p.ProjectID, &p.AdSoyad, &p.Gorev, &p.Firma, &p.SubcontractorID, &p.IsAktif, &p.Sira); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
@@ -81,12 +109,19 @@ func (h *Handler) CreatePersonel(w http.ResponseWriter, r *http.Request) {
 	if body.Gorev == "" {
 		body.Gorev = "İşçi"
 	}
+	if fields, err := h.resolveFirma(r, pid, &body); err != nil {
+		httpx.Internal(w, r)
+		return
+	} else if fields != nil {
+		httpx.ValidationFailed(w, r, fields)
+		return
+	}
 
 	var id string
 	err = h.db.QueryRow(r.Context(), `
-		INSERT INTO project_personnel (project_id, ad_soyad, gorev, firma, is_aktif, sira)
-		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-		pid, body.AdSoyad, body.Gorev, nilStr(body.Firma), body.IsAktif, body.Sira,
+		INSERT INTO project_personnel (project_id, ad_soyad, gorev, firma, subcontractor_id, is_aktif, sira)
+		VALUES ($1,$2,$3,$4,$5::uuid,$6,$7) RETURNING id`,
+		pid, body.AdSoyad, body.Gorev, nilStr(body.Firma), body.SubcontractorID, body.IsAktif, body.Sira,
 	).Scan(&id)
 	if err != nil {
 		httpx.Internal(w, r)
@@ -110,13 +145,20 @@ func (h *Handler) UpdatePersonel(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &body) {
 		return
 	}
+	if fields, err := h.resolveFirma(r, pid, &body); err != nil {
+		httpx.Internal(w, r)
+		return
+	} else if fields != nil {
+		httpx.ValidationFailed(w, r, fields)
+		return
+	}
 	tag, err := h.db.Exec(r.Context(), `
 		UPDATE project_personnel SET
 		    ad_soyad=COALESCE(NULLIF($3,''), ad_soyad),
 		    gorev=COALESCE(NULLIF($4,''), gorev),
-		    firma=$5, is_aktif=$6, sira=$7, updated_at=NOW()
+		    firma=$5, subcontractor_id=$6::uuid, is_aktif=$7, sira=$8, updated_at=NOW()
 		WHERE id=$1 AND project_id=$2`,
-		personelID, pid, body.AdSoyad, body.Gorev, nilStr(body.Firma), body.IsAktif, body.Sira,
+		personelID, pid, body.AdSoyad, body.Gorev, nilStr(body.Firma), body.SubcontractorID, body.IsAktif, body.Sira,
 	)
 	if err != nil {
 		httpx.Internal(w, r)

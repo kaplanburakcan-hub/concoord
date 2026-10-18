@@ -6,6 +6,7 @@ import { useProjects } from "../../projects/ProjectContext";
 import { apiWithOfflineFallback } from "../../offline/queue";
 import { DR_STATUS_LABEL, DR_STATUS_STYLE, formatDateTR } from "./DailyReportsPage";
 import PdfPreviewModal from "../../components/PdfPreviewModal";
+import { DURUM_META, DURUM_SIRA } from "../project/PersonelPuantajPage";
 
 // Faz 6 — Günlük rapor formu (mobil öncelikli: tek kolon, büyük dokunma
 // hedefleri, bölüm bölüm satır ekleme). Aynı bileşen üç modda çalışır:
@@ -15,6 +16,16 @@ import PdfPreviewModal from "../../components/PdfPreviewModal";
 // Çevrimdışıyken kaydet/gönder localStorage kuyruğuna düşer (offline/queue.ts).
 
 type Manpower = { subcontractor_id?: string; trade: string; headcount: number };
+// Yüklenici/Müşavir kadrosu: Proje Paydaşları'ndaki kişiler, günlük durumu
+// (Mevcut/Devamsız/İzinli/Raporlu — puantajdaki kutularla aynı).
+type Staff = { stakeholder_id?: string; grup: "yuklenici" | "musavir"; ad_soyad: string; unvan?: string; durum: string };
+type Stakeholder = { id: string; kategori_id: string; tip: string; ad: string; soyad?: string; unvan?: string };
+type PuantajPersonel = { id: string; ad_soyad: string; gorev: string; firma: string; subcontractor_id?: string | null; is_aktif: boolean };
+type PuantajKayit = { personel_id: string; tarih: string; durum: string };
+const STAFF_GRUPLAR: { id: Staff["grup"]; label: string }[] = [
+  { id: "yuklenici", label: "Yüklenici Personeli" },
+  { id: "musavir", label: "Müşavir Personeli" },
+];
 type Equipment = { equipment_name: string; count: number; working_hours?: number; idle_reason?: string };
 type WorkEntry = { work_item_id?: string; location?: string; description: string; qty?: number; unit?: string };
 type CashExpense = { description: string; category: string; amount: number; receipt_no?: string };
@@ -33,6 +44,7 @@ type Detail = {
   author_name: string;
   cover_photo_file_id?: string;
   manpower?: (Manpower & { subcontractor_name?: string })[];
+  staff?: Staff[];
   equipment?: Equipment[];
   work_entries?: (WorkEntry & { work_item_poz?: string })[];
   cash_expenses?: CashExpense[];
@@ -82,6 +94,9 @@ export default function DailyReportFormPage() {
   const [tempMax, setTempMax] = useState("");
   const [notes, setNotes] = useState("");
   const [manpower, setManpower] = useState<Manpower[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
+  const [puantajBusy, setPuantajBusy] = useState(false);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [entries, setEntries] = useState<WorkEntry[]>([]);
   const [cashExpenses, setCashExpenses] = useState<CashExpense[]>([]);
@@ -110,6 +125,7 @@ export default function DailyReportFormPage() {
       setTempMax(d.temperature_max != null ? String(d.temperature_max) : "");
       setNotes(d.notes ?? "");
       setManpower((d.manpower ?? []).map(({ subcontractor_id, trade, headcount }) => ({ subcontractor_id, trade, headcount })));
+      setStaff((d.staff ?? []).map(({ stakeholder_id, grup, ad_soyad, unvan, durum }) => ({ stakeholder_id, grup, ad_soyad, unvan, durum })));
       setEquipment((d.equipment ?? []).map(({ equipment_name, count, working_hours, idle_reason }) => ({ equipment_name, count, working_hours, idle_reason })));
       setEntries((d.work_entries ?? []).map(({ work_item_id, location, description, qty, unit }) => ({ work_item_id, location, description, qty, unit })));
       setCashExpenses((d.cash_expenses ?? []).map(({ description, category, amount, receipt_no }) => ({ description, category, amount, receipt_no })));
@@ -134,6 +150,75 @@ export default function DailyReportFormPage() {
       .then((r) => setSubs(r.subcontractors))
       .catch(() => {});
   }, [pid, reportDate]);
+  // Proje Paydaşları'ndaki Yüklenici ve Müşavir kişileri otomatik gelir.
+  useEffect(() => {
+    if (!pid) return;
+    api<{ stakeholders: Stakeholder[] }>(`/projects/${pid}/stakeholders`, { projectId: pid })
+      .then((r) => setStakeholders(r.stakeholders ?? []))
+      .catch(() => {});
+  }, [pid]);
+  // Taslakta (yeni ya da kayıtlı) paydaşlardan henüz listede olmayanları "Mevcut"
+  // olarak ekler; kayıtlı durumlar korunur. Gönderilmiş raporda dokunulmaz.
+  useEffect(() => {
+    if (readOnly || stakeholders.length === 0) return;
+    if (!isNew && !detail) return; // kayıtlı taslak yüklenene kadar bekle
+    setStaff((prev) => {
+      const have = new Set(prev.map((s) => s.stakeholder_id).filter(Boolean));
+      const add: Staff[] = stakeholders
+        .filter((s) => s.tip === "kisi" && (s.kategori_id === "yuklenici" || s.kategori_id === "musavir") && !have.has(s.id))
+        .map((s) => ({
+          stakeholder_id: s.id,
+          grup: s.kategori_id as Staff["grup"],
+          ad_soyad: `${s.ad} ${s.soyad ?? ""}`.trim(),
+          unvan: s.unvan,
+          durum: "mevcut",
+        }));
+      return add.length ? [...prev, ...add] : prev;
+    });
+  }, [stakeholders, detail, isNew, readOnly]);
+
+  // Puantajdan Al: seçili tarihteki puantaj kayıtlarından (kaydı olmayan = mevcut)
+  // firma/görev bazında kişi sayısı üretir, Personel satırlarını bununla doldurur.
+  async function fromPuantaj() {
+    if (!pid) return;
+    setPuantajBusy(true);
+    setErr(null);
+    setInfo(null);
+    try {
+      const [pl, pu] = await Promise.all([
+        api<{ personnel: PuantajPersonel[] }>(`/projects/${pid}/personnel`, { projectId: pid }),
+        api<{ entries: PuantajKayit[] }>(`/projects/${pid}/puantaj?from=${reportDate}&to=${reportDate}`, { projectId: pid }),
+      ]);
+      const durumOf = new Map((pu.entries ?? []).map((e) => [e.personel_id, e.durum]));
+      const groups = new Map<string, Manpower>();
+      let total = 0;
+      for (const p of pl.personnel ?? []) {
+        if (!p.is_aktif || (durumOf.get(p.id) ?? "mevcut") !== "mevcut") continue;
+        // Bağ puantajdaki personel kaydından gelir (subcontractor_id; boş = ana yüklenici).
+        const sid = p.subcontractor_id || undefined;
+        const trade = p.gorev;
+        const key = `${sid ?? ""}|${trade}`;
+        const g = groups.get(key) ?? { subcontractor_id: sid, trade, headcount: 0 };
+        g.headcount += 1;
+        groups.set(key, g);
+        total += 1;
+      }
+      const rows = Array.from(groups.values());
+      setManpower(rows);
+      // Rapor tarihinde geçerli sözleşmesi olmayan taşeron kaydedilirken
+      // reddedilir; bunu şimdiden görünür kılıyoruz.
+      const inactive = rows.filter((r) => r.subcontractor_id && !subs.some((s) => s.id === r.subcontractor_id));
+      setInfo(total
+        ? `Puantajdan ${total} kişi (${groups.size} satır) alındı; mevcut personel satırları değiştirildi.` +
+          (inactive.length ? ` Uyarı: ${inactive.length} satırdaki taşeronun bu tarihte geçerli sözleşmesi yok, kayıt sırasında reddedilecek.` : "")
+        : "Bu tarih için puantajda mevcut işaretli personel bulunamadı.");
+    } catch (e) {
+      setErr(describeLoadError(e, "Puantaj"));
+    } finally {
+      setPuantajBusy(false);
+    }
+  }
+
   // Tanımlı araçlar/iş makineleri/ekipmanlar — ekipman satırları serbest
   // metin yerine bu listeden seçilir.
   useEffect(() => {
@@ -172,6 +257,7 @@ export default function DailyReportFormPage() {
       temperature_max: tempMax === "" ? null : Number(tempMax),
       notes,
       manpower,
+      staff,
       equipment,
       work_entries: entries,
       cash_expenses: cashExpenses,
@@ -393,9 +479,65 @@ export default function DailyReportFormPage() {
         )}
       </div>
 
+      {/* Yüklenici / Müşavir kadrosu — Proje Paydaşları'ndan otomatik gelir */}
+      <div className={section}>
+        <h2 className="font-medium text-white text-sm">Yüklenici ve Müşavir Kadrosu</h2>
+        {staff.length === 0 && (
+          <p className="text-xs text-beton-500">
+            {readOnly
+              ? "Bu rapora kadro durumu kaydedilmemiş."
+              : "Projede tanımlı yüklenici/müşavir personeli yok. Proje Paydaşları sayfasından kişi ekleyin."}
+          </p>
+        )}
+        {STAFF_GRUPLAR.map((g) => {
+          const list = staff.map((s, i) => ({ s, i })).filter((x) => x.s.grup === g.id);
+          if (list.length === 0) return null;
+          const present = list.filter((x) => x.s.durum === "mevcut").length;
+          return (
+            <div key={g.id} className="space-y-1.5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-beton-500">
+                {g.label} <span className="font-normal normal-case">· {present}/{list.length} mevcut</span>
+              </p>
+              {list.map(({ s, i }) => {
+                const dm = DURUM_META[s.durum] ?? DURUM_META.mevcut;
+                const editable = !readOnly && canEdit;
+                return (
+                  <div key={s.stakeholder_id ?? `${g.id}-${i}`} className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={!editable}
+                      title={`${dm.label} — değiştirmek için tıklayın`}
+                      onClick={() => setStaff(upd(staff, i, {
+                        durum: DURUM_SIRA[(DURUM_SIRA.indexOf(s.durum) + 1) % DURUM_SIRA.length],
+                      }))}
+                      className={`w-10 h-8 shrink-0 rounded text-xs font-bold transition-colors disabled:opacity-80 ${dm.cellCls}`}
+                    >
+                      {dm.short}
+                    </button>
+                    <div className="min-w-0 flex-1 text-sm text-beton-200 truncate">
+                      {s.ad_soyad}
+                      {s.unvan && <span className="ml-2 text-xs text-beton-500">{s.unvan}</span>}
+                    </div>
+                    <span className="hidden sm:inline text-xs text-beton-500 w-16 text-right">{dm.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
       {/* Personel */}
       <div className={section}>
-        <h2 className="font-medium text-white text-sm">Personel</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-medium text-white text-sm">Personel (işçi / taşeron vb.)</h2>
+          {!readOnly && canEdit && (
+            <button type="button" onClick={fromPuantaj} disabled={puantajBusy}
+              className="rounded border border-beton-700 px-2.5 py-1 text-xs text-emniyet-500 hover:border-emniyet-500 disabled:opacity-50">
+              {puantajBusy ? "Alınıyor…" : "Puantajdan Al"}
+            </button>
+          )}
+        </div>
         {manpower.map((m, i) => (
           <div key={i} className="flex gap-2 items-end">
             <div className="flex-1 grid grid-cols-2 gap-2">

@@ -70,6 +70,17 @@ type manpowerDTO struct {
 	Headcount         int        `json:"headcount"`
 }
 
+// staffDTO — Yüklenici/Müşavir kadro personelinin günlük durumu
+// (Proje Paydaşları'ndaki kişiler; bkz. migration 000070).
+type staffDTO struct {
+	ID            uuid.UUID  `json:"id,omitempty"`
+	StakeholderID *uuid.UUID `json:"stakeholder_id,omitempty"`
+	Grup          string     `json:"grup"`
+	AdSoyad       string     `json:"ad_soyad"`
+	Unvan         *string    `json:"unvan,omitempty"`
+	Durum         string     `json:"durum"`
+}
+
 type equipmentDTO struct {
 	ID            uuid.UUID `json:"id,omitempty"`
 	EquipmentName string    `json:"equipment_name"`
@@ -116,6 +127,7 @@ type dailyDTO struct {
 	CoverPhotoFileID *uuid.UUID      `json:"cover_photo_file_id,omitempty"`
 
 	Manpower     []manpowerDTO    `json:"manpower,omitempty"`
+	Staff        []staffDTO       `json:"staff,omitempty"`
 	Equipment    []equipmentDTO   `json:"equipment,omitempty"`
 	WorkEntries  []workEntryDTO   `json:"work_entries,omitempty"`
 	CashExpenses []cashExpenseDTO `json:"cash_expenses,omitempty"`
@@ -128,6 +140,7 @@ type dailyInput struct {
 	TempMax      *float64         `json:"temperature_max"`
 	Notes        string           `json:"notes"`
 	Manpower     []manpowerDTO    `json:"manpower"`
+	Staff        []staffDTO       `json:"staff"`
 	Equipment    []equipmentDTO   `json:"equipment"`
 	WorkEntries  []workEntryDTO   `json:"work_entries"`
 	CashExpenses []cashExpenseDTO `json:"cash_expenses"`
@@ -208,6 +221,24 @@ func (h *Handler) loadLines(ctx context.Context, d *dailyDTO) error {
 	rows.Close()
 
 	rows, err = h.pool.Query(ctx, `
+		SELECT id, stakeholder_id, grup, ad_soyad, unvan, durum
+		FROM daily_staff_attendance
+		WHERE daily_report_id=$1 AND deleted_at IS NULL
+		ORDER BY grup DESC, created_at`, d.ID)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var s staffDTO
+		if err := rows.Scan(&s.ID, &s.StakeholderID, &s.Grup, &s.AdSoyad, &s.Unvan, &s.Durum); err != nil {
+			rows.Close()
+			return err
+		}
+		d.Staff = append(d.Staff, s)
+	}
+	rows.Close()
+
+	rows, err = h.pool.Query(ctx, `
 		SELECT id, equipment_name, count, working_hours, idle_reason
 		FROM daily_equipment
 		WHERE daily_report_id=$1 AND deleted_at IS NULL
@@ -273,6 +304,18 @@ func insertLines(ctx context.Context, tx pgx.Tx, projectID, reportID uuid.UUID, 
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO daily_manpower (daily_report_id, subcontractor_id, trade, headcount)
 			VALUES ($1,$2,$3,$4)`, reportID, m.SubcontractorID, strings.TrimSpace(m.Trade), m.Headcount); err != nil {
+			return err
+		}
+	}
+	for _, s := range in.Staff {
+		durum := s.Durum
+		if durum == "" {
+			durum = "mevcut"
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO daily_staff_attendance (daily_report_id, stakeholder_id, grup, ad_soyad, unvan, durum)
+			VALUES ($1,$2,$3,$4,NULLIF(btrim(COALESCE($5,'')),''),$6)`,
+			reportID, s.StakeholderID, s.Grup, strings.TrimSpace(s.AdSoyad), s.Unvan, durum); err != nil {
 			return err
 		}
 	}
@@ -580,7 +623,7 @@ func (h *Handler) UpdateDaily(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Satırlar: tam değişim (taslakta basit ve güvenli; audit başlıkta tutulur).
-	for _, tbl := range []string{"daily_manpower", "daily_equipment", "daily_work_entries", "daily_cash_expenses"} {
+	for _, tbl := range []string{"daily_manpower", "daily_staff_attendance", "daily_equipment", "daily_work_entries", "daily_cash_expenses"} {
 		if _, err := tx.Exec(r.Context(), `DELETE FROM `+tbl+` WHERE daily_report_id=$1`, id); err != nil {
 			if isLockViolation(err) {
 				httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
@@ -769,6 +812,9 @@ func (h *Handler) ReviseDaily(w http.ResponseWriter, r *http.Request) {
 		`INSERT INTO daily_manpower (daily_report_id, subcontractor_id, trade, headcount)
 		 SELECT $2, subcontractor_id, trade, headcount
 		 FROM daily_manpower WHERE daily_report_id=$1 AND deleted_at IS NULL`,
+		`INSERT INTO daily_staff_attendance (daily_report_id, stakeholder_id, grup, ad_soyad, unvan, durum)
+		 SELECT $2, stakeholder_id, grup, ad_soyad, unvan, durum
+		 FROM daily_staff_attendance WHERE daily_report_id=$1 AND deleted_at IS NULL`,
 		`INSERT INTO daily_equipment (daily_report_id, equipment_name, count, working_hours, idle_reason)
 		 SELECT $2, equipment_name, count, working_hours, idle_reason
 		 FROM daily_equipment WHERE daily_report_id=$1 AND deleted_at IS NULL`,
