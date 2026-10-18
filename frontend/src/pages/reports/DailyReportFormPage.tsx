@@ -208,8 +208,11 @@ export default function DailyReportFormPage() {
       // Rapor tarihinde geçerli sözleşmesi olmayan taşeron kaydedilirken
       // reddedilir; bunu şimdiden görünür kılıyoruz.
       const inactive = rows.filter((r) => r.subcontractor_id && !subs.some((s) => s.id === r.subcontractor_id));
+      const unlinked = (pl.personnel ?? []).filter(
+        (p) => p.is_aktif && !p.subcontractor_id && (p.firma ?? "").trim() !== "").length;
       setInfo(total
         ? `Puantajdan ${total} kişi (${groups.size} satır) alındı; mevcut personel satırları değiştirildi.` +
+          (unlinked ? ` Uyarı: ${unlinked} personelin firma metni bir taşeronla bağlı değil, ana yüklenici sayıldı (Personel & Puantaj sayfasından taşeron seçin).` : "") +
           (inactive.length ? ` Uyarı: ${inactive.length} satırdaki taşeronun bu tarihte geçerli sözleşmesi yok, kayıt sırasında reddedilecek.` : "")
         : "Bu tarih için puantajda mevcut işaretli personel bulunamadı.");
     } catch (e) {

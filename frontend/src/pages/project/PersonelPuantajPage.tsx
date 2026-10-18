@@ -403,7 +403,7 @@ export default function PersonelPuantajPage() {
                   {aktifPersonel.map((p) => (
                     <tr key={p.id} className="border-b border-beton-800/50 hover:bg-beton-900/30">
                       <td className="py-2 px-3 text-beton-200 text-xs font-medium">{p.ad_soyad}</td>
-                      <td className="py-2 px-3 text-beton-500 text-xs">{p.firma || "—"}</td>
+                      <td className="py-2 px-3 text-beton-500 text-xs">{p.subcontractor_id ? p.firma : (p.firma ? <span className="text-yellow-400" title="Bu firma metni bir taşeronla bağlı değil; düzenleyip taşeron seçin.">{p.firma} ⚠ bağsız</span> : "Ana yüklenici")}</td>
                       <td className="py-2 px-3 text-beton-500 text-xs">{p.gorev}</td>
                       {days.map((d, i) => {
                         const iso = toISO(d);
@@ -578,7 +578,7 @@ export default function PersonelPuantajPage() {
                     <tr key={p.id} className="border-b border-beton-800/50 hover:bg-beton-900/30 group">
                       <td className="py-2 px-3 text-beton-200 text-sm">{p.ad_soyad}</td>
                       <td className="py-2 px-3 text-beton-400 text-xs">{p.gorev}</td>
-                      <td className="py-2 px-3 text-beton-500 text-xs">{p.firma || "—"}</td>
+                      <td className="py-2 px-3 text-beton-500 text-xs">{p.subcontractor_id ? p.firma : (p.firma ? <span className="text-yellow-400" title="Bu firma metni bir taşeronla bağlı değil; düzenleyip taşeron seçin.">{p.firma} ⚠ bağsız</span> : "Ana yüklenici")}</td>
                       <td className="py-2 px-3 text-center">
                         <span className={`text-xs px-1.5 py-0.5 rounded-full ${p.is_aktif ? "bg-green-900/50 text-green-300" : "bg-beton-800 text-beton-500"}`}>
                           {p.is_aktif ? "Aktif" : "Pasif"}

@@ -37,7 +37,10 @@ type Personel struct {
 // doğrular ve firma metnini adından türetir.
 func (h *Handler) resolveFirma(r *http.Request, pid uuid.UUID, p *Personel) (map[string]string, error) {
 	if p.SubcontractorID == nil || *p.SubcontractorID == "" {
+		// Taşeron seçilmedi = ana yüklenici. Serbest firma metni kabul edilmez:
+		// bağ yalnızca subcontractor_id ile tutulur (tutarsızlığı önler).
 		p.SubcontractorID = nil
+		p.Firma = ""
 		return nil, nil
 	}
 	sid, err := uuid.Parse(*p.SubcontractorID)
@@ -66,10 +69,12 @@ func (h *Handler) ListPersonel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.db.Query(r.Context(), `
-		SELECT id, project_id, ad_soyad, gorev, COALESCE(firma,''), subcontractor_id::text, is_aktif, sira
-		FROM project_personnel
-		WHERE project_id=$1
-		ORDER BY sira, ad_soyad`, pid)
+		SELECT pp.id, pp.project_id, pp.ad_soyad, pp.gorev,
+		       COALESCE(s.company_name, pp.firma, ''), pp.subcontractor_id::text, pp.is_aktif, pp.sira
+		FROM project_personnel pp
+		LEFT JOIN subcontractors s ON s.id = pp.subcontractor_id
+		WHERE pp.project_id=$1
+		ORDER BY pp.sira, pp.ad_soyad`, pid)
 	if err != nil {
 		httpx.Internal(w, r)
 		return

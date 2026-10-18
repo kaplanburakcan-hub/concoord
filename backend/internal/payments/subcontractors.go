@@ -2,6 +2,7 @@ package payments
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -254,6 +255,20 @@ func (h *Handler) DeleteSubcontractor(w http.ResponseWriter, r *http.Request) {
 	}
 	sid, ok := parseID(w, r, "id")
 	if !ok {
+		return
+	}
+	// Puantaj personeli taşerona bağlıdır; bağlı aktif personel varken silmek
+	// "Puantajdan Al" ve günlük rapor personelini tutarsız bırakırdı.
+	var linked int
+	if err := h.pool.QueryRow(r.Context(),
+		`SELECT count(*) FROM project_personnel WHERE subcontractor_id=$1 AND project_id=$2 AND is_aktif`,
+		sid, pid).Scan(&linked); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	if linked > 0 {
+		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
+			fmt.Sprintf("Bu taşerona bağlı %d aktif puantaj personeli var; önce personelleri başka firmaya taşıyın ya da pasife alın.", linked), nil)
 		return
 	}
 	ct, err := h.pool.Exec(r.Context(),
