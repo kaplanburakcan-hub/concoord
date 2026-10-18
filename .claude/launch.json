@@ -9,6 +9,14 @@
       "cwd": "C:\\Users\\CASPER\\Desktop\\concoord\\frontend",
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "bytender",
+      "runtimeExecutable": "C:\\Users\\CASPER\\Desktop\\bytender\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["C:\\Users\\CASPER\\Desktop\\bytender\\run.py"],
+      "env": { "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1",
+               "BYTENDER_DB": "C:\\Users\\CASPER\\Desktop\\bytender\\bytender.db" },
+      "port": 8000
     }
   ]
 }
