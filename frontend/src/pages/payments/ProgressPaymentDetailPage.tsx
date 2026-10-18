@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, apiDownload, apiUpload, describeLoadError } from "../../api/client";
+import { api, apiDownload, apiUpload, describeLoadError, RequestError } from "../../api/client";
 import ApprovalChain from "./ApprovalChain";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
@@ -43,7 +43,25 @@ type DeductionView = {
   type: string; description: string; rate_pct?: number; amount?: number;
   nature?: string; reduces_cost?: boolean;
   source_entity?: string; source_id?: string;
+  catalog_code?: string; group_code?: string; vat_pct?: number;
+  auto?: boolean; // sistemin hesapladığı kalem (avans, teminat, stopaj kutusu)
 };
+// Kesinti satırı (elle girilen). done=false: veri girişi açık; done=true:
+// onaylanmış (özet görünümü + "Değiştir"). snap: düzenlemeye başlarken alınan
+// kopya — "Vazgeç" bununla geri döner.
+type Extra = {
+  type: string; description: string; amount: string;
+  source_entity?: string; source_id?: string;
+  catalog_code?: string; group_code?: string; vat_pct?: number;
+  // Tutar'a alternatif: sözleşme bedelinin %'si (yalnızca istemci tarafı
+  // yardımcı alan — sunucuya hep hesaplanmış "amount" gönderilir).
+  pct?: string;
+  done?: boolean;
+  snap?: Omit<Extra, "snap">;
+};
+// Avans/teminat kalemleri sistem tarafından hesaplanır; elle girilenler sunucuda
+// sessizce atılıyordu, bu yüzden listede seçilemez.
+const AUTO_TYPES = new Set(["AdvanceOffset", "Retention"]);
 type PenaltySuggestion = {
   penalty_id: string; penalty_no: string; violation_type: string;
   issued_at: string; amount: number; already_added: boolean;
@@ -119,16 +137,7 @@ export default function ProgressPaymentDetailPage() {
   const [qty, setQty] = useState<Record<string, string>>({});
   const [tutanakId, setTutanakId] = useState<Record<string, string>>({});
   const [onayliTutanaklar, setOnayliTutanaklar] = useState<TutanakOption[]>([]);
-  const [extras, setExtras] = useState<{
-    type: string; description: string; amount: string;
-    source_entity?: string; source_id?: string;
-    // Faz 11 — katalog seçimi ve kesintinin kendi KDV oranı
-    catalog_code?: string; group_code?: string; vat_pct?: number;
-    // Tutar'a alternatif: sözleşme bedelinin %'si (yalnızca istemci tarafı
-    // yardımcı alan — sunucuya hep hesaplanmış "amount" gönderilir, pct
-    // saklanmaz; sayfa yeniden yüklenince tutar sabit değer olarak kalır).
-    pct?: string;
-  }[]>([]);
+  const [extras, setExtras] = useState<Extra[]>([]);
   // Yüzde bazlı kesinti hesaplaması için taban: bu taşeronun bu projedeki
   // sözleşmelerinin toplam bedeli (finansal görüntüleme yetkisi olmayanlara
   // sunucu zaten null döner).
@@ -166,11 +175,17 @@ export default function ProgressPaymentDetailPage() {
       });
       setQty(q);
       setTutanakId(t);
+      // Otomatik kalemler (avans, teminat, stopaj kutusu) elle düzenlenmez;
+      // geri kalanı onaylanmış (özet) satır olarak gelir. Katalog kodu, grup ve
+      // KDV oranı da taşınır — aksi halde yeniden yükleyip kaydetmek KDV'yi
+      // sıfırlıyor, tekrar-seçim kontrolü de çalışmıyordu.
       setExtras(r.deductions
-        .filter((d) => d.type !== "AdvanceOffset" && d.type !== "Retention")
+        .filter((d) => !d.auto)
         .map((d) => ({
           type: d.type, description: d.description, amount: formatTRAmount(String(d.amount ?? 0)),
           source_entity: d.source_entity, source_id: d.source_id,
+          catalog_code: d.catalog_code, group_code: d.group_code, vat_pct: d.vat_pct ?? 0,
+          done: true,
         })));
       const wi = await api<{ work_items: WorkItem[] }>(
         `/projects/${pid}/subcontractors/${r.payment.subcontractor_id}/work-items`, { projectId: pid });
@@ -250,6 +265,12 @@ export default function ProgressPaymentDetailPage() {
   async function save() {
     if (!pmt) return;
     setMsg(null); setErr(null);
+    // Açık (onaylanmamış) kesinti satırı sessizce atlanmasın ya da yarım
+    // kaydedilmesin: önce "Ekle" / "Değişikliği onayla" ya da satır silinmeli.
+    if (extras.some((x) => !x.done)) {
+      setErr("Onaylanmamış kesinti satırı var: satırdaki 'Ekle' / 'Değişikliği onayla' düğmesine basın ya da satırı silin.");
+      return;
+    }
     // Kesin hakediş işaretliyse geçici kabul tutanağı yüklenir (zorunlu).
     let paDocId: string | undefined;
     if (pmt.is_final && paFile) {
@@ -288,7 +309,13 @@ export default function ProgressPaymentDetailPage() {
       await api(`/projects/${pid}/payments/${id}`, { method: "PATCH", projectId: pid, body });
       setMsg("Hesaplandı ve kaydedildi.");
       load();
-    } catch { setErr("Kaydedilemedi. Durum taslak olmalı ve satır sürümü güncel olmalı."); }
+    } catch (e) {
+      // Sunucunun doğrulama mesajı (ör. aynı kesinti kaleminin tekrarı) varsa onu göster.
+      const det = e instanceof RequestError ? (e.api?.details as Record<string, string> | undefined) : undefined;
+      setErr(det && typeof det === "object" && Object.keys(det).length
+        ? Object.values(det).join(" ")
+        : "Kaydedilemedi. Durum taslak olmalı ve satır sürümü güncel olmalı.");
+    }
   }
 
   async function doTransition(action: string, label: string) {
@@ -313,6 +340,24 @@ export default function ProgressPaymentDetailPage() {
     // Faz 11: KDV artık sunucuda dönem brütü üzerinden hesaplanıyor.
     return pmt?.vat_amount ?? 0;
   }, [pmt]);
+
+  // ── Kesinti satırı kuralları ─────────────────────────────────────────────
+  // Stopaj kutusu işaretliyse (ya da sözleşmeden varsayılan olarak uygulanıyorsa)
+  // sistem stopajı zaten hesaplar; aynı kalem elle ikinci kez eklenemez.
+  const stopajOn = pmt?.withholding_applied ?? deductions.some((d) => d.auto && d.type === "Withholding");
+  const stopajManuelVar = extras.some((x) => x.catalog_code === "WHT_INCOME");
+  const autoCodes = new Set(deductions.filter((d) => d.auto && d.catalog_code).map((d) => d.catalog_code as string));
+  // Katalog kalemi i. satır için seçilemiyorsa nedenini döner (liste solukta gösterilir).
+  function takenReason(i: number, code: string): string | null {
+    const item = catalog.items.find((c) => c.code === code);
+    if (item && AUTO_TYPES.has(item.deduction_type)) return "otomatik hesaplanır";
+    if (code === "WHT_INCOME" && stopajOn) return "stopaj kutusu işaretli";
+    if (autoCodes.has(code)) return "otomatik hesaplanır";
+    if (extras.some((x, j) => j !== i && x.catalog_code === code && !x.source_id)) return "eklendi";
+    return null;
+  }
+  const isValidExtra = (x: Extra) => !!x.catalog_code && x.description.trim() !== "" && trToNumber(x.amount) > 0;
+  const hasOpenExtra = extras.some((x) => !x.done);
 
   if (!current) return <p className="text-beton-400">Önce bir proje seçin.</p>;
   if (!pmt) return <p className="text-beton-400">{err || "Yükleniyor…"}</p>;
@@ -419,11 +464,13 @@ export default function ProgressPaymentDetailPage() {
               sarkan işlerde kesilir. Varsayılan sözleşmenin "yıllara sari"
               işaretinden gelir, burada hakediş bazında geçersiz kılınabilir. */}
           {editable && (
-            <label className="mt-3 flex items-start gap-2 rounded-md border border-beton-800 bg-beton-950 p-2 cursor-pointer">
+            <label className={"mt-3 flex items-start gap-2 rounded-md border border-beton-800 bg-beton-950 p-2 " +
+              (stopajManuelVar ? "opacity-60" : "cursor-pointer")}>
               <input
                 type="checkbox"
                 className="mt-0.5 accent-emniyet-500"
-                checked={!!pmt.withholding_applied}
+                checked={stopajOn}
+                disabled={stopajManuelVar && !stopajOn}
                 onChange={(e) =>
                   setPmt({ ...pmt, withholding_applied: e.target.checked })
                 }
@@ -431,7 +478,11 @@ export default function ProgressPaymentDetailPage() {
               <span className="text-xs">
                 <span className="text-beton-200">Stopaj kesintisi uygula</span>
                 <span className="block text-beton-500 mt-0.5">
-                  Yıllara sari işlerde zorunlu. Kaydettiğinizde hesaba dahil edilir.
+                  {stopajManuelVar && !stopajOn
+                    ? "Aşağıda elle eklenmiş bir stopaj kalemi var; ikisi birlikte kullanılamaz."
+                    : stopajOn
+                      ? "Stopaj sistem tarafından hesaplanır; aşağıdaki listeden ayrıca eklenemez."
+                      : "Yıllara sari işlerde zorunlu. Kaydettiğinizde hesaba dahil edilir."}
                 </span>
               </span>
             </label>
@@ -481,8 +532,13 @@ export default function ProgressPaymentDetailPage() {
               )}
             </div>
           )}
-          <ul className="mt-2 space-y-1 text-sm">
-            {deductions.map((d, i) => (
+          {/* Düzenlenebilir taslakta yalnızca sistemin hesapladıkları burada listelenir;
+              elle girilenler aşağıda satır olarak görünür (aynı kalem iki kez görünmesin). */}
+          {editable && deductions.some((d) => d.auto) && (
+            <p className="mt-2 text-[10px] uppercase tracking-wider text-beton-500">Otomatik hesaplananlar</p>
+          )}
+          <ul className="mt-1 space-y-1 text-sm">
+            {(editable ? deductions.filter((d) => d.auto) : deductions).map((d, i) => (
               <li key={i} className="flex items-center justify-between gap-2 text-beton-200">
                 <span className="flex items-center gap-2 min-w-0">
                   <span className="truncate">
@@ -507,7 +563,9 @@ export default function ProgressPaymentDetailPage() {
                 {canFin && <span className="tabular-nums flex-none">{d.amount?.toLocaleString("tr-TR")}</span>}
               </li>
             ))}
-            {!deductions.length && <li className="text-beton-400">Kesinti yok.</li>}
+            {!(editable ? deductions.filter((d) => d.auto) : deductions).length && (
+              <li className="text-beton-400">{editable ? "Otomatik kesinti yok." : "Kesinti yok."}</li>
+            )}
           </ul>
 
           {/* Faz 8: bekleyen İSG para cezaları → kesinti önerisi (PY onayıyla
@@ -534,6 +592,8 @@ export default function ProgressPaymentDetailPage() {
                           amount: formatTRAmount(String(s.amount)),
                           source_entity: "ohs_penalties",
                           source_id: s.penalty_id,
+                          vat_pct: 0,
+                          done: true,
                         }])}
                         className="ml-auto text-emniyet-500 hover:underline">
                         Kesintiye ekle
@@ -552,51 +612,88 @@ export default function ProgressPaymentDetailPage() {
           {editable && (
             <div className="mt-3 border-t border-beton-800 pt-3 space-y-2">
               {extras.map((e, i) => {
+                const open = !e.done;
+                const upd = (patch: Partial<Extra>) =>
+                  setExtras(extras.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+                const catItem = catalog.items.find((c) => c.code === e.catalog_code);
+                const valid = isValidExtra(e);
+
+                // Onaylanmış satır: özet + Değiştir
+                if (!open) {
+                  const title = catItem?.label ?? DED_LABEL[e.type] ?? e.type;
+                  return (
+                    <div key={i} className="rounded-md border border-beton-800/70 bg-beton-950/40 p-2 flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-beton-100 truncate">{title}</p>
+                        <p className="text-[11px] text-beton-500 truncate">
+                          {e.description && e.description !== title ? `${e.description} · ` : ""}KDV %{e.vat_pct ?? 0}
+                        </p>
+                      </div>
+                      <span className="tabular-nums text-sm text-beton-100 flex-none">{e.amount} TL</span>
+                      <button
+                        onClick={() => {
+                          const copy: Extra = { ...e };
+                          delete copy.snap;
+                          upd({ done: false, snap: copy });
+                        }}
+                        className="flex-none rounded border border-beton-700 px-2 py-1 text-xs text-beton-200 hover:border-emniyet-500">
+                        Değiştir
+                      </button>
+                      <button onClick={() => setExtras(extras.filter((_, j) => j !== i))}
+                        className="flex-none text-red-400 hover:text-red-300 text-xs px-1">Sil</button>
+                    </div>
+                  );
+                }
+
+                // Açık satır: veri girişi
                 const pctActive = !!e.pct?.trim();
                 const amountDisabled = pctActive;
                 const pctDisabled = !!e.amount?.trim() && !pctActive;
+                const missing = [
+                  !e.catalog_code && "kalem seçin",
+                  e.description.trim() === "" && "açıklama girin",
+                  !(trToNumber(e.amount) > 0) && "tutar girin",
+                ].filter(Boolean) as string[];
                 return (
-                <div key={i} className="rounded-md border border-beton-800/70 p-2 space-y-2">
+                <div key={i} className="rounded-md border border-emniyet-500/40 p-2 space-y-2">
                   {/* Katalogdan kalem seçimi: tür, KDV oranı ve nitelik otomatik gelir.
-                      minmax(0,1fr) şart — düz 1fr kullanılırsa <select>'in en uzun
-                      seçenek metni (ör. "Sözleşmeden doğan ceza kesintisi") grid
-                      sütununun min-width:auto varsayılanı yüzünden container'ı
-                      zorlayıp satırı kart dışına taşırıyordu. */}
+                      Zaten eklenmiş / sistemce hesaplanan kalemler solukta ve seçilemez.
+                      minmax(0,1fr) şart: düz 1fr kullanılırsa select'in uzun seçenek
+                      metni grid sütununu zorlayıp satırı kart dışına taşırıyordu. */}
                   <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
                     <select
                       value={e.catalog_code ?? ""}
                       onChange={(ev) => {
                         const it = catalog.items.find((c) => c.code === ev.target.value);
-                        setExtras(extras.map((x, j) => j === i ? {
-                          ...x,
+                        upd({
                           catalog_code: it?.code ?? "",
                           group_code: it?.group_code ?? "",
-                          type: it?.deduction_type ?? x.type,
+                          type: it?.deduction_type ?? e.type,
                           vat_pct: it?.default_vat_pct ?? 0,
-                          description: it ? it.label : x.description,
-                        } : x))
+                          description: it ? it.label : e.description,
+                        });
                       }}
                       className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100">
                       <option value="">— kalem seçin —</option>
                       {catalog.groups.map((g) => (
                         <optgroup key={g.code} label={`${g.label} · ${g.hint}`}>
-                          {catalog.items.filter((c) => c.group_code === g.code).map((c) => (
-                            <option key={c.code} value={c.code}>{c.label}</option>
-                          ))}
+                          {catalog.items.filter((c) => c.group_code === g.code).map((c) => {
+                            const reason = takenReason(i, c.code);
+                            return (
+                              <option key={c.code} value={c.code} disabled={!!reason}>
+                                {c.label}{reason ? ` — ${reason}` : ""}
+                              </option>
+                            );
+                          })}
                         </optgroup>
                       ))}
                     </select>
                     <input value={e.description} placeholder="Açıklama / dayanak"
-                      onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, description: ev.target.value } : x))}
+                      onChange={(ev) => upd({ description: ev.target.value })}
                       className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
                   </div>
 
-                  {/* Tutar / sözleşme bedelinin %'si: birbirine alternatif iki
-                      ayrı satır. Biri doluyken diğeri kilitlenir (mutual
-                      exclusive) — yüzde girilince taban, taşeronun bu
-                      projedeki toplam sözleşme bedelidir. Sözleşme bedeli
-                      bilinmiyorsa (yok ya da finansal görüntüleme yetkisi
-                      yoksa) yalnızca sabit Tutar alanı gösterilir. */}
+                  {/* Sabit tutar / sözleşme bedelinin yüzdesi: biri doluyken diğeri kilitlenir. */}
                   {contractAmount ? (
                     <div className="rounded border border-emerald-800/40 bg-emerald-500/5 p-2 space-y-1.5">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-500">
@@ -606,7 +703,7 @@ export default function ProgressPaymentDetailPage() {
                         <label className="text-xs text-beton-300">Sabit tutar (TL)</label>
                         <input value={e.amount} placeholder="0,00" inputMode="decimal"
                           disabled={amountDisabled}
-                          onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, amount: formatTRAmount(ev.target.value) } : x))}
+                          onChange={(ev) => upd({ amount: formatTRAmount(ev.target.value) })}
                           className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100 text-right disabled:opacity-40 disabled:cursor-not-allowed" />
                       </div>
                       <div className="grid grid-cols-[minmax(0,1fr)_100px] gap-2 items-center">
@@ -618,9 +715,7 @@ export default function ProgressPaymentDetailPage() {
                               const pctRaw = ev.target.value.replace(/[^\d,]/g, "");
                               const pctNum = trToNumber(pctRaw);
                               const computed = Math.round((contractAmount * pctNum) / 100);
-                              setExtras(extras.map((x, j) => j === i ? {
-                                ...x, pct: pctRaw, amount: pctRaw ? formatTRAmount(String(computed)) : "",
-                              } : x));
+                              upd({ pct: pctRaw, amount: pctRaw ? formatTRAmount(String(computed)) : "" });
                             }}
                             className="min-w-0 w-full rounded bg-beton-950 border border-beton-800 pl-2 pr-5 py-1 text-sm text-beton-100 text-right disabled:opacity-40 disabled:cursor-not-allowed" />
                           <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-beton-500">%</span>
@@ -635,16 +730,16 @@ export default function ProgressPaymentDetailPage() {
                     </div>
                   ) : (
                     <input value={e.amount} placeholder="Tutar" inputMode="decimal"
-                      onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, amount: formatTRAmount(ev.target.value) } : x))}
+                      onChange={(ev) => upd({ amount: formatTRAmount(ev.target.value) })}
                       className="min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100 text-right" />
                   )}
 
-                  <div className="flex items-end justify-end gap-2">
+                  <div className="flex items-end justify-between gap-2 flex-wrap">
                     <label className="text-xs text-beton-400">
                       <span className="block text-[10px] text-beton-500 mb-0.5">KDV oranı</span>
                       <select
                         value={String(e.vat_pct ?? 0)}
-                        onChange={(ev) => setExtras(extras.map((x, j) => j === i ? { ...x, vat_pct: Number(ev.target.value) } : x))}
+                        onChange={(ev) => upd({ vat_pct: Number(ev.target.value) })}
                         title="Kesintinin kendi KDV oranı (tutar KDV dahil girilir)"
                         className="min-w-0 rounded bg-beton-950 border border-beton-800 px-1 py-1 text-sm text-beton-100">
                         <option value="0">%0</option>
@@ -652,16 +747,41 @@ export default function ProgressPaymentDetailPage() {
                         <option value="20">%20</option>
                       </select>
                     </label>
-                    <button onClick={() => setExtras(extras.filter((_, j) => j !== i))}
-                      className="text-red-400 hover:text-red-300 text-xs px-1 pb-1.5">Sil</button>
+                    <div className="flex items-center gap-2">
+                      {!valid && (
+                        <span className="text-[10px] text-amber-400">Eksik: {missing.join(", ")}</span>
+                      )}
+                      <button
+                        onClick={() => upd({ done: true, snap: undefined })}
+                        disabled={!valid}
+                        className="rounded bg-emniyet-500 px-3 py-1 text-xs font-semibold text-beton-950 hover:bg-emniyet-600 disabled:opacity-40 disabled:cursor-not-allowed">
+                        {e.snap ? "Değişikliği onayla" : "Ekle"}
+                      </button>
+                      {e.snap ? (
+                        <button
+                          onClick={() => setExtras(extras.map((x, j) => (j === i ? { ...(e.snap as Extra), done: true } : x)))}
+                          className="rounded border border-beton-700 px-2 py-1 text-xs text-beton-200 hover:border-beton-500">
+                          Vazgeç
+                        </button>
+                      ) : (
+                        <button onClick={() => setExtras(extras.filter((_, j) => j !== i))}
+                          className="text-red-400 hover:text-red-300 text-xs px-1">İptal</button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 );
               })}
-              <button onClick={() => setExtras([...extras, { type: "Other", description: "", amount: "", vat_pct: 0 }])}
-                className="text-emniyet-500 hover:underline text-xs">+ Kesinti satırı ekle</button>
+              <button
+                onClick={() => setExtras([...extras, { type: "Other", description: "", amount: "", vat_pct: 0, done: false }])}
+                disabled={hasOpenExtra}
+                title={hasOpenExtra ? "Önce açık olan satırı onaylayın ya da iptal edin" : undefined}
+                className="text-emniyet-500 hover:underline text-xs disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">
+                + Kesinti satırı ekle
+              </button>
               <p className="text-[10px] text-beton-500">
                 Mal/hizmet kesintileri KDV DAHİL girilir; maliyet hesabında KDV hariç tutar kullanılır.
+                Her kesinti kalemi bir hakedişte yalnızca bir kez eklenebilir.
               </p>
             </div>
           )}

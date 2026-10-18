@@ -264,6 +264,14 @@ type deductionView struct {
 	Amount       *float64 `json:"amount,omitempty"`
 	SourceEntity *string  `json:"source_entity,omitempty"`
 	SourceID     *string  `json:"source_id,omitempty"`
+	// Katalog bilgisi: yeniden yüklemede satırın kalem/KDV bilgisi kaybolmasın
+	// ve arayüz aynı kalemin ikinci kez seçilmesini engelleyebilsin.
+	CatalogCode string   `json:"catalog_code,omitempty"`
+	GroupCode   string   `json:"group_code,omitempty"`
+	VatPct      *float64 `json:"vat_pct,omitempty"`
+	// Auto: sistemin hesapladığı kalem (avans mahsubu, teminat, stopaj kutusu);
+	// manuel düzenlenemez.
+	Auto bool `json:"auto"`
 }
 
 // loadPayment — proje + satır-seviyesi doğrulamalı hakediş getirir.
@@ -339,7 +347,9 @@ func (h *Handler) GetPayment(w http.ResponseWriter, r *http.Request) {
 	// Kesintiler
 	dedRows, err := h.pool.Query(r.Context(),
 		`SELECT type, COALESCE(description,''), rate_pct::float8, amount::float8,
-		        source_entity, source_id::text
+		        source_entity, source_id::text,
+		        COALESCE(catalog_code,''), COALESCE(group_code,''), vat_pct::float8,
+		        (type IN ('AdvanceOffset','Retention') OR (type='Withholding' AND rate_pct IS NOT NULL))
 		 FROM payment_deductions WHERE progress_payment_id=$1 ORDER BY created_at`, ppID)
 	if err != nil {
 		httpx.Internal(w, r)
@@ -351,7 +361,8 @@ func (h *Handler) GetPayment(w http.ResponseWriter, r *http.Request) {
 		var dv deductionView
 		var rate *float64
 		var amount float64
-		if err := dedRows.Scan(&dv.Type, &dv.Description, &rate, &amount, &dv.SourceEntity, &dv.SourceID); err != nil {
+		if err := dedRows.Scan(&dv.Type, &dv.Description, &rate, &amount, &dv.SourceEntity, &dv.SourceID,
+			&dv.CatalogCode, &dv.GroupCode, &dv.VatPct, &dv.Auto); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
@@ -755,6 +766,24 @@ func (h *Handler) UpdatePaymentDraft(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httpx.Internal(w, r)
 		return
+	}
+	// Aynı katalog kalemi bir hakedişte yalnızca bir kez kesilebilir (stopaj,
+	// damga vergisi, avans...). Sistemin otomatik hesapladığı kalemler de sayılır
+	// (ör. stopaj kutusu işaretliyken elle "Gelir/Kurumlar vergisi stopajı"
+	// eklenemez). Kaynağa bağlı satırlar (İSG ceza tutanakları) her biri ayrı
+	// kayıt olduğundan muaftır.
+	seen := map[string]bool{}
+	for _, d := range res.Deductions {
+		if d.CatalogCode == "" || (d.SourceID != nil && *d.SourceID != "") {
+			continue
+		}
+		if seen[d.CatalogCode] {
+			httpx.ValidationFailed(w, r, map[string]string{
+				"deductions": "bu kesinti kalemi hakedişte zaten var (tekrar girilemez): " + d.CatalogCode,
+			})
+			return
+		}
+		seen[d.CatalogCode] = true
 	}
 
 	if req.PeriodStart != nil || req.PeriodEnd != nil {
