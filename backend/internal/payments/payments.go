@@ -1112,12 +1112,21 @@ func (h *Handler) SummaryPDF(w http.ResponseWriter, r *http.Request) {
 		data.PeriodEnd = pp.PeriodEnd.Format("2006-01-02")
 	}
 
+	// Sözleşme bilgisi: en son sözleşmenin no'su, bu projedeki toplam bedel.
+	// Dış tablo kolonları pp. ile nitelenir (iç sorgu kolonlarıyla karışmasın).
 	_ = h.pool.QueryRow(r.Context(), `
-		SELECT p.name, p.code, COALESCE(p.currency,'TRY'), s.company_name
+		SELECT p.name, p.code, COALESCE(p.currency,'TRY'), s.company_name,
+		       COALESCE((SELECT c.contract_no FROM contracts c
+		                 WHERE c.subcontractor_id = pp.subcontractor_id AND c.project_id = pp.project_id
+		                   AND c.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT 1), ''),
+		       COALESCE((SELECT SUM(c.amount) FROM contracts c
+		                 WHERE c.subcontractor_id = pp.subcontractor_id AND c.project_id = pp.project_id
+		                   AND c.deleted_at IS NULL), 0)::float8
 		FROM progress_payments pp
 		JOIN projects p ON p.id = pp.project_id
 		JOIN subcontractors s ON s.id = pp.subcontractor_id
-		WHERE pp.id=$1`, ppID).Scan(&data.ProjectName, &data.ProjectCode, &data.Currency, &data.Subcontractor)
+		WHERE pp.id=$1`, ppID).Scan(&data.ProjectName, &data.ProjectCode, &data.Currency, &data.Subcontractor,
+		&data.ContractNo, &data.ContractAmount)
 
 	itemRows, err := h.pool.Query(r.Context(), `
 		SELECT wi.poz_no, wi.description, wi.unit, wi.unit_price::float8, wi.contract_qty::float8,
