@@ -212,10 +212,15 @@ func BuildSummaryPDF(d PDFData) []byte {
 	}
 	for _, ded := range d.Deductions {
 		lbl := dedLabel(ded.Type)
-		if ded.Description != "" && ded.Description != lbl {
+		switch {
+		case ded.Description == "" || ded.Description == lbl:
+		case strings.HasPrefix(ded.Description, lbl):
+			// Açıklama zaten etiketle başlıyor ("Stopaj (yıllara sarı) (%5)"): tekrar yazma.
+			lbl = ded.Description
+		default:
 			lbl += " · " + ded.Description
 		}
-		if ded.RatePct != nil && *ded.RatePct > 0 {
+		if ded.RatePct != nil && *ded.RatePct > 0 && !strings.Contains(lbl, "%") {
 			lbl += fmt.Sprintf(" (%%%s)", trimPct(*ded.RatePct))
 		}
 		amt := trNum(ded.Amount, 2)
