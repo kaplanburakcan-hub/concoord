@@ -212,11 +212,15 @@ func BuildSummaryPDF(d PDFData) []byte {
 	}
 	for _, ded := range d.Deductions {
 		lbl := dedLabel(ded.Type)
+		// Eski kayıtlarda açıklama ASCII ("yıllara sari") olabilir: karşılaştırmayı aksansız yap.
+		fl, fd := foldTR(lbl), foldTR(ded.Description)
 		switch {
-		case ded.Description == "" || ded.Description == lbl:
-		case strings.HasPrefix(ded.Description, lbl):
-			// Açıklama zaten etiketle başlıyor ("Stopaj (yıllara sarı) (%5)"): tekrar yazma.
-			lbl = ded.Description
+		case fd == "" || fd == fl:
+		case strings.HasPrefix(fd, fl):
+			// Açıklama etiketle başlıyor: etiketi tekrar yazma, yalnızca artanı ekle.
+			if rest := strings.TrimSpace(strings.TrimLeft(string([]rune(ded.Description)[len([]rune(lbl)):]), " ·—-")); rest != "" {
+				lbl += " " + rest
+			}
 		default:
 			lbl += " · " + ded.Description
 		}
@@ -303,6 +307,14 @@ func statusStyle(s string) (label string, fg, bg rgb) {
 		return "Reddedildi", hexc(0x9b2c22), hexc(0xf8e0dd)
 	}
 	return s, hexc(0x5b6877), hexc(0xe6eaf0)
+}
+
+// foldTR — Türkçe harfleri ASCII karşılıklarına indirip küçültür (yalnızca karşılaştırma için).
+func foldTR(s string) string {
+	return strings.ToLower(strings.NewReplacer(
+		"ı", "i", "İ", "i", "I", "i", "ş", "s", "Ş", "s", "ğ", "g", "Ğ", "g",
+		"ü", "u", "Ü", "u", "ö", "o", "Ö", "o", "ç", "c", "Ç", "c",
+	).Replace(s))
 }
 
 func dedLabel(t string) string {

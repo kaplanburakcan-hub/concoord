@@ -43,3 +43,9 @@ func TestBuildSummaryPDF_Basics(t *testing.T) {
 		t.Error("yazı tipi gömülmemiş")
 	}
 }
+
+func TestFoldTR(t *testing.T) {
+	if foldTR("Stopaj (yıllara sarı)") != foldTR("Stopaj (yillara sari)") {
+		t.Fatal("aksansız karşılaştırma eşleşmedi")
+	}
+}
