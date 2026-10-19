@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, apiDownload, apiUpload, describeLoadError, RequestError } from "../../api/client";
+import { api, apiDownload, apiFetchBlob, apiUpload, describeLoadError, RequestError } from "../../api/client";
 import ApprovalChain from "./ApprovalChain";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
@@ -328,6 +328,19 @@ export default function ProgressPaymentDetailPage() {
       setMsg(`${label} tamamlandı.`);
       load();
     } catch { setErr(`${label} başarısız (durum geçişi veya yetki uygun değil).`); }
+  }
+
+  async function viewPdf() {
+    // Sekmeyi tıklamayla eşzamanlı aç (açılır pencere engelleyicisine takılmasın), PDF gelince yönlendir.
+    const w = window.open("", "_blank");
+    try {
+      const url = await apiFetchBlob(`/projects/${pid}/payments/${id}/summary.pdf`);
+      if (w) w.location.href = url;
+      else window.location.href = url;
+    } catch {
+      w?.close();
+      setErr("PDF görüntülenemedi (finansal görüntüleme yetkisi gerekli).");
+    }
   }
 
   async function downloadPdf() {
@@ -931,10 +944,16 @@ export default function ProgressPaymentDetailPage() {
           <ActionBtn onClick={() => doTransition("finalize", "Kesinleştirme")}>Kesinleştir (Kilitle)</ActionBtn>
         )}
         {canFin && (
-          <button onClick={downloadPdf}
-            className="rounded border border-beton-700 text-beton-200 hover:bg-beton-800 text-sm px-4 py-2">
-            Özet PDF
-          </button>
+          <>
+            <button onClick={viewPdf}
+              className="rounded border border-beton-700 text-beton-200 hover:bg-beton-800 text-sm px-4 py-2">
+              Özet PDF — Görüntüle
+            </button>
+            <button onClick={downloadPdf}
+              className="rounded border border-beton-700 text-beton-200 hover:bg-beton-800 text-sm px-4 py-2">
+              PDF İndir
+            </button>
+          </>
         )}
       </div>
     </div>
