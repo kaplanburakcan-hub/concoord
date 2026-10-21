@@ -5,6 +5,7 @@ import { api, apiDownload, apiFetchBlob, apiUpload, describeLoadError, RequestEr
 import ApprovalChain from "./ApprovalChain";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
+import { useUndoable, useUndoShortcuts } from "../../hooks/useUndoable";
 
 type Payment = {
   id: string; subcontractor_id: string; period_no: number; status: string;
@@ -61,6 +62,17 @@ type Extra = {
 };
 // Avans/teminat kalemleri sistem tarafından hesaplanır; elle girilenler sunucuda
 // sessizce atılıyordu, bu yüzden listede seçilemez.
+// Hakedişe esas oranlar: sözleşmedeki değerler, bu hakedişte geçerli olanlar ve
+// kullanıcının değiştirme yetkisi (sunucudan gelir).
+type RateSet = { vat_pct: number; vat_withholding_ratio: number; retention_pct: number; withholding_pct: number };
+type RatesInfo = { contract_found: boolean; is_turu: string; contract: RateSet; effective: RateSet; can_edit: boolean };
+const IS_TURU_LABEL: Record<string, string> = { yapim: "Yapım", hizmet: "Hizmet", kiralama: "Kiralama", diger: "Diğer" };
+const TEVKIFAT_SECENEKLERI: [number, string][] = [
+  [0, "Tevkifat yok"], [0.2, "2/10"], [0.3, "3/10"], [0.4, "4/10"], [0.5, "5/10"], [0.7, "7/10"], [0.9, "9/10"], [1, "Tam tevkifat"],
+];
+const rateTxt = (v: number) => String(v).replace(".", ",");
+const rateNum = (s: string) => Number(String(s).replace(",", ".")) || 0;
+
 type PdfLayout = "resmi" | "panel" | "akis";
 const PDF_LAYOUTS: { id: PdfLayout; label: string; hint: string }[] = [
   { id: "resmi", label: "Resmi rapor", hint: "Klasik düzen, imza kutulu" },
@@ -144,7 +156,14 @@ export default function ProgressPaymentDetailPage() {
   const [qty, setQty] = useState<Record<string, string>>({});
   const [tutanakId, setTutanakId] = useState<Record<string, string>>({});
   const [onayliTutanaklar, setOnayliTutanaklar] = useState<TutanakOption[]>([]);
-  const [extras, setExtras] = useState<Extra[]>([]);
+  // Kesinti satırları geri al / yinele geçmişiyle tutulur (silme, ekleme, düzenleme).
+  const {
+    state: extras, set: setExtrasH, undo: undoExtras, redo: redoExtras, reset: resetExtras,
+    canUndo: canUndoExtras, canRedo: canRedoExtras,
+  } = useUndoable<Extra[]>([]);
+  const setExtras = (v: Extra[] | ((p: Extra[]) => Extra[]), key?: string) => setExtrasH(v, key);
+  const [rates, setRates] = useState<RatesInfo | null>(null);
+  const [rateForm, setRateForm] = useState({ vat_pct: "", retention_pct: "", withholding_pct: "" });
   // Yüzde bazlı kesinti hesaplaması için taban: bu taşeronun bu projedeki
   // sözleşmelerinin toplam bedeli (finansal görüntüleme yetkisi olmayanlara
   // sunucu zaten null döner).
@@ -169,8 +188,17 @@ export default function ProgressPaymentDetailPage() {
       const r = await api<{
         payment: Payment; items: ItemView[]; deductions: DeductionView[];
         ohs_penalty_suggestions?: PenaltySuggestion[];
+        rates?: RatesInfo;
       }>(`/projects/${pid}/payments/${id}`, { projectId: pid });
       setSuggestions(r.ohs_penalty_suggestions ?? []);
+      setRates(r.rates ?? null);
+      if (r.rates) {
+        setRateForm({
+          vat_pct: rateTxt(r.rates.effective.vat_pct),
+          retention_pct: rateTxt(r.rates.effective.retention_pct),
+          withholding_pct: rateTxt(r.rates.effective.withholding_pct),
+        });
+      }
       setPmt(r.payment);
       setItems(r.items);
       setDeductions(r.deductions);
@@ -186,7 +214,7 @@ export default function ProgressPaymentDetailPage() {
       // geri kalanı onaylanmış (özet) satır olarak gelir. Katalog kodu, grup ve
       // KDV oranı da taşınır — aksi halde yeniden yükleyip kaydetmek KDV'yi
       // sıfırlıyor, tekrar-seçim kontrolü de çalışmıyordu.
-      setExtras(r.deductions
+      resetExtras(r.deductions
         .filter((d) => !d.auto)
         .map((d) => ({
           type: d.type, description: d.description, amount: formatTRAmount(String(d.amount ?? 0)),
@@ -268,6 +296,7 @@ export default function ProgressPaymentDetailPage() {
   }, []);
 
   const editable = pmt?.status === "Draft" && canEdit;
+  useUndoShortcuts(undoExtras, redoExtras, !!editable);
 
   async function save() {
     if (!pmt) return;
@@ -295,6 +324,12 @@ export default function ProgressPaymentDetailPage() {
       row_version: pmt.row_version,
       withholding_applied: pmt.withholding_applied ?? null,
       vat_withholding_ratio: pmt.vat_withholding_ratio ?? null,
+      // Oranlar yalnızca değiştirme yetkisi olana gönderilir (sunucu da denetler).
+      ...(rates?.can_edit ? {
+        vat_pct: rateNum(rateForm.vat_pct),
+        retention_pct: rateNum(rateForm.retention_pct),
+        withholding_pct: rateNum(rateForm.withholding_pct),
+      } : {}),
       is_final: pmt.is_final ?? false,
       provisional_acceptance_document_id: paDocId ?? undefined,
       items: workItems
@@ -492,6 +527,70 @@ export default function ProgressPaymentDetailPage() {
           <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide">Kesintiler</h2>
           <p className="text-xs text-beton-400 mt-1">Avans ve teminat otomatik hesaplanır. Aşağıya vergi/İSG/diğer ekleyin.</p>
 
+          {/* Hakedişe esas oranlar: sözleşmeden gelir; farklı girmek yetki ister. */}
+          {rates && (() => {
+            const lock = !(editable && rates.can_edit);
+            const diff = (cur: number, con: number) => Math.abs(cur - con) > 1e-9;
+            const field = (label: string, key: "vat_pct" | "retention_pct" | "withholding_pct", con: number) => (
+              <label className="text-[11px] text-beton-400">
+                {label}
+                <input disabled={lock} inputMode="decimal" value={rateForm[key]}
+                  onChange={(e) => setRateForm({ ...rateForm, [key]: e.target.value })}
+                  className="mt-0.5 w-full rounded bg-beton-900 border border-beton-800 px-2 py-1 text-sm text-beton-100 text-right disabled:opacity-60" />
+                {diff(rateNum(rateForm[key]), con) && (
+                  <span className="block text-[10px] text-amber-400 mt-0.5">sözleşmede %{rateTxt(con)}</span>
+                )}
+              </label>
+            );
+            return (
+              <div className="mt-3 rounded-md border border-beton-800 bg-beton-950 p-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-beton-400">
+                  Hakediş oranları
+                  <span className="ml-2 normal-case font-normal text-beton-500">
+                    · {IS_TURU_LABEL[rates.is_turu] ?? rates.is_turu} sözleşmesi
+                    {!rates.contract_found && " (sözleşme girilmemiş — varsayılan oranlar)"}
+                  </span>
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {field("KDV oranı %", "vat_pct", rates.contract.vat_pct)}
+                  <label className="text-[11px] text-beton-400">
+                    KDV tevkifat oranı
+                    <select disabled={lock} value={String(pmt.vat_withholding_ratio ?? 0)}
+                      onChange={(e) => setPmt({ ...pmt, vat_withholding_ratio: Number(e.target.value) })}
+                      className="mt-0.5 w-full rounded bg-beton-900 border border-beton-800 px-1 py-1 text-sm text-beton-100 disabled:opacity-60">
+                      {TEVKIFAT_SECENEKLERI.map(([v, l]) => <option key={v} value={String(v)}>{l}</option>)}
+                    </select>
+                    {diff(pmt.vat_withholding_ratio ?? 0, rates.contract.vat_withholding_ratio) && (
+                      <span className="block text-[10px] text-amber-400 mt-0.5">
+                        sözleşmede {TEVKIFAT_SECENEKLERI.find(([v]) => v === rates.contract.vat_withholding_ratio)?.[1] ?? rates.contract.vat_withholding_ratio}
+                      </span>
+                    )}
+                  </label>
+                  {field("Teminat kesintisi %", "retention_pct", rates.contract.retention_pct)}
+                  {field("Stopaj oranı %", "withholding_pct", rates.contract.withholding_pct)}
+                </div>
+                <p className="mt-1.5 text-[10px] text-beton-500">
+                  {editable && rates.can_edit
+                    ? "Sözleşmedeki oranlardan farklı değer girebilirsiniz (yetkiniz var)."
+                    : "🔒 Oranlar sözleşmeden gelir; değiştirmek için \"Hakediş oranlarını değiştir\" yetkisi gerekir."}
+                </p>
+              </div>
+            );
+          })()}
+
+          {editable && (
+            <div className="mt-2 flex items-center justify-end gap-2">
+              <button onClick={undoExtras} disabled={!canUndoExtras} title="Kesinti satırlarında geri al (Ctrl+Z)"
+                className="rounded border border-beton-700 px-2 py-0.5 text-[11px] text-beton-300 hover:border-emniyet-500 disabled:opacity-40 disabled:cursor-not-allowed">
+                ↶ Geri al
+              </button>
+              <button onClick={redoExtras} disabled={!canRedoExtras} title="Yinele (Ctrl+Y)"
+                className="rounded border border-beton-700 px-2 py-0.5 text-[11px] text-beton-300 hover:border-emniyet-500 disabled:opacity-40 disabled:cursor-not-allowed">
+                ↷ Yinele
+              </button>
+            </div>
+          )}
+
           {/* Faz 11 — Stopaj (GVK Md. 42-44, yıllara sari inşaat işleri).
               Aynı takvim yılında başlayıp biten işlerde kesilmez; sonraki yıla
               sarkan işlerde kesilir. Varsayılan sözleşmenin "yıllara sari"
@@ -647,7 +746,8 @@ export default function ProgressPaymentDetailPage() {
               {extras.map((e, i) => {
                 const open = !e.done;
                 const upd = (patch: Partial<Extra>) =>
-                  setExtras(extras.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+                  setExtras(extras.map((x, j) => (j === i ? { ...x, ...patch } : x)),
+                    "x:" + i + ":" + Object.keys(patch).join(","));
                 const catItem = catalog.items.find((c) => c.code === e.catalog_code);
                 const valid = isValidExtra(e);
 

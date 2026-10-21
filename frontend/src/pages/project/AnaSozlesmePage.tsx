@@ -40,7 +40,27 @@ type ContractForm = {
   max_artis_orani: string;
   max_eksilis_orani: string;
   sgk_is_yeri_no: string;
+  // Hakedişe esas vergi ve kesinti oranları (idari hakedişler bunları varsayılan alır)
+  is_turu: string;
+  kdv_pct: string;
+  kdv_tevkifat_pct: string;
+  stopaj_pct: string;
+  damga_pct: string;
+  teminat_pct: string;
 };
+
+const IS_TURLERI: { v: string; l: string }[] = [
+  { v: "yapim", l: "Yapım" }, { v: "hizmet", l: "Hizmet" },
+  { v: "kiralama", l: "Kiralama" }, { v: "diger", l: "Diğer" },
+];
+const IS_TURU_LABEL: Record<string, string> = Object.fromEntries(IS_TURLERI.map((t) => [t.v, t.l]));
+const ORAN_ALANLARI: { k: "kdv_pct" | "kdv_tevkifat_pct" | "stopaj_pct" | "damga_pct" | "teminat_pct"; l: string; ipucu: string }[] = [
+  { k: "kdv_pct", l: "KDV oranı", ipucu: "Hakediş tutarına uygulanan KDV" },
+  { k: "kdv_tevkifat_pct", l: "KDV tevkifat oranı", ipucu: "KDV'nin tevkif edilen kısmı: %40 = 4/10, %50 = 5/10, %0 = tevkifat yok" },
+  { k: "stopaj_pct", l: "Gelir / Kurumlar vergisi stopajı", ipucu: "Bu hakediş tutarı (E) üzerinden kesilir" },
+  { k: "damga_pct", l: "Damga vergisi", ipucu: "Bu hakediş tutarı (E) üzerinden kesilir (ör. binde 9,48 = %0,948)" },
+  { k: "teminat_pct", l: "Geçici kabul / teminat kesintisi", ipucu: "Bu hakediş tutarı (E) üzerinden kesilir" },
+];
 
 const PARA_BIRIMLERI = ["TRY", "USD", "EUR", "GBP", "CHF", "JPY"];
 
@@ -137,6 +157,12 @@ export default function AnaSozlesmePage() {
     max_artis_orani: "",
     max_eksilis_orani: "",
     sgk_is_yeri_no: "",
+    is_turu: "yapim",
+    kdv_pct: "20",
+    kdv_tevkifat_pct: "0",
+    stopaj_pct: "0",
+    damga_pct: "0",
+    teminat_pct: "0",
   });
 
   const [form, setForm] = useState<ContractForm>(empty());
@@ -173,6 +199,12 @@ export default function AnaSozlesmePage() {
         max_artis_orani: c.max_artis_orani != null ? String(c.max_artis_orani) : "",
         max_eksilis_orani: c.max_eksilis_orani != null ? String(c.max_eksilis_orani) : "",
         sgk_is_yeri_no: c.sgk_is_yeri_no ?? "",
+        is_turu: c.is_turu ?? "yapim",
+        kdv_pct: String(c.kdv_pct ?? 20),
+        kdv_tevkifat_pct: String(c.kdv_tevkifat_pct ?? 0),
+        stopaj_pct: String(c.stopaj_pct ?? 0),
+        damga_pct: String(c.damga_pct ?? 0),
+        teminat_pct: String(c.teminat_pct ?? 0),
       });
     } catch (e) {
       if (e instanceof RequestError && e.status === 404) {
@@ -242,6 +274,10 @@ export default function AnaSozlesmePage() {
       errs.max_artis_orani = "Geçerli oran girin";
     if (form.max_eksilis_orani && (isNaN(+form.max_eksilis_orani) || +form.max_eksilis_orani < 0))
       errs.max_eksilis_orani = "Geçerli oran girin";
+    for (const o of ORAN_ALANLARI) {
+      const v = Number(String(form[o.k]).replace(",", "."));
+      if (form[o.k].trim() === "" || isNaN(v) || v < 0 || v > 100) errs[o.k] = "0–100 arasında oran girin";
+    }
     setFieldErr(errs);
     return Object.keys(errs).length === 0;
   }
@@ -277,6 +313,12 @@ export default function AnaSozlesmePage() {
       max_artis_orani: form.max_artis_orani ? parseFloat(form.max_artis_orani) : null,
       max_eksilis_orani: form.max_eksilis_orani ? parseFloat(form.max_eksilis_orani) : null,
       sgk_is_yeri_no: form.sgk_is_yeri_no,
+      is_turu: form.is_turu,
+      kdv_pct: Number(form.kdv_pct.replace(",", ".")),
+      kdv_tevkifat_pct: Number(form.kdv_tevkifat_pct.replace(",", ".")),
+      stopaj_pct: Number(form.stopaj_pct.replace(",", ".")),
+      damga_pct: Number(form.damga_pct.replace(",", ".")),
+      teminat_pct: Number(form.teminat_pct.replace(",", ".")),
     };
 
     try {
@@ -686,6 +728,34 @@ export default function AnaSozlesmePage() {
         </div>
       </Section>
 
+      {/* ── 7a. Hakedişe esas vergi ve kesinti oranları ──────────────────── */}
+      <Section title="Hakedişe Esas Vergi ve Kesinti Oranları">
+        <p className="text-xs text-beton-500 mb-3 max-w-2xl">
+          Bu oranlar sözleşmeyle birlikte kilitlenir; idari hakedişler bunları varsayılan alır. Hakedişte
+          farklı oran girmek için "Hakediş oranlarını değiştir" yetkisi gerekir.
+        </p>
+        <div className="flex flex-col gap-4">
+          <Field label="İş türü" error={fieldErr.is_turu}>
+            <select value={form.is_turu} disabled={!canEdit}
+              onChange={e => set("is_turu", e.target.value)} className={`${inpBase} w-48`}>
+              {IS_TURLERI.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
+            </select>
+          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+            {ORAN_ALANLARI.map((o) => (
+              <Field key={o.k} label={o.l} error={fieldErr[o.k]}>
+                <div className="flex items-center gap-2" title={o.ipucu}>
+                  <span className="text-sm text-beton-400">%</span>
+                  <input type="text" inputMode="decimal" value={form[o.k]} disabled={!canEdit}
+                    onChange={e => set(o.k, e.target.value)} className={`${inpBase} w-28 text-right`} />
+                </div>
+                <p className="text-[11px] text-beton-600 mt-1 max-w-xs">{o.ipucu}</p>
+              </Field>
+            ))}
+          </div>
+        </div>
+      </Section>
+
       {/* ── 7. SGK ────────────────────────────────────────────────────────── */}
       <Section title="Diğer Bilgiler">
         <div className="flex flex-col gap-4">
@@ -816,6 +886,15 @@ function ContractSummary({ form, meta, pid, canEdit }: {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <SummaryRow label="Azami Artış Oranı" value={form.max_artis_orani ? `+%${form.max_artis_orani}` : "—"} />
           <SummaryRow label="Azami Eksiliş Oranı" value={form.max_eksilis_orani ? `−%${form.max_eksilis_orani}` : "—"} />
+        </div>
+      </Section>
+
+      <Section title="Hakedişe Esas Vergi ve Kesinti Oranları">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <SummaryRow label="İş türü" value={IS_TURU_LABEL[form.is_turu] ?? form.is_turu} />
+          {ORAN_ALANLARI.map((o) => (
+            <SummaryRow key={o.k} label={o.l} value={`%${form[o.k]}`} />
+          ))}
         </div>
       </Section>
 

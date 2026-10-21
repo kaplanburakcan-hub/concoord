@@ -41,6 +41,7 @@ var AllPermissions = []PermissionDef{
 	{"progress_payments", "approve", "Hakedişi saha onayından geçir"},
 	{"progress_payments", "finalize", "Hakedişi kesinleştir (kilitle)"},
 	{"progress_payments", "view_financials", "Birim fiyat/tutar kolonlarını gör"},
+	{"progress_payments", "edit_rates", "Hakedişte sözleşmeden gelen vergi/kesinti oranlarını (KDV, tevkifat, teminat, stopaj, damga) değiştir"},
 
 	{"material_approvals", "view", "Malzeme onaylarını görüntüle"},
 	{"material_approvals", "create", "Malzeme onay talebi (MAR) oluştur"},
@@ -127,7 +128,7 @@ var roleDefaults = map[string][]string{
 		"contracts.view", "contracts.upload", "contracts.delete",
 		"progress_payments.view", "progress_payments.create_draft", "progress_payments.edit_draft",
 		"progress_payments.submit", "progress_payments.approve", "progress_payments.finalize",
-		"progress_payments.view_financials",
+		"progress_payments.view_financials", "progress_payments.edit_rates",
 		"material_approvals.view", "material_approvals.review", "material_approvals.decide",
 		"documents.view", "documents.upload", "documents.download", "documents.delete", "documents.manage_folders",
 		"correspondence.view", "correspondence.create", "correspondence.edit", "correspondence.delete",

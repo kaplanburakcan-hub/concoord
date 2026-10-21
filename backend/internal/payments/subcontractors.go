@@ -316,6 +316,11 @@ type contractDTO struct {
 	RevisedEndDate   *time.Time `json:"revised_end_date,omitempty"`
 	IsMultiYear      bool       `json:"is_multi_year"`
 	WithholdingPct   float64    `json:"withholding_pct"`
+	// Hakedişe esas vergi oranları: sözleşme girişinde belirlenir, hakedişler
+	// bunları varsayılan alır (hakedişte değiştirmek progress_payments.edit_rates ister).
+	IsTuru              string  `json:"is_turu"` // yapim | hizmet | kiralama | diger
+	VatPct              float64 `json:"vat_pct"`
+	VatWithholdingRatio float64 `json:"vat_withholding_ratio"` // 0 = tevkifat yok, 0.4 = 4/10
 	// DefaultPaymentMethod — Nakit Akış Faz A: PO/hakediş/ekstre ödeme
 	// planlarının varsayılan ödeme şeklini buradan alması içindir.
 	DefaultPaymentMethod *string   `json:"default_payment_method,omitempty"`
@@ -326,13 +331,15 @@ type contractDTO struct {
 const contractCols = `id, project_id, subcontractor_id, contract_no, type, parent_contract_id,
 	amount::float8, advance_amount::float8, retention_pct::float8, advance_rate_pct::float8,
 	sign_date, document_id, start_date, end_date, revised_end_date,
-	is_multi_year, withholding_pct::float8, default_payment_method, row_version, created_at`
+	is_multi_year, withholding_pct::float8, default_payment_method, row_version, created_at,
+	is_turu, vat_pct::float8, vat_withholding_ratio::float8`
 
 func scanContract(row pgx.Row, c *contractDTO) error {
 	return row.Scan(&c.ID, &c.ProjectID, &c.SubcontractorID, &c.ContractNo, &c.Type, &c.ParentContractID,
 		&c.Amount, &c.AdvanceAmount, &c.RetentionPct, &c.AdvanceRatePct,
 		&c.SignDate, &c.DocumentID, &c.StartDate, &c.EndDate, &c.RevisedEndDate,
-		&c.IsMultiYear, &c.WithholdingPct, &c.DefaultPaymentMethod, &c.RowVersion, &c.CreatedAt)
+		&c.IsMultiYear, &c.WithholdingPct, &c.DefaultPaymentMethod, &c.RowVersion, &c.CreatedAt,
+		&c.IsTuru, &c.VatPct, &c.VatWithholdingRatio)
 }
 
 // maskFinancials — view_financials yoksa tutar alanlarını gizler (Plan §4).
@@ -397,6 +404,9 @@ type contractReq struct {
 	RevisedEndDate   *string  `json:"revised_end_date"`
 	IsMultiYear      *bool    `json:"is_multi_year"`
 	WithholdingPct   *float64 `json:"withholding_pct"`
+	IsTuru              *string  `json:"is_turu"`
+	VatPct              *float64 `json:"vat_pct"`
+	VatWithholdingRatio *float64 `json:"vat_withholding_ratio"`
 	// DefaultPaymentMethod — Nakit Akış Faz A (nakit|havale|cek).
 	DefaultPaymentMethod *string `json:"default_payment_method"`
 	RowVersion           int     `json:"row_version"`
@@ -414,6 +424,26 @@ func normalizePaymentMethod(s *string) *string {
 		return nil
 	}
 	return &t
+}
+
+// validateTaxTerms — hakedişe esas oranların aralık kontrolü.
+func validateTaxTerms(isTuru string, vatPct, vatRatio float64, withholdingPct *float64) map[string]string {
+	f := map[string]string{}
+	switch isTuru {
+	case "yapim", "hizmet", "kiralama", "diger":
+	default:
+		f["is_turu"] = "Geçerli değer: yapim, hizmet, kiralama, diger"
+	}
+	if vatPct < 0 || vatPct > 100 {
+		f["vat_pct"] = "0–100 aralığında olmalı"
+	}
+	if vatRatio < 0 || vatRatio > 1 {
+		f["vat_withholding_ratio"] = "0–1 aralığında olmalı (0,4 = 4/10)"
+	}
+	if withholdingPct != nil && (*withholdingPct < 0 || *withholdingPct > 100) {
+		f["withholding_pct"] = "0–100 aralığında olmalı"
+	}
+	return f
 }
 
 func optUUID(s *string) (*uuid.UUID, bool) {
@@ -464,6 +494,20 @@ func (h *Handler) CreateContract(w http.ResponseWriter, r *http.Request) {
 	if req.AdvanceAmount != nil {
 		advAmount = *req.AdvanceAmount
 	}
+	isTuru, vatPct, vatRatio := "yapim", 20.0, 0.0
+	if req.IsTuru != nil && *req.IsTuru != "" {
+		isTuru = *req.IsTuru
+	}
+	if req.VatPct != nil {
+		vatPct = *req.VatPct
+	}
+	if req.VatWithholdingRatio != nil {
+		vatRatio = *req.VatWithholdingRatio
+	}
+	if f := validateTaxTerms(isTuru, vatPct, vatRatio, req.WithholdingPct); len(f) > 0 {
+		httpx.ValidationFailed(w, r, f)
+		return
+	}
 
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {
@@ -476,7 +520,8 @@ func (h *Handler) CreateContract(w http.ResponseWriter, r *http.Request) {
 	err = scanContract(tx.QueryRow(r.Context(), `
 		INSERT INTO contracts (project_id, subcontractor_id, contract_no, type, parent_contract_id,
 			amount, advance_amount, retention_pct, advance_rate_pct, sign_date, document_id,
-			is_multi_year, withholding_pct, start_date, end_date, revised_end_date, default_payment_method)
+			is_multi_year, withholding_pct, start_date, end_date, revised_end_date, default_payment_method,
+			is_turu, vat_pct, vat_withholding_ratio)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NULLIF($10,'')::date, $11,
 			-- Yıllara sari varsayılanı: açıkça verilmemişse proje takviminden
 			-- türetilir (başlangıç ve bitiş yılı farklıysa iş yıllara saridir).
@@ -486,12 +531,13 @@ func (h *Handler) CreateContract(w http.ResponseWriter, r *http.Request) {
 				FROM projects p WHERE p.id = $1
 			), false),
 			COALESCE($13, 5.00),
-			NULLIF($14,'')::date, NULLIF($15,'')::date, NULLIF($16,'')::date, $17)
+			NULLIF($14,'')::date, NULLIF($15,'')::date, NULLIF($16,'')::date, $17,
+			$18, $19, $20)
 		RETURNING `+contractCols,
 		pid, subID, req.ContractNo, ctype, parentID, req.Amount, advAmount, retention, advRate,
 		strDeref(req.SignDate), docID, req.IsMultiYear, req.WithholdingPct,
 		strDeref(req.StartDate), strDeref(req.EndDate), strDeref(req.RevisedEndDate),
-		normalizePaymentMethod(req.DefaultPaymentMethod)), &c)
+		normalizePaymentMethod(req.DefaultPaymentMethod), isTuru, vatPct, vatRatio), &c)
 	if err != nil {
 		if isUniqueViolation(err) {
 			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "Bu sözleşme no zaten kullanımda.", nil)
@@ -593,6 +639,20 @@ func (h *Handler) UpdateContract(w http.ResponseWriter, r *http.Request) {
 	if req.DefaultPaymentMethod != nil {
 		paymentMethod = normalizePaymentMethod(req.DefaultPaymentMethod)
 	}
+	isTuru, vatPct, vatRatio := before.IsTuru, before.VatPct, before.VatWithholdingRatio
+	if req.IsTuru != nil && *req.IsTuru != "" {
+		isTuru = *req.IsTuru
+	}
+	if req.VatPct != nil {
+		vatPct = *req.VatPct
+	}
+	if req.VatWithholdingRatio != nil {
+		vatRatio = *req.VatWithholdingRatio
+	}
+	if f := validateTaxTerms(isTuru, vatPct, vatRatio, req.WithholdingPct); len(f) > 0 {
+		httpx.ValidationFailed(w, r, f)
+		return
+	}
 
 	var c contractDTO
 	err = scanContract(tx.QueryRow(r.Context(), `
@@ -605,12 +665,14 @@ func (h *Handler) UpdateContract(w http.ResponseWriter, r *http.Request) {
 			end_date=NULLIF($13,'')::date,
 			revised_end_date=NULLIF($14,'')::date,
 			default_payment_method=$15,
+			is_turu=$16, vat_pct=$17, vat_withholding_ratio=$18,
 			row_version=row_version+1
 		WHERE id=$1 AND project_id=$2
 		RETURNING `+contractCols,
 		cid, pid, contractNo, ctype, amount, advAmount, retention, advRate, strDeref(req.SignDate),
 		req.IsMultiYear, req.WithholdingPct,
-		strDeref(req.StartDate), strDeref(req.EndDate), strDeref(req.RevisedEndDate), paymentMethod), &c)
+		strDeref(req.StartDate), strDeref(req.EndDate), strDeref(req.RevisedEndDate), paymentMethod,
+		isTuru, vatPct, vatRatio), &c)
 	if err != nil {
 		if isUniqueViolation(err) {
 			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "Bu sözleşme no zaten kullanımda.", nil)

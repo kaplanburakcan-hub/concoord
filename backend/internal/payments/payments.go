@@ -49,9 +49,12 @@ type paymentDTO struct {
 	ProvisionalAcceptanceDocumentID *uuid.UUID `json:"provisional_acceptance_document_id,omitempty"`
 	ProvisionalAcceptanceDate       *time.Time `json:"provisional_acceptance_date,omitempty"`
 	CurrentStepNo                   int        `json:"current_step_no"`
-	FinalizedAt                     *time.Time `json:"finalized_at,omitempty"`
-	RowVersion                      int        `json:"row_version"`
-	CreatedAt                       time.Time  `json:"created_at"`
+	// Yetkili kullanıcı hakedişte teminat/stopaj oranını sözleşmeden farklı girdiyse; nil = sözleşmeden.
+	RetentionPctOverride   *float64   `json:"retention_pct_override,omitempty"`
+	WithholdingPctOverride *float64   `json:"withholding_pct_override,omitempty"`
+	FinalizedAt            *time.Time `json:"finalized_at,omitempty"`
+	RowVersion             int        `json:"row_version"`
+	CreatedAt              time.Time  `json:"created_at"`
 }
 
 const paymentCols = `id, project_id, subcontractor_id, period_no, period_start, period_end, status,
@@ -61,7 +64,8 @@ const paymentCols = `id, project_id, subcontractor_id, period_no, period_start, 
 	vat_amount::float8, vat_withheld::float8, vat_collected::float8,
 	payable_gross::float8, actual_cost::float8, total_additions::float8, current_step_no,
 	is_final, provisional_acceptance_document_id, provisional_acceptance_date,
-	finalized_at, row_version, created_at`
+	finalized_at, row_version, created_at,
+	retention_pct_override::float8, withholding_pct_override::float8`
 
 func scanPayment(row pgx.Row, p *paymentDTO) error {
 	var gc, gp, gt, td, np float64
@@ -71,7 +75,8 @@ func scanPayment(row pgx.Row, p *paymentDTO) error {
 		&p.VatAmount, &p.VatWithheld, &p.VatCollected, &p.PayableGross, &p.ActualCost,
 		&p.TotalAdditions, &p.CurrentStepNo,
 		&p.IsFinal, &p.ProvisionalAcceptanceDocumentID, &p.ProvisionalAcceptanceDate,
-		&p.FinalizedAt, &p.RowVersion, &p.CreatedAt); err != nil {
+		&p.FinalizedAt, &p.RowVersion, &p.CreatedAt,
+		&p.RetentionPctOverride, &p.WithholdingPctOverride); err != nil {
 		return err
 	}
 	p.GrossCum, p.GrossPrev, p.GrossThis = &gc, &gp, &gt
@@ -153,11 +158,6 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, http.StatusForbidden, httpx.CodeForbidden, "Bu taşerona erişiminiz yok.", nil)
 		return
 	}
-	vat := 20.0
-	if req.VatPct != nil {
-		vat = *req.VatPct
-	}
-
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {
 		httpx.Internal(w, r)
@@ -176,6 +176,18 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 	if !exists {
 		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Taşeron bulunamadı.", nil)
 		return
+	}
+
+	// KDV ve tevkifat varsayılanı sözleşmeden gelir; farklı değer yetki ister.
+	ct := h.contractTax(r.Context(), tx, subID)
+	vat, vatRatio := ct.VatPct, ct.VatRatio
+	if req.VatPct != nil && !sameRate(*req.VatPct, ct.VatPct) {
+		if !h.canEditRates(r, pid) {
+			httpx.Error(w, r, http.StatusForbidden, httpx.CodeForbidden,
+				"KDV oranını sözleşmedeki değerden farklı girmek için yetkiniz yok.", nil)
+			return
+		}
+		vat = *req.VatPct
 	}
 
 	periodNo := 0
@@ -213,10 +225,10 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 
 	var p paymentDTO
 	err = scanPayment(tx.QueryRow(r.Context(), `
-		INSERT INTO progress_payments (project_id, subcontractor_id, period_no, period_start, period_end, vat_pct, created_by)
-		VALUES ($1,$2,$3, NULLIF($4,'')::date, NULLIF($5,'')::date, $6, $7)
+		INSERT INTO progress_payments (project_id, subcontractor_id, period_no, period_start, period_end, vat_pct, created_by, vat_withholding_ratio)
+		VALUES ($1,$2,$3, NULLIF($4,'')::date, NULLIF($5,'')::date, $6, $7, $8)
 		RETURNING `+paymentCols,
-		pid, subID, periodNo, strDeref(req.PeriodStart), strDeref(req.PeriodEnd), vat, uid), &p)
+		pid, subID, periodNo, strDeref(req.PeriodStart), strDeref(req.PeriodEnd), vat, uid, vatRatio), &p)
 	if err != nil {
 		if isUniqueViolation(err) {
 			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "Bu taşeron için bu dönem no zaten var.", nil)
@@ -389,9 +401,32 @@ func (h *Handler) GetPayment(w http.ResponseWriter, r *http.Request) {
 	if !fin {
 		p.maskFinancials()
 	}
+	// Hakedişe esas oranlar: sözleşmedeki değerler, bu hakedişte geçerli olanlar ve
+	// kullanıcının değiştirme yetkisi.
+	ct := h.contractTax(r.Context(), h.pool, p.SubcontractorID)
+	effRet, effWh := ct.RetentionPct, ct.WithholdingPct
+	if p.RetentionPctOverride != nil {
+		effRet = *p.RetentionPctOverride
+	}
+	if p.WithholdingPctOverride != nil {
+		effWh = *p.WithholdingPctOverride
+	}
+	rates := map[string]interface{}{
+		"contract_found": ct.Found,
+		"is_turu":        ct.IsTuru,
+		"contract": map[string]float64{
+			"vat_pct": ct.VatPct, "vat_withholding_ratio": ct.VatRatio,
+			"retention_pct": ct.RetentionPct, "withholding_pct": ct.WithholdingPct,
+		},
+		"effective": map[string]float64{
+			"vat_pct": p.VatPct, "vat_withholding_ratio": p.VatWithholdingRatio,
+			"retention_pct": effRet, "withholding_pct": effWh,
+		},
+		"can_edit": h.canEditRates(r, pid),
+	}
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{
 		"payment": p, "items": items, "deductions": deductions,
-		"ohs_penalty_suggestions": suggestions,
+		"ohs_penalty_suggestions": suggestions, "rates": rates,
 	})
 }
 
@@ -496,6 +531,12 @@ func (h *Handler) computeForPayment(ctx context.Context, q pgxQuerier, pp *payme
 		return CalcResult{}, err
 	}
 	terms.AdvanceAmount = advAmount
+	if pp.RetentionPctOverride != nil {
+		retPct = *pp.RetentionPctOverride
+	}
+	if pp.WithholdingPctOverride != nil {
+		whPct = *pp.WithholdingPctOverride
+	}
 	terms.RetentionPct = retPct
 	terms.AdvanceRatePct = advRate
 
@@ -637,6 +678,9 @@ type updateDraftReq struct {
 	// KDV tevkifat oranı (0=yok, 0.4=4/10) ve %0 KDV istisna gerekçesi.
 	VatWithholdingRatio *float64 `json:"vat_withholding_ratio"`
 	VatExemptionCode    *string  `json:"vat_exemption_code"`
+	// Teminat / stopaj oranı (yetki ister; sözleşmedeki değere eşitse hakedişe özel değer silinir).
+	RetentionPct   *float64 `json:"retention_pct"`
+	WithholdingPct *float64 `json:"withholding_pct"`
 	// Kesin hakediş ve dayanağı olan geçici kabul belgesi.
 	IsFinal                         *bool   `json:"is_final"`
 	ProvisionalAcceptanceDocumentID *string `json:"provisional_acceptance_document_id"`
@@ -716,6 +760,7 @@ func (h *Handler) UpdatePaymentDraft(w http.ResponseWriter, r *http.Request) {
 			"Kayıt başkası tarafından güncellendi.", map[string]int{"current_version": pp.RowVersion})
 		return
 	}
+	before := struct{ VatPct, VatWithholdingRatio float64 }{pp.VatPct, pp.VatWithholdingRatio}
 	if req.WithholdingApplied != nil {
 		pp.WithholdingApplied = req.WithholdingApplied
 	}
@@ -724,6 +769,42 @@ func (h *Handler) UpdatePaymentDraft(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.VatPct != nil {
 		pp.VatPct = *req.VatPct
+	}
+
+	// Oranlar sözleşmeden farklı girilecekse izin gerekir.
+	ct := h.contractTax(r.Context(), tx, pp.SubcontractorID)
+	effRet, effWh := ct.RetentionPct, ct.WithholdingPct
+	if pp.RetentionPctOverride != nil {
+		effRet = *pp.RetentionPctOverride
+	}
+	if pp.WithholdingPctOverride != nil {
+		effWh = *pp.WithholdingPctOverride
+	}
+	ratesTouched := false
+	if req.RetentionPct != nil && !sameRate(*req.RetentionPct, effRet) {
+		ratesTouched = true
+		if sameRate(*req.RetentionPct, ct.RetentionPct) {
+			pp.RetentionPctOverride = nil
+		} else {
+			v := *req.RetentionPct
+			pp.RetentionPctOverride = &v
+		}
+	}
+	if req.WithholdingPct != nil && !sameRate(*req.WithholdingPct, effWh) {
+		ratesTouched = true
+		if sameRate(*req.WithholdingPct, ct.WithholdingPct) {
+			pp.WithholdingPctOverride = nil
+		} else {
+			v := *req.WithholdingPct
+			pp.WithholdingPctOverride = &v
+		}
+	}
+	vatChanged := (req.VatPct != nil && !sameRate(*req.VatPct, before.VatPct)) ||
+		(req.VatWithholdingRatio != nil && !sameRate(*req.VatWithholdingRatio, before.VatWithholdingRatio))
+	if (ratesTouched || vatChanged) && !h.canEditRates(r, pid) {
+		httpx.Error(w, r, http.StatusForbidden, httpx.CodeForbidden,
+			"Hakediş oranlarını (KDV, tevkifat, teminat, stopaj) değiştirmek için yetkiniz yok.", nil)
+		return
 	}
 
 	entries := make([]itemEntry, 0, len(req.Items))
@@ -810,6 +891,14 @@ func (h *Handler) UpdatePaymentDraft(w http.ResponseWriter, r *http.Request) {
 				period_start=COALESCE(NULLIF($2,'')::date, period_start),
 				period_end=COALESCE(NULLIF($3,'')::date, period_end)
 			WHERE id=$1`, ppID, strDeref(req.PeriodStart), strDeref(req.PeriodEnd)); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+	}
+	if ratesTouched {
+		if _, err := tx.Exec(r.Context(),
+			`UPDATE progress_payments SET retention_pct_override=$2, withholding_pct_override=$3 WHERE id=$1`,
+			ppID, pp.RetentionPctOverride, pp.WithholdingPctOverride); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
@@ -1245,6 +1334,10 @@ func (h *Handler) loadFlowPDFData(ctx context.Context, ppID uuid.UUID, data *PDF
 				} else {
 					v.State = "rej"
 				}
+			} else if data.Status == "Finalized" {
+				// Zincir tamamlanmadan kesinleşemez; onay kaydı olmayan (eski/demo) adımlar
+				// kişi/tarih yazılmadan "tamamlandı" gösterilir.
+				v.State = "done"
 			} else if inFlow && st.StepNo == curStep+1 {
 				v.State = "now"
 			}

@@ -157,7 +157,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	correspondenceH := correspondence.NewHandler(pool)
 
 	// --- Nakit Akış Faz D: İdari Hakedişler ---
-	idariHakedisH := idarihakedis.NewHandler(pool)
+	idariHakedisH := idarihakedis.NewHandler(pool, eval)
 
 	// --- Nakit Akış Faz E: Sabit Giderler ---
 	fixedExpensesH := fixedexpenses.NewHandler(pool)
@@ -386,6 +386,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("progress_payments.finalize")).Post("/projects/{projectID}/idari-hakedisler", idariHakedisH.Create)
 			pr.With(mw.RequirePermission("progress_payments.finalize")).Patch("/projects/{projectID}/idari-hakedisler/{id}", idariHakedisH.Update)
 			pr.With(mw.RequirePermission("progress_payments.finalize")).Delete("/projects/{projectID}/idari-hakedisler/{id}", idariHakedisH.Delete)
+			pr.With(mw.RequirePermission("progress_payments.finalize")).Post("/projects/{projectID}/idari-hakedisler/{id}/restore", idariHakedisH.Restore)
 		})
 
 		// Faz E (Nakit Akış) — Sabit Giderler (araç, endirekt personel, mobilizasyon vb.).

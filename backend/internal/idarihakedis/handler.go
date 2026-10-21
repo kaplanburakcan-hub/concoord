@@ -34,17 +34,23 @@ import (
 
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/rbac"
 	kesinkabul "github.com/ipks/ipks/backend/internal/validate"
 )
 
-type Handler struct{ pool *pgxpool.Pool }
+type Handler struct {
+	pool *pgxpool.Pool
+	eval *rbac.Evaluator
+}
 
-func NewHandler(pool *pgxpool.Pool) *Handler { return &Handler{pool: pool} }
+func NewHandler(pool *pgxpool.Pool, eval *rbac.Evaluator) *Handler {
+	return &Handler{pool: pool, eval: eval}
+}
 
-// KesintiKalem — rapordaki a-i kesinti/mahsup kalemleri + serbest ek satırlar.
-type KesintiKalem struct {
-	Ad    string  `json:"ad"`
-	Tutar float64 `json:"tutar"`
+// canEditRates — hakedişte sözleşme oranlarını değiştirme izni.
+func (h *Handler) canEditRates(ctx context.Context, uid, pid uuid.UUID) bool {
+	ok, err := h.eval.Can(ctx, uid, &pid, "progress_payments.edit_rates")
+	return err == nil && ok
 }
 
 type IdariHakedis struct {
@@ -87,6 +93,7 @@ func scanRow(row pgx.Row, i *IdariHakedis) error {
 	if err := json.Unmarshal(kesintilerJSON, &i.Kesintiler); err != nil {
 		i.Kesintiler = []KesintiKalem{}
 	}
+	i.Kesintiler = normalizeKesintiler(i.Kesintiler)
 	return nil
 }
 
@@ -122,6 +129,16 @@ func calc(a, b, d, kdvPct float64, kesintiler []KesintiKalem) (c, e, f, g, hSum,
 	return
 }
 
+// hesapla — oranlı kalemlerin tutarını yazar ve yükleniciye ödenecek tutarı döner.
+func hesapla(req *reqBody, kdvPct float64) float64 {
+	c := req.SozlesmeFiyatlariTutari + req.FiyatFarkiTutari
+	e := c - req.OncekiHakedisToplami
+	f := e * kdvPct / 100
+	oranliTutarlar(req.Kesintiler, e, f)
+	_, _, _, _, _, odenecek := calc(req.SozlesmeFiyatlariTutari, req.FiyatFarkiTutari, req.OncekiHakedisToplami, kdvPct, req.Kesintiler)
+	return odenecek
+}
+
 // ── List ─────────────────────────────────────────────────────────────────
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
@@ -149,7 +166,16 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, i)
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"idari_hakedisler": out})
+	uid, _ := auth.UserIDFrom(r.Context())
+	ref := h.contractOranlar(r.Context(), pid)
+	httpx.JSON(w, http.StatusOK, map[string]any{
+		"idari_hakedisler": out,
+		// Yeni hakediş formu bunlarla açılır: sözleşmedeki oranlar, standart kalemler,
+		// ve bu kullanıcının hakedişte oranları değiştirip değiştiremeyeceği.
+		"oran_varsayilan":     map[string]any{"sozlesme_var": ref.Var, "kdv_pct": ref.Kdv, "oranlar": ref.Oran},
+		"standart_kalemler":   stdKalemler,
+		"oran_degistirebilir": h.canEditRates(r.Context(), uid, pid),
+	})
 }
 
 // ── Create ───────────────────────────────────────────────────────────────
@@ -206,18 +232,24 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		httpx.ValidationFailed(w, r, f)
 		return
 	}
-	kdvPct := 20.0
-	if req.KdvPct != nil {
-		kdvPct = *req.KdvPct
-	}
 	aciklama := strings.TrimSpace(req.Aciklama)
 	if aciklama == "" {
 		aciklama = fmt.Sprintf("Hakediş No %d", req.DonemNo)
 	}
-	if req.Kesintiler == nil {
-		req.Kesintiler = []KesintiKalem{}
+	// Referans = sözleşmedeki oranlar. Oranlar sözleşmeden farklıysa izin gerekir.
+	ref := h.contractOranlar(r.Context(), pid)
+	kdvPct := ref.Kdv
+	if req.KdvPct != nil {
+		kdvPct = *req.KdvPct
 	}
-	_, _, _, _, _, odenecek := calc(req.SozlesmeFiyatlariTutari, req.FiyatFarkiTutari, req.OncekiHakedisToplami, kdvPct, req.Kesintiler)
+	req.Kesintiler = normalizeKesintiler(req.Kesintiler)
+	oranDoldur(req.Kesintiler, ref)
+	if oranDegisti(kdvPct, req.Kesintiler, ref) && !h.canEditRates(r.Context(), uid, pid) {
+		httpx.Error(w, r, http.StatusForbidden, httpx.CodeForbidden,
+			"Hakediş oranlarını (KDV, stopaj, damga, tevkifat, teminat) sözleşmedeki değerlerden farklı girmek için yetkiniz yok.", nil)
+		return
+	}
+	odenecek := hesapla(&req, kdvPct)
 	kesintilerJSON, err := json.Marshal(req.Kesintiler)
 	if err != nil {
 		httpx.Internal(w, r)
@@ -305,18 +337,33 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		httpx.ValidationFailed(w, r, f)
 		return
 	}
-	kdvPct := 20.0
-	if req.KdvPct != nil {
-		kdvPct = *req.KdvPct
-	}
 	aciklama := strings.TrimSpace(req.Aciklama)
 	if aciklama == "" {
 		aciklama = "Hakediş"
 	}
-	if req.Kesintiler == nil {
-		req.Kesintiler = []KesintiKalem{}
+	// Referans = kaydın mevcut oranları; oranlara dokunulmuyorsa izin gerekmez.
+	var storedKdv float64
+	var storedJSON []byte
+	if err := h.pool.QueryRow(r.Context(),
+		`SELECT kdv_pct::float8, kesintiler FROM idari_hakedisler WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`,
+		id, pid).Scan(&storedKdv, &storedJSON); err != nil {
+		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Kayıt bulunamadı.", nil)
+		return
 	}
-	_, _, _, _, _, odenecek := calc(req.SozlesmeFiyatlariTutari, req.FiyatFarkiTutari, req.OncekiHakedisToplami, kdvPct, req.Kesintiler)
+	var storedKal []KesintiKalem
+	_ = json.Unmarshal(storedJSON, &storedKal)
+	ref := oranlarFromKalemler(storedKdv, normalizeKesintiler(storedKal))
+	kdvPct := storedKdv
+	if req.KdvPct != nil {
+		kdvPct = *req.KdvPct
+	}
+	req.Kesintiler = normalizeKesintiler(req.Kesintiler)
+	if oranDegisti(kdvPct, req.Kesintiler, ref) && !h.canEditRates(r.Context(), uid, pid) {
+		httpx.Error(w, r, http.StatusForbidden, httpx.CodeForbidden,
+			"Hakediş oranlarını (KDV, stopaj, damga, tevkifat, teminat) değiştirmek için yetkiniz yok.", nil)
+		return
+	}
+	odenecek := hesapla(&req, kdvPct)
 	kesintilerJSON, err := json.Marshal(req.Kesintiler)
 	if err != nil {
 		httpx.Internal(w, r)
@@ -423,6 +470,61 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// ── Restore (silinen hakedişi geri al) ───────────────────────────────────
+
+func (h *Handler) Restore(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	id, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+	uid, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	tx, err := h.pool.Begin(r.Context())
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var aciklama string
+	var tutar float64
+	var gelen *string
+	err = tx.QueryRow(r.Context(), `
+		UPDATE idari_hakedisler SET deleted_at=NULL, updated_at=now(), row_version=row_version+1
+		WHERE id=$1 AND project_id=$2 AND deleted_at IS NOT NULL
+		RETURNING aciklama, tutar::float8, to_char(gelen_odeme_tarihi,'YYYY-MM-DD')`, id, pid).Scan(&aciklama, &tutar, &gelen)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Geri alınacak silinmiş kayıt bulunamadı.", nil)
+			return
+		}
+		if isUniqueViolation(err) {
+			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
+				"Bu dönem numarası silindikten sonra yeniden kullanılmış; geri alınamıyor.", nil)
+			return
+		}
+		httpx.Internal(w, r)
+		return
+	}
+	if g := strDeref(gelen); g != "" {
+		if err := writeCashEvent(r.Context(), tx, pid, id, aciklama, tutar, g, uid); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "restored"})
 }
 
 // ── Yardımcılar ──────────────────────────────────────────────────────────

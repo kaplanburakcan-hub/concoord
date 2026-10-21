@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, apiFetchBlob, apiUpload, RequestError, describeLoadError } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
+import { useUndoable, useUndoShortcuts } from "../../hooks/useUndoable";
 
 // Nakit Akış Faz D — İdari Hakedişler: idare (işveren) tarafından ana
 // yükleniciye ödenen hakedişler, nakit akışının tek "in" (giriş) kaynağı.
@@ -15,7 +16,19 @@ import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 // backend'de de hesaplanır (bkz. internal/idarihakedis/handler.go calc) —
 // burada sadece önizleme için aynı formül tekrarlanır.
 
-type KesintiKalem = { ad: string; tutar: number };
+type KesintiKalem = {
+  kod?: string;            // standart kalem kodu; serbest satırda boş
+  ad: string;
+  tutar: number;
+  oran_pct?: number | null; // oranlı kalem: tutar = baz × oran / 100 (sunucu da hesaplar)
+  kilitli?: boolean;       // temel kalem: silinemez (sunucu belirler)
+  oran_txt?: string;       // yalnızca form: oran kutusundaki ham metin
+};
+
+// Sunucudan gelen standart kalem tanımı (kod, ad, kilitli mi, oran bazı E/F).
+type StdKalem = { kod: string; ad: string; kilitli: boolean; baz: string };
+// Sözleşmedeki (Ana Sözleşme) hakedişe esas oranlar.
+type OranBilgi = { sozlesme_var: boolean; kdv_pct: number; oranlar: Record<string, number> };
 
 type IdariHakedis = {
   id: string;
@@ -37,18 +50,6 @@ type IdariHakedis = {
 
 type DocItem = { id: string; title: string; latest_version?: number };
 type DocLink = { key: string; ad: string; url: string; docId: string };
-
-const KESINTI_VARSAYILAN: KesintiKalem[] = [
-  { ad: "Gelir / Kurumlar Vergisi (E x %3)", tutar: 0 },
-  { ad: "Damga Vergisi (E x % …)", tutar: 0 },
-  { ad: "KDV Tevkifatı (F x ….)", tutar: 0 },
-  { ad: "Geçici Kabul Kesintisi", tutar: 0 },
-  { ad: "Fiyat Farkı Kesin Teminat Kesintisi", tutar: 0 },
-  { ad: "Sosyal Sigortalar Kurumu Kesintisi", tutar: 0 },
-  { ad: "İdare Makinesi Kiraları", tutar: 0 },
-  { ad: "Gecikme Cezası", tutar: 0 },
-  { ad: "Avans Mahsubu", tutar: 0 },
-];
 
 const inpBase =
   "rounded-md bg-beton-950 border border-beton-800 px-3 py-2 text-sm text-beton-100 " +
@@ -122,20 +123,41 @@ type FormState = {
   row_version: number;
 };
 
-function bosForm(donemNo?: number, oncekiToplam?: number): FormState {
+const num = (s: string) => Number(String(s).replace(",", ".")) || 0;
+const round2 = (v: number) => Math.round(v * 100) / 100;
+const oranMetni = (v: number | null | undefined) => (v == null ? "" : String(v).replace(".", ","));
+
+// Yeni hakediş: standart kalemlerin hepsi gelir; oranlı olanlar sözleşmedeki oranla açılır.
+function varsayilanKesintiler(std: StdKalem[], oran: OranBilgi): KesintiKalem[] {
+  return std.map((s) => ({
+    kod: s.kod, ad: s.ad, tutar: 0, kilitli: s.kilitli,
+    oran_pct: s.baz !== "" && s.kod in oran.oranlar ? oran.oranlar[s.kod] : null,
+  }));
+}
+
+function bosForm(donemNo: number | undefined, oncekiToplam: number | undefined, std: StdKalem[], oran: OranBilgi): FormState {
   return {
     donem_no: donemNo ? String(donemNo) : "",
     aciklama: "", hakedis_tarihi: "",
     a: "", b: "", d: oncekiToplam ? fmt(oncekiToplam) : "",
-    kdv_pct: "20",
-    kesintiler: KESINTI_VARSAYILAN.map((k) => ({ ...k })),
+    kdv_pct: oranMetni(oran.kdv_pct),
+    kesintiler: varsayilanKesintiler(std, oran),
     fatura_no: "", gelen_odeme_tarihi: "", row_version: 0,
   };
 }
 
+// Oranlı kalemlerin tutarı baz × oran / 100 (E = bu hakediş tutarı, F = KDV).
+function efektifKesintiler(ks: KesintiKalem[], std: StdKalem[], e: number, fKdv: number): KesintiKalem[] {
+  return ks.map((k) => {
+    const s = std.find((x) => x.kod === k.kod);
+    if (!s || s.baz === "" || k.oran_pct == null) return k;
+    return { ...k, tutar: round2((s.baz === "F" ? fKdv : e) * k.oran_pct / 100) };
+  });
+}
+
 // ── Rapor formu (yeni + düzenle ortak) ──────────────────────────────────────
 function HakedisForm({
-  initial, projectName, projectId, onSave, onCancel, canEdit,
+  initial, projectName, projectId, onSave, onCancel, canEdit, std, oranDegistirebilir, sozlesmeVar,
 }: {
   initial: FormState;
   projectName: string;
@@ -143,36 +165,51 @@ function HakedisForm({
   onSave: (f: FormState) => Promise<void>;
   onCancel: () => void;
   canEdit: boolean;
+  std: StdKalem[];
+  oranDegistirebilir: boolean;
+  sozlesmeVar: boolean;
 }) {
   const kesinKabul = useKesinKabulTarihi(projectId);
-  const [f, setF] = useState<FormState>(initial);
+  const { state: f, set: setState, undo, redo, canUndo, canRedo } = useUndoable<FormState>(initial);
+  useUndoShortcuts(undo, redo, canEdit);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
-    setF((p) => ({ ...p, [k]: v }));
+    setState((p) => ({ ...p, [k]: v }), `f:${k}`);
   }
-  function setKesinti(i: number, patch: Partial<KesintiKalem>) {
-    setF((p) => ({ ...p, kesintiler: p.kesintiler.map((k, idx) => (idx === i ? { ...k, ...patch } : k)) }));
+  function setKesinti(i: number, patch: Partial<KesintiKalem>, key?: string) {
+    setState((p) => ({ ...p, kesintiler: p.kesintiler.map((k, idx) => (idx === i ? { ...k, ...patch } : k)) }), key);
   }
   function addKesinti() {
-    setF((p) => ({ ...p, kesintiler: [...p.kesintiler, { ad: "", tutar: 0 }] }));
+    setState((p) => ({ ...p, kesintiler: [...p.kesintiler, { ad: "", tutar: 0 }] }));
   }
   function removeKesinti(i: number) {
-    setF((p) => ({ ...p, kesintiler: p.kesintiler.filter((_, idx) => idx !== i) }));
+    setState((p) => {
+      if (p.kesintiler[i]?.kilitli) return p; // temel kalem silinemez
+      return { ...p, kesintiler: p.kesintiler.filter((_, idx) => idx !== i) };
+    });
   }
+  // Silinen (silinebilir) standart kalemi geri ekle.
+  function addStd(s: StdKalem) {
+    setState((p) => ({ ...p, kesintiler: [...p.kesintiler, { kod: s.kod, ad: s.ad, tutar: 0, kilitli: s.kilitli, oran_pct: null }] }));
+  }
+  const eksikStd = std.filter((s) => !s.kilitli && !f.kesintiler.some((k) => k.kod === s.kod));
 
-  const a = parseFmt(f.a), b = parseFmt(f.b), d = parseFmt(f.d), kdvPct = Number(f.kdv_pct) || 0;
-  const { c, e, fVal, g, h, odenecek } = useMemo(() => {
-    const r = calcAll(a, b, d, kdvPct, f.kesintiler);
-    return { c: r.c, e: r.e, fVal: r.f, g: r.g, h: r.h, odenecek: r.odenecek };
-  }, [a, b, d, kdvPct, f.kesintiler]);
+  const a = parseFmt(f.a), b = parseFmt(f.b), d = parseFmt(f.d), kdvPct = num(f.kdv_pct);
+  const { c, e, fVal, g, h, odenecek, kesintiler } = useMemo(() => {
+    const c0 = a + b, e0 = c0 - d, f0 = (e0 * kdvPct) / 100;
+    const eff = efektifKesintiler(f.kesintiler, std, e0, f0);
+    const r = calcAll(a, b, d, kdvPct, eff);
+    return { c: r.c, e: r.e, fVal: r.f, g: r.g, h: r.h, odenecek: r.odenecek, kesintiler: eff };
+  }, [a, b, d, kdvPct, f.kesintiler, std]);
 
   async function submit() {
     setSaving(true);
     setErr(null);
     try {
-      await onSave(f);
+      // Hesaplanmış (oranlı) tutarlarla kaydet; sunucu zaten yeniden hesaplar.
+      await onSave({ ...f, kesintiler });
     } catch (e) {
       setErr(e instanceof RequestError ? e.message : "Kaydedilemedi.");
     } finally {
@@ -180,8 +217,29 @@ function HakedisForm({
     }
   }
 
+  const oranKilitIpucu = oranDegistirebilir
+    ? "Sözleşmedeki oran; değiştirme yetkiniz var."
+    : "Oran sözleşmeden gelir; değiştirmek için yetki gerekir.";
+
   return (
     <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden mb-4">
+      {canEdit && (
+        <div className="px-4 pt-3 flex items-center justify-end gap-2">
+          {!sozlesmeVar && (
+            <span className="mr-auto text-[11px] text-amber-400">
+              Ana Sözleşme'de hakedişe esas oranlar girilmemiş — oranlı kalemlerin tutarı elle girilir.
+            </span>
+          )}
+          <button onClick={undo} disabled={!canUndo} title="Geri al (Ctrl+Z)"
+            className="rounded border border-beton-700 px-2.5 py-1 text-xs text-beton-300 hover:border-emniyet-500 disabled:opacity-40 disabled:cursor-not-allowed">
+            ↶ Geri al
+          </button>
+          <button onClick={redo} disabled={!canRedo} title="Yinele (Ctrl+Y)"
+            className="rounded border border-beton-700 px-2.5 py-1 text-xs text-beton-300 hover:border-emniyet-500 disabled:opacity-40 disabled:cursor-not-allowed">
+            ↷ Yinele
+          </button>
+        </div>
+      )}
       <div className="p-4 border-b border-beton-800 grid sm:grid-cols-[1fr_120px] gap-3">
         <div>
           <label className="block text-xs text-beton-500 mb-1">İşin Adı</label>
@@ -218,9 +276,11 @@ function HakedisForm({
         </Satir>
         <SatirHesap harf="E" etiket="Bu Hakedişin Tutarı (C−D)" deger={e} />
         <Satir harf="F" etiket={<>KDV (E x %
-          <input disabled={!canEdit} value={f.kdv_pct} inputMode="decimal"
+          <input disabled={!canEdit || !oranDegistirebilir} value={f.kdv_pct} inputMode="decimal"
+            title={oranKilitIpucu}
             onChange={(ev) => set("kdv_pct", ev.target.value)}
-            className="inline-block w-14 mx-1 text-center rounded border border-beton-800 bg-beton-950 px-1 py-0.5 text-beton-100" />)</>}>
+            className="inline-block w-14 mx-1 text-center rounded border border-beton-800 bg-beton-950 px-1 py-0.5 text-beton-100 disabled:opacity-60" />)
+          {!oranDegistirebilir && <span title={oranKilitIpucu} className="ml-1 text-[11px] text-beton-500">🔒 sözleşmeden</span>}</>}>
           <span className="w-44 text-right font-mono text-beton-100 font-semibold">{fmt(fVal)}</span>
         </Satir>
         <SatirHesap harf="G" etiket="Tahakkuk Tutarı (E+F)" deger={g} vurgu />
@@ -233,27 +293,66 @@ function HakedisForm({
             Kesintiler ve Mahsuplar
           </div>
           <div className="flex-1 space-y-1.5">
-            {f.kesintiler.map((k, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span className="text-xs text-beton-500 w-5">{String.fromCharCode(97 + i)})</span>
-                <input disabled={!canEdit} value={k.ad} onChange={(e) => setKesinti(i, { ad: e.target.value })}
-                  className="flex-1 bg-transparent border-none text-sm text-beton-200 focus:bg-beton-950 focus:rounded px-1 py-1 outline-none" />
-                <input disabled={!canEdit} value={k.tutar ? fmt(k.tutar) : ""} placeholder="0,00" inputMode="decimal"
-                  onChange={(e) => setKesinti(i, { tutar: parseFmt(e.target.value) })}
-                  onBlur={(e) => setKesinti(i, { tutar: parseFmt(e.target.value) })}
-                  className={`${inpBase} w-36 text-right font-mono py-1`} />
-                {canEdit && (
-                  <button onClick={() => removeKesinti(i)} className="text-beton-600 hover:text-red-400 w-5 text-sm">✕</button>
-                )}
-              </div>
-            ))}
+            {f.kesintiler.map((k, i) => {
+              const s = std.find((x) => x.kod === k.kod);
+              const oranliKalem = !!s && s.baz !== "";
+              const hesapli = oranliKalem && k.oran_pct != null; // tutar oran × bazdan gelir
+              const etiket = hesapli ? `${k.ad} (${s!.baz} × %${oranMetni(k.oran_pct)})` : k.ad;
+              return (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-xs text-beton-500 w-5">{String.fromCharCode(97 + i)})</span>
+                  {k.kod ? (
+                    <span className="flex-1 text-sm text-beton-200 px-1 py-1 flex items-center gap-1.5">
+                      {etiket}
+                      {k.kilitli && <span title="Temel kalem — silinemez" className="text-[11px] text-beton-600">🔒</span>}
+                    </span>
+                  ) : (
+                    <input disabled={!canEdit} value={k.ad} placeholder="Ek kesinti / ceza açıklaması"
+                      onChange={(e) => setKesinti(i, { ad: e.target.value }, `k:${i}:ad`)}
+                      className="flex-1 bg-transparent border-none text-sm text-beton-200 focus:bg-beton-950 focus:rounded px-1 py-1 outline-none" />
+                  )}
+                  {oranliKalem && (oranDegistirebilir || k.oran_pct != null) && (
+                    <label className="flex items-center gap-1 text-[11px] text-beton-500" title={oranKilitIpucu}>
+                      %
+                      <input disabled={!canEdit || !oranDegistirebilir} inputMode="decimal"
+                        value={k.oran_txt ?? oranMetni(k.oran_pct)} placeholder="oran"
+                        onChange={(ev) => {
+                          const raw = ev.target.value;
+                          setKesinti(i, { oran_txt: raw, oran_pct: raw.trim() === "" ? null : num(raw) }, `k:${i}:oran`);
+                        }}
+                        className="w-16 rounded border border-beton-800 bg-beton-950 px-1 py-1 text-right text-sm text-beton-100 disabled:opacity-60" />
+                    </label>
+                  )}
+                  <input disabled={!canEdit || hesapli}
+                    value={kesintiler[i].tutar ? fmt(kesintiler[i].tutar) : ""} placeholder="0,00" inputMode="decimal"
+                    title={hesapli ? "Oran × baz olarak otomatik hesaplanır" : undefined}
+                    onChange={(e) => setKesinti(i, { tutar: parseFmt(e.target.value) }, `k:${i}:tutar`)}
+                    onBlur={(e) => setKesinti(i, { tutar: parseFmt(e.target.value) }, `k:${i}:tutar`)}
+                    className={`${inpBase} w-36 text-right font-mono py-1`} />
+                  {canEdit && (k.kilitli ? (
+                    <span className="w-5" />
+                  ) : (
+                    <button onClick={() => removeKesinti(i)} title="Satırı sil (geri alınabilir)"
+                      className="text-beton-600 hover:text-red-400 w-5 text-sm">✕</button>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         </div>
         {canEdit && (
-          <button onClick={addKesinti}
-            className="mt-2 text-xs border border-dashed border-beton-700 hover:border-emniyet-500 text-emniyet-500 rounded-md px-3 py-1.5">
-            + Kesinti / Mahsup Satırı Ekle
-          </button>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button onClick={addKesinti}
+              className="text-xs border border-dashed border-beton-700 hover:border-emniyet-500 text-emniyet-500 rounded-md px-3 py-1.5">
+              + Kesinti / Mahsup Satırı Ekle
+            </button>
+            {eksikStd.map((s) => (
+              <button key={s.kod} onClick={() => addStd(s)}
+                className="text-xs border border-dashed border-beton-800 hover:border-beton-500 text-beton-400 rounded-md px-3 py-1.5">
+                + {s.ad}
+              </button>
+            ))}
+          </div>
         )}
         <div className="mt-3">
           <SatirHesap harf="H" etiket="Kesinti ve Mahsuplar Toplamı" deger={h} />
@@ -402,13 +501,28 @@ export default function IdariHakedisPage() {
   const [aktifId, setAktifId] = useState<string | "yeni" | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<IdariHakedis | null>(null);
+  // Sözleşmedeki oranlar, standart kalemler ve oran değiştirme yetkisi (sunucudan gelir).
+  const [std, setStd] = useState<StdKalem[]>([]);
+  const [oran, setOran] = useState<OranBilgi>({ sozlesme_var: false, kdv_pct: 20, oranlar: {} });
+  const [oranDegistirebilir, setOranDegistirebilir] = useState(false);
+  // Silinen hakediş için "Geri al" bildirimi.
+  const [silinen, setSilinen] = useState<IdariHakedis | null>(null);
+  const silinenTimer = useRef<number | undefined>(undefined);
 
   const load = useCallback(async () => {
     if (!pid) return;
     setErr(null);
     try {
-      const r = await api<{ idari_hakedisler: IdariHakedis[] }>(`/projects/${pid}/idari-hakedisler`, { projectId: pid });
+      const r = await api<{
+        idari_hakedisler: IdariHakedis[];
+        standart_kalemler?: StdKalem[];
+        oran_varsayilan?: OranBilgi;
+        oran_degistirebilir?: boolean;
+      }>(`/projects/${pid}/idari-hakedisler`, { projectId: pid });
       setListe(r.idari_hakedisler ?? []);
+      setStd(r.standart_kalemler ?? []);
+      if (r.oran_varsayilan) setOran(r.oran_varsayilan);
+      setOranDegistirebilir(!!r.oran_degistirebilir);
     } catch (e) {
       setErr(describeLoadError(e, "İdari hakedişler"));
     }
@@ -424,7 +538,10 @@ export default function IdariHakedisPage() {
 
   async function kaydet(f: FormState) {
     if (!pid) return;
-    const kesintiler = f.kesintiler.filter((k) => k.ad.trim() !== "" || k.tutar !== 0);
+    // Standart (kodlu) kalemler her zaman gider (sıfır tutarlı olsa da); boş serbest satırlar atılır.
+    const kesintiler = f.kesintiler
+      .filter((k) => k.kod || k.ad.trim() !== "" || k.tutar !== 0)
+      .map((k) => ({ kod: k.kod || undefined, ad: k.ad, tutar: k.tutar, oran_pct: k.oran_pct ?? undefined }));
     const body = {
       donem_no: Number(f.donem_no),
       aciklama: f.aciklama.trim(),
@@ -432,7 +549,7 @@ export default function IdariHakedisPage() {
       sozlesme_fiyatlari_tutari: parseFmt(f.a),
       fiyat_farki_tutari: parseFmt(f.b),
       onceki_hakedis_toplami: parseFmt(f.d),
-      kdv_pct: Number(f.kdv_pct) || 20,
+      kdv_pct: num(f.kdv_pct),
       kesintiler,
       fatura_no: f.fatura_no.trim() || undefined,
       gelen_odeme_tarihi: f.gelen_odeme_tarihi || undefined,
@@ -453,9 +570,25 @@ export default function IdariHakedisPage() {
       await api(`/projects/${pid}/idari-hakedisler/${h.id}`, { method: "DELETE", projectId: pid });
       if (aktifId === h.id) setAktifId(null);
       setConfirmDelete(null);
+      setSilinen(h);
+      window.clearTimeout(silinenTimer.current);
+      silinenTimer.current = window.setTimeout(() => setSilinen(null), 15000);
       await load();
     } catch {
       setErr("Silinemedi.");
+    }
+  }
+
+  // Silinen hakedişi geri yükler (nakit akışı satırı da yeniden yazılır).
+  async function geriAl(h: IdariHakedis) {
+    if (!pid) return;
+    try {
+      await api(`/projects/${pid}/idari-hakedisler/${h.id}/restore`, { method: "POST", projectId: pid });
+      window.clearTimeout(silinenTimer.current);
+      setSilinen(null);
+      await load();
+    } catch (e) {
+      setErr(e instanceof RequestError ? e.message : "Geri alınamadı.");
     }
   }
 
@@ -468,7 +601,8 @@ export default function IdariHakedisPage() {
     aktifId === "yeni"
       ? bosForm(
           (liste[0]?.donem_no ?? 0) + 1,
-          liste[0] ? liste[0].sozlesme_fiyatlari_tutari + liste[0].fiyat_farki_tutari : undefined
+          liste[0] ? liste[0].sozlesme_fiyatlari_tutari + liste[0].fiyat_farki_tutari : undefined,
+          std, oran
         )
       : secili
       ? {
@@ -479,8 +613,8 @@ export default function IdariHakedisPage() {
           a: fmt(secili.sozlesme_fiyatlari_tutari),
           b: fmt(secili.fiyat_farki_tutari),
           d: fmt(secili.onceki_hakedis_toplami),
-          kdv_pct: String(secili.kdv_pct),
-          kesintiler: secili.kesintiler.length > 0 ? secili.kesintiler : KESINTI_VARSAYILAN.map((k) => ({ ...k })),
+          kdv_pct: oranMetni(secili.kdv_pct),
+          kesintiler: secili.kesintiler.length > 0 ? secili.kesintiler : varsayilanKesintiler(std, oran),
           fatura_no: secili.fatura_no ?? "",
           gelen_odeme_tarihi: secili.gelen_odeme_tarihi ?? "",
           row_version: secili.row_version,
@@ -504,6 +638,16 @@ export default function IdariHakedisPage() {
         )}
       </div>
       {err && <p className="text-sm text-red-400">{err}</p>}
+      {silinen && (
+        <div role="status" className="rounded-lg border border-beton-700 bg-beton-900 px-4 py-2.5 flex items-center justify-between gap-3">
+          <span className="text-sm text-beton-200">Hakediş No {silinen.donem_no} silindi.</span>
+          <span className="flex items-center gap-3">
+            <button onClick={() => geriAl(silinen)} className="text-sm font-medium text-emniyet-500 hover:underline">↶ Geri al</button>
+            <button onClick={() => { window.clearTimeout(silinenTimer.current); setSilinen(null); }}
+              className="text-xs text-beton-500 hover:text-beton-300">Kapat</button>
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
@@ -525,6 +669,9 @@ export default function IdariHakedisPage() {
             projectName={current.name}
             projectId={pid!}
             canEdit
+            std={std}
+            oranDegistirebilir={oranDegistirebilir}
+            sozlesmeVar={oran.sozlesme_var}
             onSave={kaydet}
             onCancel={() => setAktifId(null)}
           />
@@ -579,7 +726,7 @@ export default function IdariHakedisPage() {
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-sm space-y-4">
-            <p className="text-sm text-beton-200">Hakediş No {confirmDelete.donem_no} silinsin mi? Bu işlem geri alınamaz.</p>
+            <p className="text-sm text-beton-200">Hakediş No {confirmDelete.donem_no} silinsin mi? Silince "Geri al" ile geri yükleyebilirsiniz.</p>
             <div className="flex justify-end gap-2">
               <button onClick={() => setConfirmDelete(null)}
                 className="rounded-md border border-beton-700 px-4 py-2 text-sm text-beton-300 hover:border-beton-500">

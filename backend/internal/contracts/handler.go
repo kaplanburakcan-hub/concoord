@@ -52,7 +52,21 @@ type Contract struct {
 	UpdatedAt               *string           `json:"updated_at,omitempty"`
 	IsLocked                bool              `json:"is_locked"`
 	UpdatedByName           string            `json:"updated_by_name,omitempty"`
+
+	// Hakedişe esas vergi ve kesinti oranları — sözleşme girişinde belirlenir,
+	// idari hakedişler bunları varsayılan alır (hakedişte değiştirmek
+	// progress_payments.edit_rates izni ister).
+	IsTuru         string  `json:"is_turu"`          // yapim | hizmet | kiralama | diger
+	KdvPct         float64 `json:"kdv_pct"`          // KDV oranı (%)
+	KdvTevkifatPct float64 `json:"kdv_tevkifat_pct"` // KDV'nin tevkif edilen kısmı (%): 40 = 4/10
+	StopajPct      float64 `json:"stopaj_pct"`       // gelir/kurumlar vergisi stopajı (%)
+	DamgaPct       float64 `json:"damga_pct"`        // damga vergisi (%)
+	TeminatPct     float64 `json:"teminat_pct"`      // geçici kabul/teminat kesintisi (%)
 }
+
+var validIsTuru = map[string]bool{"yapim": true, "hizmet": true, "kiralama": true, "diger": true}
+
+func pctOK(v float64) bool { return v >= 0 && v <= 100 }
 
 // Get — proje ana sözleşmesini döner. Henüz kaydedilmemişse 404.
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +89,9 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		       c.max_artis_orani, c.max_eksilis_orani,
 		       COALESCE(c.sgk_is_yeri_no,''),
 		       TO_CHAR(c.updated_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
-		       c.is_locked, COALESCE(u.full_name,'')
+		       c.is_locked, COALESCE(u.full_name,''),
+		       c.is_turu, c.kdv_pct::float8, c.kdv_tevkifat_pct::float8,
+		       c.stopaj_pct::float8, c.damga_pct::float8, c.teminat_pct::float8
 		FROM project_main_contracts c
 		LEFT JOIN users u ON u.id = c.updated_by
 		WHERE c.project_id=$1`, pid).
@@ -89,7 +105,8 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 			&c.MaxArtisOrani, &c.MaxEksilisOrani,
 			&c.SgkIsYeriNo,
 			&c.UpdatedAt,
-			&c.IsLocked, &c.UpdatedByName)
+			&c.IsLocked, &c.UpdatedByName,
+			&c.IsTuru, &c.KdvPct, &c.KdvTevkifatPct, &c.StopajPct, &c.DamgaPct, &c.TeminatPct)
 
 	if err == pgx.ErrNoRows {
 		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Ana sözleşme henüz girilmemiş.", nil)
@@ -143,6 +160,18 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 	if body.YukleniciProjeSorumlusu == "" {
 		valid["yuklenici_proje_sorumlusu"] = "Yüklenici Proje Sorumlusu zorunludur."
 	}
+	if body.IsTuru == "" {
+		body.IsTuru = "yapim"
+	}
+	if !validIsTuru[body.IsTuru] {
+		valid["is_turu"] = "Geçerli değer: yapim, hizmet, kiralama, diger"
+	}
+	for k, v := range map[string]float64{"kdv_pct": body.KdvPct, "kdv_tevkifat_pct": body.KdvTevkifatPct,
+		"stopaj_pct": body.StopajPct, "damga_pct": body.DamgaPct, "teminat_pct": body.TeminatPct} {
+		if !pctOK(v) {
+			valid[k] = "0–100 aralığında olmalı"
+		}
+	}
 	if len(valid) > 0 {
 		httpx.ValidationFailed(w, r, valid)
 		return
@@ -164,11 +193,13 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		    is_suresi_gun, gecici_kabul_sonrasi_gun,
 		    max_artis_orani, max_eksilis_orani,
 		    sgk_is_yeri_no,
+		    is_turu, kdv_pct, kdv_tevkifat_pct, stopaj_pct, damga_pct, teminat_pct,
 		    created_by, updated_by, is_locked, updated_at
 		) VALUES (
 		    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
 		    $11::date,$12::date,
 		    $13,$14,$15,$16,$17,
+		    $19,$20,$21,$22,$23,$24,
 		    $18,$18,TRUE,NOW()
 		)
 		ON CONFLICT (project_id) DO UPDATE SET
@@ -188,7 +219,13 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		    max_artis_orani          = EXCLUDED.max_artis_orani,
 		    max_eksilis_orani        = EXCLUDED.max_eksilis_orani,
 		    sgk_is_yeri_no           = EXCLUDED.sgk_is_yeri_no,
-		    updated_by               = EXCLUDED.updated_by,
+		    is_turu                  = EXCLUDED.is_turu,
+		    kdv_pct                  = EXCLUDED.kdv_pct,
+		    kdv_tevkifat_pct         = EXCLUDED.kdv_tevkifat_pct,
+		    stopaj_pct               = EXCLUDED.stopaj_pct,
+		    damga_pct                = EXCLUDED.damga_pct,
+		    teminat_pct              = EXCLUDED.teminat_pct,
+		    updated_by              = EXCLUDED.updated_by,
 		    is_locked                = TRUE,
 		    updated_at               = NOW()
 		RETURNING id`,
@@ -200,6 +237,7 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		body.MaxArtisOrani, body.MaxEksilisOrani,
 		nilStr(body.SgkIsYeriNo),
 		uid,
+		body.IsTuru, body.KdvPct, body.KdvTevkifatPct, body.StopajPct, body.DamgaPct, body.TeminatPct,
 	).Scan(&id)
 
 	if err != nil {

@@ -28,9 +28,19 @@ type Contract = {
   revised_end_date?: string | null;
   is_multi_year: boolean;
   withholding_pct: number;
+  // Hakedişe esas vergi oranları (sözleşmeyle kilitlenir; hakedişler varsayılan alır)
+  is_turu?: string;
+  vat_pct?: number;
+  vat_withholding_ratio?: number;
   default_payment_method?: string | null;
   row_version: number;
 };
+
+const IS_TURLERI: [string, string][] = [["yapim", "Yapım"], ["hizmet", "Hizmet"], ["kiralama", "Kiralama"], ["diger", "Diğer"]];
+const TEVKIFAT_SECENEKLERI: [string, string][] = [
+  ["0", "Tevkifat yok"], ["0.2", "2/10"], ["0.3", "3/10"], ["0.4", "4/10"],
+  ["0.5", "5/10"], ["0.7", "7/10"], ["0.9", "9/10"], ["1", "Tam tevkifat"],
+];
 
 const PAYMENT_METHOD_LABEL: Record<string, string> = { nakit: "Nakit", havale: "Havale", cek: "Çek" };
 
@@ -47,6 +57,9 @@ const empty = {
   revised_end_date: "",
   is_multi_year: false,
   withholding_pct: "5",
+  is_turu: "yapim",
+  vat_pct: "20",
+  vat_withholding_ratio: "0",
   default_payment_method: "",
 };
 
@@ -100,6 +113,9 @@ export default function ContractPanel({
       revised_end_date: c.revised_end_date?.slice(0, 10) ?? "",
       is_multi_year: c.is_multi_year,
       withholding_pct: String(c.withholding_pct ?? "5"),
+      is_turu: c.is_turu ?? "yapim",
+      vat_pct: String(c.vat_pct ?? 20),
+      vat_withholding_ratio: String(c.vat_withholding_ratio ?? 0),
       default_payment_method: c.default_payment_method ?? "",
     });
   }
@@ -121,6 +137,9 @@ export default function ContractPanel({
       revised_end_date: f.revised_end_date || null,
       is_multi_year: f.is_multi_year,
       withholding_pct: Number(f.withholding_pct) || 0,
+      is_turu: f.is_turu,
+      vat_pct: Number(String(f.vat_pct).replace(",", ".")) || 0,
+      vat_withholding_ratio: Number(f.vat_withholding_ratio) || 0,
       default_payment_method: f.default_payment_method || "",
     };
     try {
@@ -170,6 +189,7 @@ export default function ContractPanel({
               <th className="py-1 pr-2 text-right">Teminat %</th>
               <th className="py-1 pr-2">Süre</th>
               <th className="py-1 pr-2">Stopaj</th>
+              <th className="py-1 pr-2">KDV</th>
               <th className="py-1 pr-2">Ödeme</th>
               <th />
             </tr>
@@ -201,6 +221,14 @@ export default function ContractPanel({
                       <span className="text-emniyet-500">Yıllara sari · %{c.withholding_pct}</span>
                     ) : (
                       <span className="text-beton-500">Yok</span>
+                    )}
+                  </td>
+                  <td className="py-1.5 pr-2 text-xs text-beton-400">
+                    %{c.vat_pct ?? 20}
+                    {(c.vat_withholding_ratio ?? 0) > 0 && (
+                      <span className="ml-1 text-beton-500" title="KDV tevkifat oranı">
+                        · {TEVKIFAT_SECENEKLERI.find(([v]) => Number(v) === c.vat_withholding_ratio)?.[1] ?? `${c.vat_withholding_ratio}`}
+                      </span>
                     )}
                   </td>
                   <td className="py-1.5 pr-2 text-xs text-beton-400">
@@ -344,6 +372,43 @@ export default function ContractPanel({
                 <option value="nakit">Nakit</option>
                 <option value="havale">Havale</option>
                 <option value="cek">Çek</option>
+              </select>
+            </div>
+
+            <div className="sm:col-span-3 mt-2 border-t border-beton-800 pt-2">
+              <p className="text-[11px] text-beton-400">
+                Hakedişe esas vergi oranları — sözleşmeyle kilitlenir; hakedişler bunları varsayılan alır.
+                (Teminat ve stopaj oranları yukarıdadır.) Hakedişte farklı oran girmek için "Hakediş
+                oranlarını değiştir" yetkisi gerekir.
+              </p>
+            </div>
+            <div>
+              <label className={labelCls}>İş türü</label>
+              <select
+                className={inputCls}
+                value={f.is_turu}
+                onChange={(e) => setF({ ...f, is_turu: e.target.value })}
+              >
+                {IS_TURLERI.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>KDV oranı %</label>
+              <input
+                className={inputCls}
+                inputMode="decimal"
+                value={f.vat_pct}
+                onChange={(e) => setF({ ...f, vat_pct: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>KDV tevkifat oranı</label>
+              <select
+                className={inputCls}
+                value={f.vat_withholding_ratio}
+                onChange={(e) => setF({ ...f, vat_withholding_ratio: e.target.value })}
+              >
+                {TEVKIFAT_SECENEKLERI.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <label className="flex items-start gap-2 sm:col-span-1 mt-5">

@@ -54,6 +54,8 @@ var registry = []Step{
 	// Ana Sözleşme düzenleme yetkisi projects.edit'ten ayrıldı: contracts.edit_main
 	// eklendi (varsayılan olarak yalnızca Admin alır, ProjectManager artık düzenleyemez).
 	{Name: "0013_ana_sozlesme_izin_sync", Run: stepFaz2PermSync},
+	// Hakedişe esas oranlar: progress_payments.edit_rates eklendi (ProjectManager + Admin).
+	{Name: "0014_hakedis_oran_izin_sync", Run: stepFaz2PermSync},
 }
 
 // stepFaz2PermSync — izin sözlüğünü ve rol varsayılanlarını yeniden senkronlar.
