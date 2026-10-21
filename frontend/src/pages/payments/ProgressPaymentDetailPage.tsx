@@ -61,6 +61,13 @@ type Extra = {
 };
 // Avans/teminat kalemleri sistem tarafından hesaplanır; elle girilenler sunucuda
 // sessizce atılıyordu, bu yüzden listede seçilemez.
+type PdfLayout = "resmi" | "panel" | "akis";
+const PDF_LAYOUTS: { id: PdfLayout; label: string; hint: string }[] = [
+  { id: "resmi", label: "Resmi rapor", hint: "Klasik düzen, imza kutulu" },
+  { id: "panel", label: "Özet panel", hint: "Ana rakamlar, ilerleme çubuğu, ödeme yolu" },
+  { id: "akis", label: "İzlenebilir akış", hint: "Onay zinciri, dönem geçmişi, ödeme planı" },
+];
+
 const AUTO_TYPES = new Set(["AdvanceOffset", "Retention"]);
 type PenaltySuggestion = {
   penalty_id: string; penalty_no: string; violation_type: string;
@@ -330,11 +337,24 @@ export default function ProgressPaymentDetailPage() {
     } catch { setErr(`${label} başarısız (durum geçişi veya yetki uygun değil).`); }
   }
 
+  // Özet PDF düzeni: resmi rapor / özet panel / izlenebilir akış (seçim hatırlanır).
+  const [pdfLayout, setPdfLayoutState] = useState<PdfLayout>(() => {
+    try {
+      const v = localStorage.getItem("hakedis.pdfLayout");
+      return v === "panel" || v === "akis" ? v : "resmi";
+    } catch { return "resmi"; }
+  });
+  function setPdfLayout(v: PdfLayout) {
+    setPdfLayoutState(v);
+    try { localStorage.setItem("hakedis.pdfLayout", v); } catch { /* tercih saklanamadı */ }
+  }
+  const pdfPath = `/projects/${pid}/payments/${id}/summary.pdf?layout=${pdfLayout}`;
+
   async function viewPdf() {
     // Sekmeyi tıklamayla eşzamanlı aç (açılır pencere engelleyicisine takılmasın), PDF gelince yönlendir.
     const w = window.open("", "_blank");
     try {
-      const url = await apiFetchBlob(`/projects/${pid}/payments/${id}/summary.pdf`);
+      const url = await apiFetchBlob(pdfPath);
       if (w) w.location.href = url;
       else window.location.href = url;
     } catch {
@@ -345,7 +365,7 @@ export default function ProgressPaymentDetailPage() {
 
   async function downloadPdf() {
     try {
-      await apiDownload(`/projects/${pid}/payments/${id}/summary.pdf`, `hakedis-${id}.pdf`);
+      await apiDownload(pdfPath, `hakedis-${id}.pdf`);
     } catch { setErr("PDF indirilemedi (finansal görüntüleme yetkisi gerekli)."); }
   }
 
@@ -945,6 +965,18 @@ export default function ProgressPaymentDetailPage() {
         )}
         {canFin && (
           <>
+            <div role="group" aria-label="Özet PDF düzeni"
+              className="flex rounded border border-beton-700 overflow-hidden text-sm">
+              {PDF_LAYOUTS.map((l) => (
+                <button key={l.id} onClick={() => setPdfLayout(l.id)} aria-pressed={pdfLayout === l.id}
+                  title={l.hint}
+                  className={`px-3 py-2 ${pdfLayout === l.id
+                    ? "bg-emniyet-500 text-beton-950 font-semibold"
+                    : "text-beton-200 hover:bg-beton-800"}`}>
+                  {l.label}
+                </button>
+              ))}
+            </div>
             <button onClick={viewPdf}
               className="rounded border border-beton-700 text-beton-200 hover:bg-beton-800 text-sm px-4 py-2">
               Özet PDF — Görüntüle

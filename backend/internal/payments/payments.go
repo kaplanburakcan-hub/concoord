@@ -1186,11 +1186,111 @@ func (h *Handler) SummaryPDF(w http.ResponseWriter, r *http.Request) {
 		dedRows.Close()
 	}
 
+	// Düzen seçimi: resmi (varsayılan) | panel | akis. Akış düzeni için onay
+	// zinciri, önceki dönemler ve ödeme planı da yüklenir.
+	switch lay := r.URL.Query().Get("layout"); lay {
+	case "panel", "akis":
+		data.Layout = lay
+	}
+	if data.Layout == "akis" {
+		h.loadFlowPDFData(r.Context(), ppID, &data)
+	}
+
 	pdf := BuildSummaryPDF(data)
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", "inline; filename=\"hakedis-"+ppID.String()+".pdf\"")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(pdf)
+}
+
+// loadFlowPDFData — "izlenebilir akış" düzeni için onay zinciri (kim/ne zaman),
+// aynı taşeronun önceki dönemleri ve ödeme planı. Hatalar sessizce atlanır:
+// eksik bölüm PDF'te boş durumla çıkar, belge yine üretilir.
+func (h *Handler) loadFlowPDFData(ctx context.Context, ppID uuid.UUID, data *PDFData) {
+	var projID, subID uuid.UUID
+	var curStep int
+	if err := h.pool.QueryRow(ctx,
+		`SELECT project_id, subcontractor_id, current_step_no FROM progress_payments WHERE id=$1`, ppID,
+	).Scan(&projID, &subID, &curStep); err != nil {
+		return
+	}
+
+	// Onay zinciri: her adımın son kararı (onay / ret).
+	if chain, err := loadChain(ctx, h.pool, projID); err == nil {
+		type rec struct {
+			decision, actor string
+			at              time.Time
+		}
+		last := map[int]rec{}
+		if rows, err := h.pool.Query(ctx, `
+			SELECT a.step_no, a.decision, u.full_name, a.created_at
+			FROM payment_approvals a JOIN users u ON u.id = a.actor_id
+			WHERE a.progress_payment_id=$1 ORDER BY a.created_at`, ppID); err == nil {
+			for rows.Next() {
+				var no int
+				var rc rec
+				if rows.Scan(&no, &rc.decision, &rc.actor, &rc.at) == nil {
+					last[no] = rc
+				}
+			}
+			rows.Close()
+		}
+		inFlow := data.Status == "Submitted" || data.Status == "InApproval"
+		for _, st := range chain {
+			v := ChainStepView{Label: st.Label}
+			if rc, ok := last[st.StepNo]; ok {
+				v.Actor, v.Date = rc.actor, rc.at.Format("02.01.2006")
+				if rc.decision == "Approved" {
+					v.State = "done"
+				} else {
+					v.State = "rej"
+				}
+			} else if inFlow && st.StepNo == curStep+1 {
+				v.State = "now"
+			}
+			data.Chain = append(data.Chain, v)
+		}
+	}
+
+	// Önceki dönemler (aynı taşeron).
+	if rows, err := h.pool.Query(ctx, `
+		SELECT period_no, COALESCE(gross_this,0)::float8, COALESCE(net_payable,0)::float8, status, updated_at
+		FROM progress_payments
+		WHERE project_id=$1 AND subcontractor_id=$2 AND period_no < $3 AND deleted_at IS NULL
+		ORDER BY period_no`, projID, subID, data.PeriodNo); err == nil {
+		for rows.Next() {
+			var ph PeriodHist
+			var at time.Time
+			if rows.Scan(&ph.No, &ph.Gross, &ph.Net, &ph.Status, &at) == nil {
+				if ph.Status == "Finalized" {
+					ph.Date = at.Format("02.01.2006")
+				}
+				data.History = append(data.History, ph)
+			}
+		}
+		rows.Close()
+	}
+
+	// Ödeme planı (kısmi ödemeler).
+	if rows, err := h.pool.Query(ctx, `
+		SELECT payment_method, amount::float8, event_date
+		FROM progress_payment_disbursements
+		WHERE progress_payment_id=$1 AND deleted_at IS NULL ORDER BY event_date, created_at`, ppID); err == nil {
+		methods := map[string]string{"nakit": "Nakit", "havale": "Havale", "cek": "Çek"}
+		for rows.Next() {
+			var method string
+			var amt float64
+			var at time.Time
+			if rows.Scan(&method, &amt, &at) == nil {
+				m := methods[method]
+				if m == "" {
+					m = method
+				}
+				data.Plan = append(data.Plan, PlanRow{Method: m, Amount: amt, Date: at.Format("02.01.2006")})
+			}
+		}
+		rows.Close()
+	}
 }
 
 // pgxQuerier — tx veya pool ile ortak sorgu arayüzü (computeForPayment için).

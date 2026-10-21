@@ -48,6 +48,36 @@ type PDFData struct {
 	VatCollected    float64 // tahsil edilen KDV (ödemeye eklenen)
 	PayableGross    float64 // brüt + tahsil edilen KDV
 	GeneratedAt     time.Time
+
+	// Alternatif düzenler (panel / akış) için ek veri.
+	Layout  string // "" / "resmi" | "panel" | "akis"
+	Chain   []ChainStepView
+	History []PeriodHist
+	Plan    []PlanRow
+}
+
+// ChainStepView — onay zincirinin bir adımı (akış düzeni).
+type ChainStepView struct {
+	Label string
+	Actor string
+	Date  string // 02.01.2006
+	State string // "done" | "now" | "rej" | ""
+}
+
+// PeriodHist — aynı taşeronun önceki dönemlerinden biri.
+type PeriodHist struct {
+	No     int
+	Gross  float64
+	Net    float64
+	Status string
+	Date   string
+}
+
+// PlanRow — ödeme planı (kısmi ödeme) satırı.
+type PlanRow struct {
+	Method string
+	Amount float64
+	Date   string
 }
 
 type rgb struct{ r, g, b float64 }
@@ -77,11 +107,21 @@ const (
 	contStartY = 52.0
 )
 
-// BuildSummaryPDF — çok sayfalı özet PDF baytları döner.
+// BuildSummaryPDF — çok sayfalı özet PDF baytları döner; Layout'a göre düzen seçilir.
 func BuildSummaryPDF(d PDFData) []byte {
 	if d.GeneratedAt.IsZero() {
 		d.GeneratedAt = time.Now()
 	}
+	switch d.Layout {
+	case "panel":
+		return buildPanelPDF(d)
+	case "akis":
+		return buildFlowPDF(d)
+	}
+	return buildOfficialPDF(d)
+}
+
+func buildOfficialPDF(d PDFData) []byte {
 	cur := d.Currency
 	if cur == "" {
 		cur = "TRY"
@@ -211,22 +251,7 @@ func BuildSummaryPDF(d PDFData) []byte {
 		ly += rowH
 	}
 	for _, ded := range d.Deductions {
-		lbl := dedLabel(ded.Type)
-		// Eski kayıtlarda açıklama ASCII ("yıllara sari") olabilir: karşılaştırmayı aksansız yap.
-		fl, fd := foldTR(lbl), foldTR(ded.Description)
-		switch {
-		case fd == "" || fd == fl:
-		case strings.HasPrefix(fd, fl):
-			// Açıklama etiketle başlıyor: etiketi tekrar yazma, yalnızca artanı ekle.
-			if rest := strings.TrimSpace(strings.TrimLeft(string([]rune(ded.Description)[len([]rune(lbl)):]), " ·—-")); rest != "" {
-				lbl += " " + rest
-			}
-		default:
-			lbl += " · " + ded.Description
-		}
-		if ded.RatePct != nil && *ded.RatePct > 0 && !strings.Contains(lbl, "%") {
-			lbl += fmt.Sprintf(" (%%%s)", trimPct(*ded.RatePct))
-		}
+		lbl := deductionLabel(ded)
 		amt := trNum(ded.Amount, 2)
 		p.text(leftX+4, ly+11, p.fit(lbl, false, 8, halfW-12-p.width(amt, false, 8)-8), false, 8, colInk)
 		p.textR(leftX+halfW-4, ly+11, amt, false, 8, colInk)
@@ -389,8 +414,12 @@ type tblCol struct {
 }
 
 func (p *pdfDoc) tableHeader(y float64, cols []tblCol) float64 {
-	p.fillRect(mL, y, contentW, 17, colNavy)
-	x := mL
+	return p.tableHeaderAt(mL, contentW, y, cols)
+}
+
+func (p *pdfDoc) tableHeaderAt(x0, w, y float64, cols []tblCol) float64 {
+	p.fillRect(x0, y, w, 17, colNavy)
+	x := x0
 	for _, c := range cols {
 		if c.right {
 			p.textR(x+c.w-6, y+11.5, c.title, true, 6.3, colWhite)
@@ -403,7 +432,11 @@ func (p *pdfDoc) tableHeader(y float64, cols []tblCol) float64 {
 }
 
 func (p *pdfDoc) tableRow(y float64, cols []tblCol, cells []string, bold bool) {
-	x := mL
+	p.tableRowAt(mL, y, cols, cells, bold)
+}
+
+func (p *pdfDoc) tableRowAt(x0, y float64, cols []tblCol, cells []string, bold bool) {
+	x := x0
 	for i, c := range cols {
 		s := p.fit(cells[i], bold, 8, c.w-12)
 		if c.right {
@@ -425,6 +458,29 @@ func (p *pdfDoc) brand(x, y float64) {
 		p.text(x, y, pt.s, true, 10, pt.c)
 		x += p.width(pt.s, true, 10)
 	}
+}
+
+// brandOn — koyu zemin üzerinde "CONCOORD" (beyaz + amber C).
+func (p *pdfDoc) brandOn(x, y float64) {
+	parts := []struct {
+		s string
+		c rgb
+	}{{"CON", colWhite}, {"C", colAmber}, {"OORD", colWhite}}
+	for _, pt := range parts {
+		p.text(x, y, pt.s, true, 10, pt.c)
+		x += p.width(pt.s, true, 10)
+	}
+}
+
+// fillCircle — dolu daire (4 Bézier yayı); y üstten ölçülür.
+func (p *pdfDoc) fillCircle(cx, cy, r float64, c rgb) {
+	const k = 0.5523
+	x, y := cx, pgH-cy
+	fmt.Fprintf(p.cur, "%.3f %.3f %.3f rg %.2f %.2f m ", c.r, c.g, c.b, x+r, y)
+	fmt.Fprintf(p.cur, "%.2f %.2f %.2f %.2f %.2f %.2f c ", x+r, y+k*r, x+k*r, y+r, x, y+r)
+	fmt.Fprintf(p.cur, "%.2f %.2f %.2f %.2f %.2f %.2f c ", x-k*r, y+r, x-r, y+k*r, x-r, y)
+	fmt.Fprintf(p.cur, "%.2f %.2f %.2f %.2f %.2f %.2f c ", x-r, y-k*r, x-k*r, y-r, x, y-r)
+	fmt.Fprintf(p.cur, "%.2f %.2f %.2f %.2f %.2f %.2f c f\n", x+k*r, y-r, x+r, y-k*r, x+r, y)
 }
 
 // contHeader — devam sayfaları için küçük üst bilgi; içerik başlangıç y'sini döner.
