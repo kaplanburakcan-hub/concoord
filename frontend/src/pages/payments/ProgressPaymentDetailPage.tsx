@@ -570,9 +570,13 @@ export default function ProgressPaymentDetailPage() {
                   {field("Stopaj oranı %", "withholding_pct", rates.contract.withholding_pct)}
                 </div>
                 <p className="mt-1.5 text-[10px] text-beton-500">
-                  {editable && rates.can_edit
-                    ? "Sözleşmedeki oranlardan farklı değer girebilirsiniz (yetkiniz var)."
-                    : "🔒 Oranlar sözleşmeden gelir; değiştirmek için \"Hakediş oranlarını değiştir\" yetkisi gerekir."}
+                  {pmt.status !== "Draft"
+                    ? "🔒 Hakediş taslak durumunda değil; oranlar değiştirilemez."
+                    : !canEdit
+                      ? "🔒 Taslağı düzenleme yetkiniz olmadığı için oranlar değiştirilemez."
+                      : rates.can_edit
+                        ? "Sözleşmedeki oranlardan farklı değer girebilirsiniz (yetkiniz var)."
+                        : "🔒 Oranlar sözleşmeden gelir; değiştirmek için \"Hakediş oranlarını değiştir\" yetkisi gerekir."}
                 </p>
               </div>
             );
