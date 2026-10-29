@@ -7,11 +7,14 @@ package dashboard
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/ipks/ipks/backend/internal/schedule"
 )
 
 // EVMResult — bir projenin güncel EVM durumu (kümülatif) + tam S-eğrisi.
@@ -175,7 +178,11 @@ func LoadEVM(ctx context.Context, pool *pgxpool.Pool, pid uuid.UUID, now time.Ti
 	rows.Close()
 
 	// Plan ufku: künye tarihleri → yoksa PV girişleri/gerçekleşen aylar → bugün.
-	months, plannedPct, source, err := loadPlan(ctx, pool, pid, start, end, evByMonth, acByMonth, now)
+	ctrl, err := loadControlSettings(ctx, pool, pid)
+	if err != nil {
+		return nil, err
+	}
+	months, plannedPct, source, err := loadPlan(ctx, pool, pid, start, end, evByMonth, acByMonth, now, ctrl.PVSource)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +219,7 @@ func LoadEVM(ctx context.Context, pool *pgxpool.Pool, pid uuid.UUID, now time.Ti
 //  2. milestone ağırlıkları (planned_date ayına weight_pct yazılır)
 //  3. doğrusal dağılım
 func loadPlan(ctx context.Context, pool *pgxpool.Pool, pid uuid.UUID,
-	start, end *time.Time, evBy, acBy map[string]float64, now time.Time,
+	start, end *time.Time, evBy, acBy map[string]float64, now time.Time, pvSource string,
 ) (months []string, plannedPct map[string]float64, source string, err error) {
 
 	// 1) Manuel giriş.
@@ -268,6 +275,17 @@ func loadPlan(ctx context.Context, pool *pgxpool.Pool, pid uuid.UUID,
 		s, e = &ls, &le
 	}
 	months = MonthsBetween(*s, *e)
+
+	// 0) Kullanıcı PV kaynağı olarak baseline'ı seçtiyse ve baseline varsa.
+	if pvSource == pvSourceBaseline {
+		pct, label, ok, err := baselinePlanPct(ctx, pool, pid, months)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		if ok {
+			return months, pct, label, nil
+		}
+	}
 
 	if len(manual) > 0 {
 		// Manuel girişte ufuk dışı aylar da eğriye dahil edilir.
@@ -336,4 +354,51 @@ func sortMonths(m []string) {
 			m[j], m[j-1] = m[j-1], m[j]
 		}
 	}
+}
+
+// baselinePlanPct — son dondurulmuş iş programı baseline'ından AY BAZLI
+// planlanan artış yüzdesini üretir. BuildSCurve değerleri kümülatif topladığı
+// için her ay, ayın sonundaki kümülatif planlanan ilerleme ile bir önceki ayın
+// sonu arasındaki fark olarak verilir. Baseline yoksa ok=false döner ve çağıran
+// mevcut öncelik sırasına düşer.
+func baselinePlanPct(ctx context.Context, pool *pgxpool.Pool, pid uuid.UUID, months []string,
+) (pct map[string]float64, label string, ok bool, err error) {
+	if len(months) == 0 {
+		return nil, "", false, nil
+	}
+	var rev int
+	var snap []byte
+	err = pool.QueryRow(ctx, `
+		SELECT revision_no, snapshot FROM schedule_baselines
+		WHERE project_id=$1 ORDER BY revision_no DESC LIMIT 1`, pid).Scan(&rev, &snap)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, "", false, nil
+	}
+	if err != nil {
+		return nil, "", false, err
+	}
+	first, err := time.Parse("2006-01", months[0])
+	if err != nil {
+		return nil, "", false, err
+	}
+	// Serinin başlangıcından önceki planlanan ilerleme taban olarak alınır;
+	// böylece baseline ufuktan önce başlamışsa ilk ayın artışı şişmez.
+	prev, err := schedule.PlannedPhysicalFromSnapshot(snap, first.AddDate(0, 0, -1))
+	if err != nil {
+		return nil, "", false, err
+	}
+	pct = make(map[string]float64, len(months))
+	for _, m := range months {
+		t, err := time.Parse("2006-01", m)
+		if err != nil {
+			return nil, "", false, err
+		}
+		cum, err := schedule.PlannedPhysicalFromSnapshot(snap, t.AddDate(0, 1, -1))
+		if err != nil {
+			return nil, "", false, err
+		}
+		pct[m] = cum - prev
+		prev = cum
+	}
+	return pct, fmt.Sprintf("baseline:R%d", rev), true, nil
 }

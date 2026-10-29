@@ -21,7 +21,7 @@ type Monthly = {
   has_pdf: boolean;
   created_at: string;
 };
-type Settings = { cpi_min: number; spi_min: number; finding_aging_days: number };
+type Settings = { cpi_min: number; spi_min: number; finding_aging_days: number; pv_source: "auto" | "baseline" };
 
 export default function MonthlyReportsPage() {
   const { current } = useProjects();
@@ -245,6 +245,16 @@ function ThresholdEditor({ projectId }: { projectId: string }) {
             onChange={(e) => setS({ ...s, finding_aging_days: Number(e.target.value) })}
             className="w-24 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100 font-mono"
           />
+        </Field>
+        <Field label="PV kaynağı">
+          <select
+            value={s.pv_source}
+            onChange={(e) => setS({ ...s, pv_source: e.target.value as Settings["pv_source"] })}
+            className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100"
+          >
+            <option value="auto">Otomatik (manuel → milestone → doğrusal)</option>
+            <option value="baseline">İş programı baseline'ı</option>
+          </select>
         </Field>
         <button
           onClick={save}

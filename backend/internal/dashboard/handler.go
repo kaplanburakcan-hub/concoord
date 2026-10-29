@@ -681,20 +681,28 @@ func (h *Handler) PutPVPlan(w http.ResponseWriter, r *http.Request) {
 // Kontrol eşikleri (Plan §7: eşikler veri olarak tutulur)
 // ---------------------------------------------------------------------------
 
+// PV kaynağı: 'auto' (manuel → milestone → doğrusal) veya 'baseline'
+// (son dondurulmuş iş programı baseline'ı).
+const (
+	pvSourceAuto     = "auto"
+	pvSourceBaseline = "baseline"
+)
+
 type controlSettingsDTO struct {
 	CPIMin           float64 `json:"cpi_min"`
 	SPIMin           float64 `json:"spi_min"`
 	FindingAgingDays int     `json:"finding_aging_days"`
+	PVSource         string  `json:"pv_source"`
 }
 
-var defaultControlSettings = controlSettingsDTO{CPIMin: 0.90, SPIMin: 0.90, FindingAgingDays: 14}
+var defaultControlSettings = controlSettingsDTO{CPIMin: 0.90, SPIMin: 0.90, FindingAgingDays: 14, PVSource: pvSourceAuto}
 
 func loadControlSettings(ctx context.Context, pool *pgxpool.Pool, pid uuid.UUID) (controlSettingsDTO, error) {
 	s := defaultControlSettings
 	err := pool.QueryRow(ctx, `
-		SELECT cpi_min, spi_min, finding_aging_days FROM project_control_settings
+		SELECT cpi_min, spi_min, finding_aging_days, pv_source FROM project_control_settings
 		WHERE project_id=$1 AND deleted_at IS NULL`, pid).
-		Scan(&s.CPIMin, &s.SPIMin, &s.FindingAgingDays)
+		Scan(&s.CPIMin, &s.SPIMin, &s.FindingAgingDays, &s.PVSource)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return defaultControlSettings, nil
 	}
@@ -733,18 +741,24 @@ func (h *Handler) PutControlSettings(w http.ResponseWriter, r *http.Request) {
 	if in.FindingAgingDays < 1 {
 		fields["finding_aging_days"] = "en az 1 gün olmalı"
 	}
+	if in.PVSource == "" {
+		in.PVSource = pvSourceAuto
+	}
+	if in.PVSource != pvSourceAuto && in.PVSource != pvSourceBaseline {
+		fields["pv_source"] = "auto veya baseline olmalı"
+	}
 	if len(fields) > 0 {
 		httpx.ValidationFailed(w, r, fields)
 		return
 	}
 	// Upsert (yaşayan satır tekil; soft delete edilmişse yeni satır açılır).
 	_, err := h.pool.Exec(r.Context(), `
-		INSERT INTO project_control_settings (project_id, cpi_min, spi_min, finding_aging_days)
-		VALUES ($1,$2,$3,$4)
+		INSERT INTO project_control_settings (project_id, cpi_min, spi_min, finding_aging_days, pv_source)
+		VALUES ($1,$2,$3,$4,$5)
 		ON CONFLICT (project_id) WHERE deleted_at IS NULL
-		DO UPDATE SET cpi_min=$2, spi_min=$3, finding_aging_days=$4,
+		DO UPDATE SET cpi_min=$2, spi_min=$3, finding_aging_days=$4, pv_source=$5,
 		              row_version=project_control_settings.row_version+1`,
-		pid, in.CPIMin, in.SPIMin, in.FindingAgingDays)
+		pid, in.CPIMin, in.SPIMin, in.FindingAgingDays, in.PVSource)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -753,7 +767,7 @@ func (h *Handler) PutControlSettings(w http.ResponseWriter, r *http.Request) {
 	h.rec.Record(r.Context(), audit.Entry{
 		ActorID: m.ActorID, Entity: "project_control_settings", EntityID: pid.String(),
 		Action: audit.ActionUpdate,
-		After:  map[string]interface{}{"cpi_min": in.CPIMin, "spi_min": in.SPIMin, "finding_aging_days": in.FindingAgingDays},
+		After:  map[string]interface{}{"cpi_min": in.CPIMin, "spi_min": in.SPIMin, "finding_aging_days": in.FindingAgingDays, "pv_source": in.PVSource},
 		IP:     m.IP, ReqID: m.ReqID,
 	})
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{"settings": in})

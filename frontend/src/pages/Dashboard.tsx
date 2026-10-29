@@ -675,6 +675,7 @@ function cpiHint(v: number): string {
   return "Bütçe üzerinde";
 }
 function planSourceTR(s: string) {
+  if (s.startsWith("baseline:")) return `iş programı baseline'ı (${s.slice("baseline:".length)})`;
   if (s === "manual") return "aylık dağılım girişi";
   if (s === "milestones") return "milestone ağırlıkları";
   return "doğrusal dağılım";
