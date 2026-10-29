@@ -108,6 +108,14 @@ type cashExpenseDTO struct {
 	ReceiptNo   *string   `json:"receipt_no,omitempty"`
 }
 
+// delayCauseDTO — günlük rapordaki bir gecikme kaydı (E16). Kodlar sabit
+// listedir (bkz. validate.go delayReasonCodes); saatler günün en fazla 24 saatidir.
+type delayCauseDTO struct {
+	ReasonCode string  `json:"reason_code"`
+	Hours      float64 `json:"hours"`
+	Note       string  `json:"note,omitempty"`
+}
+
 type dailyDTO struct {
 	ID               uuid.UUID       `json:"id"`
 	ProjectID        uuid.UUID       `json:"project_id"`
@@ -125,6 +133,7 @@ type dailyDTO struct {
 	RowVersion       int             `json:"row_version"`
 	CreatedAt        time.Time       `json:"created_at"`
 	CoverPhotoFileID *uuid.UUID      `json:"cover_photo_file_id,omitempty"`
+	DelayCauses      []delayCauseDTO `json:"delay_causes"`
 
 	Manpower     []manpowerDTO    `json:"manpower,omitempty"`
 	Staff        []staffDTO       `json:"staff,omitempty"`
@@ -144,6 +153,7 @@ type dailyInput struct {
 	Equipment    []equipmentDTO   `json:"equipment"`
 	WorkEntries  []workEntryDTO   `json:"work_entries"`
 	CashExpenses []cashExpenseDTO `json:"cash_expenses"`
+	DelayCauses  []delayCauseDTO  `json:"delay_causes"`
 }
 
 // ---------------------------------------------------------------------------
@@ -189,14 +199,14 @@ const drSelect = `
 	SELECT dr.id, dr.project_id, to_char(dr.report_date,'YYYY-MM-DD'), dr.revision_no,
 	       dr.parent_report_id, dr.weather, dr.temperature_min, dr.temperature_max,
 	       dr.notes, dr.status, dr.author_id, u.full_name, dr.submitted_at,
-	       dr.row_version, dr.created_at, dr.cover_photo_file_id
+	       dr.row_version, dr.created_at, dr.cover_photo_file_id, dr.delay_causes
 	FROM daily_reports dr
 	JOIN users u ON u.id = dr.author_id`
 
 func scanDaily(row pgx.Row, d *dailyDTO) error {
 	return row.Scan(&d.ID, &d.ProjectID, &d.ReportDate, &d.RevisionNo, &d.ParentReportID,
 		&d.Weather, &d.TempMin, &d.TempMax, &d.Notes, &d.Status,
-		&d.AuthorID, &d.AuthorName, &d.SubmittedAt, &d.RowVersion, &d.CreatedAt, &d.CoverPhotoFileID)
+		&d.AuthorID, &d.AuthorName, &d.SubmittedAt, &d.RowVersion, &d.CreatedAt, &d.CoverPhotoFileID, &d.DelayCauses)
 }
 
 // loadLines — bir raporun satırlarını doldurur.
@@ -533,10 +543,11 @@ func (h *Handler) CreateDaily(w http.ResponseWriter, r *http.Request) {
 	var id uuid.UUID
 	err = tx.QueryRow(r.Context(), `
 		INSERT INTO daily_reports (project_id, report_date, weather, temperature_min,
-		                           temperature_max, notes, author_id)
-		VALUES ($1,$2::date,$3,$4,$5,NULLIF(btrim($6),''),$7)
+		                           temperature_max, notes, author_id, delay_causes)
+		VALUES ($1,$2::date,$3,$4,$5,NULLIF(btrim($6),''),$7,$8::jsonb)
 		RETURNING id`,
-		pid, in.ReportDate, nullJSON(in.Weather), in.TempMin, in.TempMax, in.Notes, uid).Scan(&id)
+		pid, in.ReportDate, nullJSON(in.Weather), in.TempMin, in.TempMax, in.Notes, uid,
+		delayCausesJSON(in.DelayCauses)).Scan(&id)
 	if isUniqueViolation(err) {
 		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
 			"Bu tarih için rapor zaten var. Gönderilmiş raporu düzeltmek için revizyon açın.", nil)
@@ -605,9 +616,9 @@ func (h *Handler) UpdateDaily(w http.ResponseWriter, r *http.Request) {
 	ct, err := tx.Exec(r.Context(), `
 		UPDATE daily_reports
 		SET weather=$3, temperature_min=$4, temperature_max=$5,
-		    notes=NULLIF(btrim($6),''), row_version=row_version+1
+		    notes=NULLIF(btrim($6),''), delay_causes=$7::jsonb, row_version=row_version+1
 		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`,
-		id, pid, nullJSON(in.Weather), in.TempMin, in.TempMax, in.Notes)
+		id, pid, nullJSON(in.Weather), in.TempMin, in.TempMax, in.Notes, delayCausesJSON(in.DelayCauses))
 	if isLockViolation(err) {
 		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
 			"Gönderilmiş rapor değiştirilemez; düzeltme için revizyon açın.", nil)
@@ -790,11 +801,11 @@ func (h *Handler) ReviseDaily(w http.ResponseWriter, r *http.Request) {
 	var newID uuid.UUID
 	err = tx.QueryRow(r.Context(), `
 		INSERT INTO daily_reports (project_id, report_date, revision_no, parent_report_id,
-		                           weather, temperature_min, temperature_max, notes, author_id)
+		                           weather, temperature_min, temperature_max, notes, delay_causes, author_id)
 		SELECT project_id, report_date,
 		       (SELECT max(revision_no)+1 FROM daily_reports x
 		        WHERE x.project_id=$2 AND x.report_date=$3::date AND x.deleted_at IS NULL),
-		       id, weather, temperature_min, temperature_max, notes, $4
+		       id, weather, temperature_min, temperature_max, notes, delay_causes, $4
 		FROM daily_reports WHERE id=$1
 		RETURNING id`, id, pid, reportDate, uid).Scan(&newID)
 	if isUniqueViolation(err) {
@@ -1051,6 +1062,19 @@ func (h *Handler) GetCoverPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, obj.Body)
+}
+
+// delayCausesJSON — gecikme listesini jsonb parametresine çevirir; nil liste
+// veritabanında boş dizi olarak saklanır.
+func delayCausesJSON(causes []delayCauseDTO) string {
+	if causes == nil {
+		return "[]"
+	}
+	b, err := json.Marshal(causes)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
 }
 
 func nullJSON(raw json.RawMessage) interface{} {
