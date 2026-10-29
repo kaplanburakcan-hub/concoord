@@ -149,6 +149,26 @@ export default function MaterialApprovalDetailPage() {
         </button>
       )}
 
+      {(mar.status === "Approved" || mar.status === "ConditionallyApproved") && can("procurement.create_pr") && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 space-y-2">
+          <p className="text-sm font-semibold text-beton-200">Satın alma</p>
+          <p className="text-xs text-beton-400">
+            Malzeme bilgileri dolu bir satın alma talebi taslağı açılır; ihtiyaç tarihi ve miktar sizin girişinizle tamamlanır.
+          </p>
+          <Link
+            to={`/satinalma/talepler?${new URLSearchParams({
+              yeni: "1",
+              kalem: mar.material_name,
+              spec: mar.spec_ref ?? "",
+              not: `${mar.mar_no} onaylı malzeme${mar.decision_note ? ` — ${mar.decision_note}` : ""}`,
+            }).toString()}`}
+            className="inline-block rounded border border-emniyet-500/60 px-4 py-2 text-sm text-emniyet-500 hover:bg-emniyet-500/10"
+          >
+            Satın alma talebi taslağı oluştur
+          </Link>
+        </div>
+      )}
+
       {mar.status === "UnderReview" && can("material_approvals.decide") && (
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 space-y-2">
           <p className="text-sm font-semibold text-beton-200">Karar</p>

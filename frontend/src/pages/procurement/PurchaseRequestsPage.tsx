@@ -64,8 +64,17 @@ export default function PurchaseRequestsPage() {
   //      (aksi hâlde React Router aynı adrese gidişi yok sayar ve form açılmaz).
   const location = useLocation();
   const navigate = useNavigate();
+  // Malzeme onayından (MAR) gelen bağlantı kalem ve notu da taşır
+  // (?kalem=&spec=&not=); form bu değerlerle açılır, kayıt yine kullanıcıdadır.
   useEffect(() => {
-    if (new URLSearchParams(location.search).has("yeni")) {
+    const sp = new URLSearchParams(location.search);
+    if (sp.has("yeni")) {
+      const kalem = sp.get("kalem");
+      if (kalem) {
+        setItems([{ ...EMPTY_ITEM, material_name: kalem, spec: sp.get("spec") || undefined }]);
+      }
+      const not = sp.get("not");
+      if (not) setNote(not);
       setShowForm(true);
       navigate(location.pathname, { replace: true });
     }
