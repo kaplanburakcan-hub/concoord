@@ -1391,3 +1391,27 @@ type pgxQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
+
+// PendingCount — bekleyen (onay sürecindeki) hakediş sayısı; sidebar rozeti
+// için. Kapsam ListPayments ile aynıdır: taşeron kullanıcısı yalnız kendi
+// hakedişlerini sayar.
+func (h *Handler) PendingCount(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	_, scope, ok := h.requireScope(w, r, pid)
+	if !ok {
+		return
+	}
+	var n int
+	if err := h.pool.QueryRow(r.Context(), `
+		SELECT count(*) FROM progress_payments
+		WHERE project_id=$1 AND deleted_at IS NULL
+		  AND status IN ('Submitted','InApproval','SiteApproved')
+		  AND ($2::uuid IS NULL OR subcontractor_id=$2)`, pid, scope).Scan(&n); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]int{"count": n})
+}

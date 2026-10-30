@@ -345,6 +345,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("progress_payments.view")).Get("/payments/{id}/approvals", payH.ApprovalChain)
 			pr.With(mw.RequirePermission("progress_payments.view")).Post("/payments/{id}/approvals", payH.ApproveStep)
 			pr.With(mw.RequirePermission("progress_payments.view")).Get("/projects/{projectID}/payments", payH.ListPayments)
+			pr.With(mw.RequirePermission("progress_payments.view")).Get("/projects/{projectID}/payments/pending-count", payH.PendingCount)
 			pr.With(mw.RequirePermission("progress_payments.create_draft")).Post("/projects/{projectID}/payments", payH.CreatePayment)
 			pr.With(mw.RequirePermission("progress_payments.view")).Get("/projects/{projectID}/payments/{id}", payH.GetPayment)
 			pr.With(mw.RequirePermission("progress_payments.edit_draft")).Patch("/projects/{projectID}/payments/{id}", payH.UpdatePaymentDraft)

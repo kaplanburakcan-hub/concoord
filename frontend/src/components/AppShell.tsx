@@ -1,6 +1,7 @@
 import { type ReactNode, useState, useEffect } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { api } from "../api/client";
 import { Can } from "../auth/guards";
 import { useProjects } from "../projects/ProjectContext";
 import { useTheme } from "../theme/ThemeContext";
@@ -171,13 +172,45 @@ function groupHasActiveRoute(group: NavGroup, pathname: string): boolean {
 }
 
 export default function AppShell({ children }: { children: ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, logout, can } = useAuth();
   const { projects, current, select } = useProjects();
   const { theme, toggle } = useTheme();
   const nav = useNavigate();
   const { pathname } = useLocation();
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
+
+  // Sidebar rozetleri (E11): bekleyen hakediş ve ödeme planı onayı sayıları.
+  // Yalnız ilgili izin varsa istek atılır; hata olursa rozet sessizce gizlenir.
+  const [badges, setBadges] = useState<{ hakedis: number; plan: number }>({ hakedis: 0, plan: 0 });
+  const pid = current?.id;
+  const canHakedis = can("progress_payments.view");
+  const canPlan = can("payments.approve_plan_change");
+  useEffect(() => {
+    if (!pid) return;
+    let alive = true;
+    (async () => {
+      const next = { hakedis: 0, plan: 0 };
+      try {
+        if (canHakedis) {
+          const r = await api<{ count: number }>(`/projects/${pid}/payments/pending-count`, { projectId: pid });
+          next.hakedis = r.count ?? 0;
+        }
+      } catch { /* rozet gizlenir */ }
+      try {
+        if (canPlan) {
+          const r = await api<{ changes: unknown[] }>(`/projects/${pid}/payment-plan-changes`, { projectId: pid });
+          next.plan = r.changes?.length ?? 0;
+        }
+      } catch { /* rozet gizlenir */ }
+      if (alive) setBadges(next);
+    })();
+    return () => { alive = false; };
+  }, [pid, canHakedis, canPlan]);
+  const withBadge = (it: NavDef): NavDef =>
+    it.to === "/hakedis" ? { ...it, badge: badges.hakedis }
+    : it.to === "/odeme-plani-onaylari" ? { ...it, badge: badges.plan }
+    : it;
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(collapsed));
@@ -245,10 +278,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 {open && g.items.map((it) =>
                   it.perm ? (
                     <Can key={it.to} perm={it.perm}>
-                      <SideLink item={it} />
+                      <SideLink item={withBadge(it)} />
                     </Can>
                   ) : (
-                    <SideLink key={it.to} item={it} />
+                    <SideLink key={it.to} item={withBadge(it)} />
                   )
                 )}
               </div>
@@ -379,6 +412,11 @@ function SideLink({ item }: { item: NavDef }) {
               {item.icon}
             </span>
             <span className="flex-1 min-w-0 truncate">{item.label}</span>
+            {!!item.badge && item.badge > 0 && (
+              <span className="ml-auto rounded-full bg-emniyet-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-beton-950">
+                {item.badge}
+              </span>
+            )}
             {isActive && (
               <span
                 className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r"
