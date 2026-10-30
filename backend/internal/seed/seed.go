@@ -59,6 +59,8 @@ var registry = []Step{
 	// Plan adımları (risk, değişiklik, karar, NCR, EOT, takvim, bütçe izinleri) ve
 	// Müşavir rolü: mevcut kurulumlara da yansıtılır (idempotent senkron).
 	{Name: "0015_plan_adimlari_izin_ve_musavir_sync", Run: stepPlanVeMusavirSync},
+	// Taşeron temsilcisi: uygunsuzluk ve bulgu görünümü (E14) izinlerinin senkronu.
+	{Name: "0016_taseron_gorunumu_izin_sync", Run: stepFaz2PermSync},
 }
 
 // stepFaz2PermSync — izin sözlüğünü ve rol varsayılanlarını yeniden senkronlar.

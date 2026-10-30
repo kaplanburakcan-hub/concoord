@@ -5,6 +5,7 @@
 package ncr
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -58,10 +59,26 @@ func scanNCR(row pgx.Row, d *NCRDTO) error {
 }
 
 type ncrInput struct {
-	Title       string     `json:"title"`
-	PozNo       *string    `json:"poz_no"`
-	Description *string    `json:"description"`
-	OwnerID     *uuid.UUID `json:"owner_id"`
+	Title           string     `json:"title"`
+	PozNo           *string    `json:"poz_no"`
+	Description     *string    `json:"description"`
+	OwnerID         *uuid.UUID `json:"owner_id"`
+	SubcontractorID *uuid.UUID `json:"subcontractor_id"`
+}
+
+// scopedSub — kullanıcının bu projedeki taşeron kapsamı (yoksa nil). Taşeron
+// temsilcisi yalnız kendi firmasının kayıtlarını görür; filtre backend'de zorunludur.
+func (h *Handler) scopedSub(ctx context.Context, uid, pid uuid.UUID) (*uuid.UUID, error) {
+	var sub *uuid.UUID
+	err := h.pool.QueryRow(ctx, `
+		SELECT subcontractor_id FROM project_members
+		WHERE user_id=$1 AND project_id=$2 AND deleted_at IS NULL
+		  AND subcontractor_id IS NOT NULL
+		LIMIT 1`, uid, pid).Scan(&sub)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return sub, err
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
@@ -69,9 +86,19 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	uid, ok := auth.UserIDFrom(r.Context())
+	if !ok {
+		httpx.Error(w, r, http.StatusUnauthorized, httpx.CodeUnauthorized, "Oturum gerekli.", nil)
+		return
+	}
+	sub, err := h.scopedSub(r.Context(), uid, pid)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
 	rows, err := h.pool.Query(r.Context(), ncrSelect+`
-		WHERE n.project_id=$1
-		ORDER BY (n.status='Kapandı'), n.ncr_no DESC`, pid)
+		WHERE n.project_id=$1 AND ($2::uuid IS NULL OR n.subcontractor_id=$2)
+		ORDER BY (n.status='Kapandı'), n.ncr_no DESC`, pid, sub)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -123,12 +150,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var id uuid.UUID
 	if err := tx.QueryRow(r.Context(), `
-		INSERT INTO ncrs (project_id, ncr_no, title, poz_no, description, owner_id, created_by)
+		INSERT INTO ncrs (project_id, ncr_no, title, poz_no, description, owner_id, created_by, subcontractor_id)
 		VALUES ($1,
 		        (SELECT COALESCE(max(ncr_no),0)+1 FROM ncrs WHERE project_id=$1),
-		        $2, NULLIF(btrim(coalesce($3,'')),''), NULLIF(btrim(coalesce($4,'')),''), $5, $6)
+		        $2, NULLIF(btrim(coalesce($3,'')),''), NULLIF(btrim(coalesce($4,'')),''), $5, $6, $7)
 		RETURNING id`,
-		pid, t, in.PozNo, in.Description, in.OwnerID, uid).Scan(&id); err != nil {
+		pid, t, in.PozNo, in.Description, in.OwnerID, uid, in.SubcontractorID).Scan(&id); err != nil {
 		httpx.Internal(w, r)
 		return
 	}

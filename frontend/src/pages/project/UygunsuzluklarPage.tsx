@@ -27,6 +27,8 @@ export default function UygunsuzluklarPage() {
   const [poz, setPoz] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const [subID, setSubID] = useState("");
+  const [subs, setSubs] = useState<{ id: string; company_name: string }[]>([]);
   // Kapatma akışı: önce kanıt belgesi seçilir (E4 kapanış kanıtı).
   const [closingId, setClosingId] = useState<string | null>(null);
   const [closeDoc, setCloseDoc] = useState("");
@@ -44,6 +46,12 @@ export default function UygunsuzluklarPage() {
   }, [pid]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!pid) return;
+    api<{ subcontractors: { id: string; company_name: string }[] }>(`/projects/${pid}/subcontractors`, { projectId: pid })
+      .then((r) => setSubs(r.subcontractors ?? []))
+      .catch(() => setSubs([]));
+  }, [pid]);
 
   async function create() {
     if (!pid || !title.trim()) return;
@@ -51,9 +59,12 @@ export default function UygunsuzluklarPage() {
     try {
       await api(`/projects/${pid}/ncrs`, {
         method: "POST", projectId: pid,
-        body: { title: title.trim(), poz_no: poz.trim() || undefined, description: description.trim() || undefined },
+        body: {
+          title: title.trim(), poz_no: poz.trim() || undefined, description: description.trim() || undefined,
+          subcontractor_id: subID || undefined,
+        },
       });
-      setTitle(""); setPoz(""); setDescription(""); setShowForm(false);
+      setTitle(""); setPoz(""); setDescription(""); setSubID(""); setShowForm(false);
       await load();
     } catch (e) {
       setErr(describeLoadError(e, "Uygunsuzluk kaydı"));
@@ -107,7 +118,10 @@ export default function UygunsuzluklarPage() {
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 grid gap-3 md:grid-cols-4">
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Başlık *" className={`${inp} md:col-span-2`} />
           <input value={poz} onChange={(e) => setPoz(e.target.value)} placeholder="Poz no (isteğe bağlı)" className={inp} />
-          <div />
+          <select value={subID} onChange={(e) => setSubID(e.target.value)} className={inp}>
+            <option value="">Taşeron (isteğe bağlı)</option>
+            {subs.map((x) => <option key={x.id} value={x.id}>{x.company_name}</option>)}
+          </select>
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2}
             placeholder="Açıklama" className={`${inp} md:col-span-4`} />
           <div className="md:col-span-4 flex justify-end">

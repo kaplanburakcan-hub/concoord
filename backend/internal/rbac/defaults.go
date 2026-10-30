@@ -200,7 +200,7 @@ var roleDefaults = map[string][]string{
 		// Aynı ilke: attendance.view_location/adjust/approve de VARSAYILAN DEĞİL.
 	},
 	"SubcontractorRep": {
-		"projects.view",
+		"projects.view", "ncr.view", "ohs.view",
 		"contracts.view",
 		"progress_payments.view", "progress_payments.create_draft", "progress_payments.edit_draft",
 		"progress_payments.submit", "progress_payments.view_financials",
