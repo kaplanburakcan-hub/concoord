@@ -25,6 +25,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/notify"
+	"github.com/ipks/ipks/backend/internal/rbac"
 	"github.com/ipks/ipks/backend/internal/validate"
 )
 
@@ -697,6 +698,9 @@ func (h *Handler) AddDelivery(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w, r)
 		return
 	}
+	if req.Condition != "" && req.Condition != "Complete" {
+		h.notifyDiscrepancy(r.Context(), pid, poID, uid, req.Condition, strings.TrimSpace(req.DeliveryNoteNo))
+	}
 	out, err := h.getPO(r.Context(), pid, poID, true)
 	if err != nil {
 		httpx.JSON(w, http.StatusCreated, map[string]string{"id": did.String()})
@@ -855,4 +859,58 @@ func NotifyOverduePOs(ctx context.Context, pool *pgxpool.Pool, nt *notify.Servic
 	if len(items) > 0 {
 		log.Info("geciken sipariş uyarıları üretildi", "count", len(items))
 	}
+}
+
+// notifyDiscrepancy — eksik/hasarlı mal kabulü kaydedildiğinde PO sahibine ve
+// satın alma yetkisi olanlara bildirim gönderir. Kayıt zaten commit edilmiştir;
+// bildirim hatası teslimat kaydını geri almaz (yalnızca loglanır).
+func (h *Handler) notifyDiscrepancy(ctx context.Context, pid, poID, actor uuid.UUID, condition, deliveryNo string) {
+	var poNo string
+	var owner uuid.UUID
+	if err := h.pool.QueryRow(ctx, `
+		SELECT po.po_no, po.created_by FROM purchase_orders po
+		WHERE po.id=$1 AND po.project_id=$2`, poID, pid).Scan(&poNo, &owner); err != nil {
+		h.log.Error("uygunsuzluk bildirimi: PO okunamadı", "err", err, "po", poID)
+		return
+	}
+	targets := map[uuid.UUID]bool{}
+	if owner != actor {
+		targets[owner] = true
+	}
+	rows, err := h.pool.Query(ctx, `
+		SELECT pm.user_id, r.code FROM project_members pm
+		JOIN roles r ON r.id = pm.role_id
+		WHERE pm.project_id=$1 AND pm.deleted_at IS NULL`, pid)
+	if err != nil {
+		h.log.Error("uygunsuzluk bildirimi: üyeler okunamadı", "err", err, "project", pid)
+	} else {
+		for rows.Next() {
+			var uid uuid.UUID
+			var role string
+			if rows.Scan(&uid, &role) == nil && uid != actor && rbac.RoleHasDefault(role, "procurement.manage_po") {
+				targets[uid] = true
+			}
+		}
+		rows.Close()
+	}
+	if len(targets) == 0 {
+		return
+	}
+	ids := make([]uuid.UUID, 0, len(targets))
+	for id := range targets {
+		ids = append(ids, id)
+	}
+	label := map[string]string{"Short": "eksik", "Damaged": "hasarlı", "Defective": "kusurlu", "Rejected": "reddedildi"}[condition]
+	if label == "" {
+		label = condition
+	}
+	title := poNo + " — teslimatta uygunsuzluk"
+	if deliveryNo != "" {
+		title += " (irsaliye " + deliveryNo + ")"
+	}
+	h.nt.Send(ctx, notify.Input{
+		UserIDs: ids, Type: notify.TypeDeliveryDiscrepancy,
+		Title: title, Body: "Teslim durumu: " + label,
+		EntityType: "purchase_orders", EntityID: &poID, ProjectID: &pid,
+	})
 }

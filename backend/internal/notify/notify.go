@@ -33,9 +33,11 @@ const (
 	TypeWeeklyReportFailed = "weekly_report_failed" // PDF üretimi başarısız → üreten kullanıcı
 
 	// Faz 7 — Satınalma ve tedarik zinciri
-	TypePRSubmitted = "pr_submitted" // PR onaya sunuldu → onay yetkilileri
-	TypePRDecided   = "pr_decided"   // PR onaylandı/reddedildi → talep sahibi
-	TypePOOverdue   = "po_overdue"   // beklenen teslim tarihi geçti → sipariş sahibi + PR sahibi
+	TypePRSubmitted         = "pr_submitted"         // PR onaya sunuldu → onay yetkilileri
+	TypePRDecided           = "pr_decided"           // PR onaylandı/reddedildi → talep sahibi
+	TypePOOverdue           = "po_overdue"           // beklenen teslim tarihi geçti → sipariş sahibi + PR sahibi
+	TypeDailyIssueReported  = "daily_issue_reported" // sorun işaretli günlük rapor gönderildi → PY
+	TypeDeliveryDiscrepancy = "delivery_discrepancy" // mal kabulde eksik/hasarlı teslimat → sipariş sahibi + satın alma yetkilileri
 
 	// Faz 8 — İSG
 	TypeOHSPenaltyIssued  = "ohs_penalty_issued"  // ceza tutanağı kesildi → taşeron temsilcisi + PY
