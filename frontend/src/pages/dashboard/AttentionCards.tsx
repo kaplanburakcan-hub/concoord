@@ -5,15 +5,20 @@ import { api } from "../../api/client";
 // Panel dikkat sayaçları (E11): yanıtı geciken yazışma ve teslim tarihi geçen
 // tedarik kalemi. Her sayaç yalnız kendi izni varsa istenir; hata olursa gizlenir.
 
-export default function AttentionCards({ projectId, canRfi, canPlan }: {
-  projectId: string; canRfi: boolean; canPlan: boolean;
+export default function AttentionCards({ projectId, canRfi, canPlan, canTasks }: {
+  projectId: string; canRfi: boolean; canPlan: boolean; canTasks: boolean;
 }) {
   const [rfi, setRfi] = useState<number | null>(null);
   const [plan, setPlan] = useState<number | null>(null);
+  const [overdueTasks, setOverdueTasks] = useState<number | null>(null);
 
   useEffect(() => {
     let alive = true;
-    setRfi(null); setPlan(null);
+    setRfi(null); setPlan(null); setOverdueTasks(null);
+    if (canTasks) {
+      api<{ count: number }>(`/projects/${projectId}/attention/tasks-overdue`, { projectId })
+        .then((r) => alive && setOverdueTasks(r.count)).catch(() => {});
+    }
     if (canRfi) {
       api<{ count: number }>(`/projects/${projectId}/attention/rfi-overdue`, { projectId })
         .then((r) => alive && setRfi(r.count)).catch(() => {});
@@ -23,11 +28,12 @@ export default function AttentionCards({ projectId, canRfi, canPlan }: {
         .then((r) => alive && setPlan(r.count)).catch(() => {});
     }
     return () => { alive = false; };
-  }, [projectId, canRfi, canPlan]);
+  }, [projectId, canRfi, canPlan, canTasks]);
 
   const cards: { label: string; value: number | null; to: string; hint: string }[] = [];
   if (canRfi) cards.push({ label: "Yanıtı geciken yazışma", value: rfi, to: "/yazismalar/gelen", hint: "Cevap tarihi geçmiş, hâlâ açık" });
   if (canPlan) cards.push({ label: "Teslim tarihi geçen kalem", value: plan, to: "/satinalma/tedarik-plani", hint: "Teslim alınmamış tedarik kalemi" });
+  if (canTasks) cards.push({ label: "Vadesi geçen görev", value: overdueTasks, to: "/gorevler", hint: "Tamamlanmamış, vadesi geçmiş görev" });
   if (cards.length === 0) return null;
 
   return (

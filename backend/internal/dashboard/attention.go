@@ -45,3 +45,12 @@ func (h *Handler) countOf(w http.ResponseWriter, r *http.Request, query string) 
 	}
 	httpx.JSON(w, http.StatusOK, map[string]int{"count": n})
 }
+
+// TasksOverdueCount — vadesi geçmiş, tamamlanmamış ve silinmemiş görevler.
+// Görev listesindeki 'Done' dışı durumlarla aynı koşul.
+func (h *Handler) TasksOverdueCount(w http.ResponseWriter, r *http.Request) {
+	h.countOf(w, r, `
+		SELECT count(*) FROM tasks
+		WHERE project_id=$1 AND deleted_at IS NULL
+		  AND status <> 'Done' AND due_date IS NOT NULL AND due_date < CURRENT_DATE`)
+}

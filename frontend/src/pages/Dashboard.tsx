@@ -325,7 +325,7 @@ export default function Dashboard() {
           {/* ── Dikkat sayaçları + takvim bağlantısı (E11 / E12) ── */}
           <PanelRow cols={can("calendar.subscribe") ? "1fr 1fr" : "1fr"}>
             <PanelCell title="Dikkat Gerektirenler">
-              <AttentionCards projectId={current.id} canRfi={can("correspondence.view")} canPlan={can("procurement.view")} />
+              <AttentionCards projectId={current.id} canRfi={can("correspondence.view")} canPlan={can("procurement.view")} canTasks={can("tasks.view")} />
             </PanelCell>
             {can("calendar.subscribe") && (
               <PanelCell title="Takvim Bağlantısı">
