@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, describeLoadError } from "../../api/client";
 import { apiWithOfflineFallback } from "../../offline/queue";
 import { useAuth } from "../../auth/AuthContext";
+import { exportXlsx } from "../../lib/exportXlsx";
 import { useProjects } from "../../projects/ProjectContext";
 
 // Uygunsuzluk (NCR) kaydı, ilk sürüm (E4). Kayıt silinmez; kapatılır. Muayene
@@ -113,6 +114,18 @@ export default function UygunsuzluklarPage() {
           <h1 className="text-lg font-display font-bold text-white">Uygunsuzluklar</h1>
           <p className="text-xs text-beton-500 mt-0.5">Açık uygunsuzluklar listelenir. Kapatılan kayıtlar silinmez.</p>
         </div>
+        <button onClick={() => exportXlsx("uygunsuzluklar", "Uygunsuzluklar", [
+            { header: "No", value: (n) => `U-${String(n.no).padStart(3, "0")}` },
+            { header: "Başlık", value: (n) => n.title },
+            { header: "Poz", value: (n) => n.poz_no ?? "" },
+            { header: "Sorumlu", value: (n) => n.owner_name ?? "" },
+            { header: "Durum", value: (n) => n.status },
+            { header: "Kapanış", value: (n) => n.closed_at ?? "" },
+          ], ncrs)}
+          disabled={ncrs.length === 0}
+          className="ml-auto rounded-md border border-beton-700 px-3 py-1.5 text-xs text-beton-200 hover:border-emniyet-500 disabled:opacity-50">
+          Excel indir
+        </button>
         {canManage && (
           <button onClick={() => setShowForm((v) => !v)}
             className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-xs font-semibold px-3 py-1.5">

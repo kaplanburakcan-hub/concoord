@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
+import { exportXlsx } from "../../lib/exportXlsx";
 import { useProjects } from "../../projects/ProjectContext";
 
 // Değişiklik olayı taslakları (E1, ilk adım). Yalnız kayıt: onay akışı, sözleşme
@@ -81,6 +82,18 @@ export default function DegisiklikOlaylariPage() {
             Taslak kayıt. Onay, sözleşme bedeli ve bütçe etkisi sonraki aşamada eklenecek.
           </p>
         </div>
+        <button onClick={() => exportXlsx("degisiklik-olaylari", "Değişiklikler", [
+            { header: "No", value: (e) => `D-${String(e.no).padStart(3, "0")}` },
+            { header: "Başlık", value: (e) => e.title },
+            { header: "Kaynak", value: (e) => SOURCE_LABEL[e.source] ?? e.source },
+            { header: "Tahmini tutar", value: (e) => e.estimated_amount ?? "" },
+            { header: "Süre (gün)", value: (e) => e.estimated_days ?? "" },
+            { header: "Durum", value: (e) => e.status },
+          ], events)}
+          disabled={events.length === 0}
+          className="ml-auto rounded-md border border-beton-700 px-3 py-1.5 text-xs text-beton-200 hover:border-emniyet-500 disabled:opacity-50">
+          Excel indir
+        </button>
         {canCreate && (
           <button onClick={() => setShowForm((v) => !v)}
             className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-xs font-semibold px-3 py-1.5">
