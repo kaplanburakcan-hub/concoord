@@ -84,6 +84,13 @@ export default function ProcurementPlanPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Gecikmiş: teslim tarihi bugünden önce ve kalem teslim alınmamış. Tarih
+  // karşılaştırması yerel takvim gününe göre yapılır (sv-SE → YYYY-MM-DD).
+  const today = new Date().toLocaleDateString("sv-SE");
+  const isLate = (it: PlanItem) =>
+    !!it.planned_delivery_date && it.planned_delivery_date < today && it.status !== "TeslimAlindi";
+  const lateCount = items.filter(isLate).length;
+
   const loadUnmatched = useCallback(async () => {
     if (!pid) return;
     try {
@@ -251,6 +258,13 @@ export default function ProcurementPlanPage() {
         </div>
       )}
 
+      {lateCount > 0 && (
+        <p className="text-xs text-red-300">
+          Gecikmiş kalem: <span className="font-semibold">{lateCount}</span>
+          <span className="text-beton-500"> (teslim tarihi geçmiş, teslim alınmamış)</span>
+        </p>
+      )}
+
       <div className="flex gap-2 text-xs">
         {(["all", "unmatched"] as const).map((v) => (
           <button key={v} onClick={() => setView(v)}
@@ -279,7 +293,7 @@ export default function ProcurementPlanPage() {
           </thead>
           <tbody>
             {(view === "all" ? items : unmatched).map((it) => (
-              <tr key={it.id} className="border-b border-beton-800/60 hover:bg-beton-900/30">
+              <tr key={it.id} className={`border-b border-beton-800/60 hover:bg-beton-900/30 ${isLate(it) ? "bg-red-500/10" : ""}`}>
                 <td className="py-2 px-3 text-beton-400 text-xs font-mono">{it.poz_no ?? "—"}</td>
                 <td className="py-2 px-3 text-beton-100">
                   {it.description}
