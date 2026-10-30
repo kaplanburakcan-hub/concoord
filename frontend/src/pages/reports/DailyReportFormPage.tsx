@@ -62,6 +62,7 @@ type Detail = {
   temperature_max?: number;
   notes?: string;
   delay_causes?: DelayCause[];
+  issue_flagged?: boolean;
   author_name: string;
   cover_photo_file_id?: string;
   manpower?: (Manpower & { subcontractor_name?: string })[];
@@ -115,6 +116,7 @@ export default function DailyReportFormPage() {
   const [tempMax, setTempMax] = useState("");
   const [notes, setNotes] = useState("");
   const [delays, setDelays] = useState<DelayCause[]>([]);
+  const [issueFlagged, setIssueFlagged] = useState(false);
   // Hava ölçümleri (öneri ve kayıt için): ön doldurmadan veya kayıttan gelir.
   const [windKph, setWindKph] = useState<number | undefined>(undefined);
   const [weatherSource, setWeatherSource] = useState<string>("manual");
@@ -152,6 +154,7 @@ export default function DailyReportFormPage() {
       setTempMax(d.temperature_max != null ? String(d.temperature_max) : "");
       setNotes(d.notes ?? "");
       setDelays((d.delay_causes ?? []).map(({ reason_code, hours, note }) => ({ reason_code, hours, note })));
+      setIssueFlagged(!!d.issue_flagged);
       setWindKph(d.weather?.wind_kph);
       setPrecipMM(d.weather?.precipitation_mm);
       setManpower((d.manpower ?? []).map(({ subcontractor_id, trade, headcount }) => ({ subcontractor_id, trade, headcount })));
@@ -292,6 +295,7 @@ export default function DailyReportFormPage() {
       temperature_max: tempMax === "" ? null : Number(tempMax),
       notes,
       delay_causes: delays,
+      issue_flagged: issueFlagged,
       manpower,
       staff,
       equipment,
@@ -784,6 +788,11 @@ export default function DailyReportFormPage() {
         <label className={label}>Genel notlar</label>
         <textarea rows={3} className={input} value={notes} disabled={readOnly || !canEdit}
           onChange={(e) => setNotes(e.target.value)} />
+        <label className="flex items-center gap-2 text-xs text-beton-300">
+          <input type="checkbox" checked={issueFlagged} disabled={readOnly || !canEdit}
+            onChange={(e) => setIssueFlagged(e.target.checked)} />
+          Bu raporda sorun var (gönderilince proje yöneticisine bildirim gider)
+        </label>
       </div>
 
       {/* Gecikme nedenleri (E16) */}
@@ -1302,6 +1311,12 @@ function ReadOnlyView({
         <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
           <SecHeader color="#4e6a87" title="Notlar & Açıklamalar" />
           <p className="px-4 py-3 text-sm text-beton-300 leading-relaxed">{detail.notes}</p>
+        </div>
+      )}
+
+      {detail.issue_flagged && (
+        <div className="rounded-md border border-red-500/40 bg-red-500/10 px-4 py-2 text-xs text-red-200">
+          Bu rapor sorun olarak işaretlendi.
         </div>
       )}
 
