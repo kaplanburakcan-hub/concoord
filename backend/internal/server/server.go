@@ -14,6 +14,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/attendance"
 	"github.com/ipks/ipks/backend/internal/audit"
 	"github.com/ipks/ipks/backend/internal/auth"
+	"github.com/ipks/ipks/backend/internal/calendarfeed"
 	"github.com/ipks/ipks/backend/internal/cashflow"
 	"github.com/ipks/ipks/backend/internal/changes"
 	"github.com/ipks/ipks/backend/internal/config"
@@ -123,6 +124,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	procH := procurement.NewHandler(pool, eval, recorder, notifySvc, log)
 	riskH := risks.NewHandler(pool, recorder)
 	changeH := changes.NewHandler(pool, recorder)
+	calendarH := calendarfeed.NewHandler(pool, recorder)
 
 	// --- Faz 8 bağımlılıkları (İSG: checklist, denetim, bulgu, ceza otomasyonu) ---
 	ohsH := ohs.NewHandler(pool, eval, recorder, notifySvc, store, log)
@@ -231,6 +233,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			// Blok 2 Aşama 2: PDKS konum verisi KVKK saklama süresi (varsayılan 730 gün).
 			cr.Post("/purge-attendance-location", attendanceH.PurgeStaleLocations)
 		})
+
+		// ---- Kişisel takvim akışı (E12): oturum değil, süreli belirteç ister ----
+		api.Get("/calendar/{token}", calendarH.Serve)
 
 		// ---- Admin Paneli v1 (tümü kimlik doğrulamalı + izin korumalı) ----
 		api.Route("/admin", func(ad chi.Router) {
@@ -506,6 +511,11 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("risks.manage")).Post("/projects/{projectID}/risks", riskH.Create)
 			pr.With(mw.RequirePermission("risks.manage")).Patch("/projects/{projectID}/risks/{id}", riskH.Update)
 
+			// Faz 3.4 (E12): kişisel takvim bağlantısı (oturumlu yönetim uçları).
+			pr.With(mw.RequirePermission("calendar.subscribe")).Post("/projects/{projectID}/calendar-feeds", calendarH.Create)
+			pr.With(mw.RequirePermission("calendar.subscribe")).Delete("/projects/{projectID}/calendar-feeds/{feedID}", calendarH.Revoke)
+			pr.With(mw.RequirePermission("calendar.subscribe")).Get("/projects/{projectID}/calendar-feeds", calendarH.List)
+
 			// Faz 3.3 (E1, ilk adım): değişiklik olayı taslakları — onay akışı yok.
 			pr.With(mw.RequirePermission("changes.view")).Get("/projects/{projectID}/change-events", changeH.List)
 			pr.With(mw.RequirePermission("changes.create")).Post("/projects/{projectID}/change-events", changeH.Create)
@@ -562,6 +572,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 			// Rol duyarlı proje dashboard'u.
 			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/dashboard", dashH.ProjectDashboard)
+			// Panel dikkat sayaçları (E11): her biri kendi izniyle korunur.
+			pr.With(mw.RequirePermission("correspondence.view")).Get("/projects/{projectID}/attention/rfi-overdue", dashH.RFIOverdueCount)
+			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/attention/plan-late", dashH.PlanLateCount)
 
 			// PV aylık dağılım girişi (EVM S-eğrisini zenginleştirir).
 			pr.With(mw.RequirePermission("reports.view_financial_reports")).Get("/projects/{projectID}/pv-plan", dashH.GetPVPlan)
