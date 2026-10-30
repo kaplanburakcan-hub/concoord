@@ -46,6 +46,12 @@ const DELAY_REASONS: [string, string][] = [
 ];
 const DELAY_LABEL = Object.fromEntries(DELAY_REASONS);
 
+// Hava gecikmesi önerisi (E2): bu eşiklerin üzerindeki günlerde form, "Hava"
+// gecikmesi ekleyebileceğini sorar. Kayda yalnız kullanıcı eklerse girer.
+// Eşikler varsayımdır; proje bazında ayarlanabilir hale getirilebilir.
+const RAIN_SUGGEST_MM = 10;
+const WIND_SUGGEST_KPH = 50;
+
 type Detail = {
   id: string;
   report_date: string;
@@ -109,6 +115,11 @@ export default function DailyReportFormPage() {
   const [tempMax, setTempMax] = useState("");
   const [notes, setNotes] = useState("");
   const [delays, setDelays] = useState<DelayCause[]>([]);
+  // Hava ölçümleri (öneri ve kayıt için): ön doldurmadan veya kayıttan gelir.
+  const [windKph, setWindKph] = useState<number | undefined>(undefined);
+  const [weatherSource, setWeatherSource] = useState<string>("manual");
+  const [precipMM, setPrecipMM] = useState<number | undefined>(undefined);
+  const [weatherHintDismissed, setWeatherHintDismissed] = useState(false);
   const [manpower, setManpower] = useState<Manpower[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
@@ -141,6 +152,8 @@ export default function DailyReportFormPage() {
       setTempMax(d.temperature_max != null ? String(d.temperature_max) : "");
       setNotes(d.notes ?? "");
       setDelays((d.delay_causes ?? []).map(({ reason_code, hours, note }) => ({ reason_code, hours, note })));
+      setWindKph(d.weather?.wind_kph);
+      setPrecipMM(d.weather?.precipitation_mm);
       setManpower((d.manpower ?? []).map(({ subcontractor_id, trade, headcount }) => ({ subcontractor_id, trade, headcount })));
       setStaff((d.staff ?? []).map(({ stakeholder_id, grup, ad_soyad, unvan, durum }) => ({ stakeholder_id, grup, ad_soyad, unvan, durum })));
       setEquipment((d.equipment ?? []).map(({ equipment_name, count, working_hours, idle_reason }) => ({ equipment_name, count, working_hours, idle_reason })));
@@ -272,7 +285,9 @@ export default function DailyReportFormPage() {
   function buildBody() {
     return {
       report_date: reportDate,
-      weather: condition ? { condition, source: "manual" } : null,
+      weather: condition
+        ? { condition, wind_kph: windKph, precipitation_mm: precipMM, source: weatherSource }
+        : null,
       temperature_min: tempMin === "" ? null : Number(tempMin),
       temperature_max: tempMax === "" ? null : Number(tempMax),
       notes,
@@ -378,11 +393,16 @@ export default function DailyReportFormPage() {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
-          const r = await api<{ weather: { condition: string; temperature_min?: number; temperature_max?: number } }>(
+          const r = await api<{ weather: { condition: string; temperature_min?: number; temperature_max?: number;
+            wind_kph?: number; precipitation_mm?: number; source?: string } }>(
             `/projects/${pid}/daily-reports/weather?date=${reportDate}&lat=${pos.coords.latitude.toFixed(4)}&lng=${pos.coords.longitude.toFixed(4)}`,
             { projectId: pid }
           );
           setCondition(r.weather.condition);
+          setWindKph(r.weather.wind_kph);
+          setPrecipMM(r.weather.precipitation_mm);
+          setWeatherSource(r.weather.source ?? "manual");
+          setWeatherHintDismissed(false);
           if (r.weather.temperature_min != null) setTempMin(String(r.weather.temperature_min));
           if (r.weather.temperature_max != null) setTempMax(String(r.weather.temperature_max));
           setInfo("Hava durumu ön dolduruldu; kaydetmeden önce kontrol edin.");
@@ -770,6 +790,20 @@ export default function DailyReportFormPage() {
       <div className={section}>
         <h2 className="font-medium text-white text-sm">Gecikme nedenleri</h2>
         <p className="text-xs text-beton-500">Kaybedilen süreyi nedenine göre girin. Gecikme yoksa bu bölüm boş kalır.</p>
+        {!readOnly && canEdit && !weatherHintDismissed && !delays.some((d) => d.reason_code === "Hava") &&
+          ((precipMM ?? 0) >= RAIN_SUGGEST_MM || (windKph ?? 0) >= WIND_SUGGEST_KPH) && (
+          <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-3 text-xs text-sky-200 flex flex-wrap items-center gap-2">
+            <span className="flex-1">
+              Hava koşulları çalışmayı etkilemiş olabilir
+              {(precipMM ?? 0) >= RAIN_SUGGEST_MM ? ` (yağış ${precipMM} mm)` : ""}
+              {(windKph ?? 0) >= WIND_SUGGEST_KPH ? ` (rüzgâr ${windKph} km/sa)` : ""}. Hava gecikmesi eklensin mi?
+            </span>
+            <button className="rounded border border-sky-400 px-2 py-1 hover:bg-sky-500/20"
+              onClick={() => setDelays([...delays, { reason_code: "Hava", hours: 1 }])}>Ekle (1 saat)</button>
+            <button className="rounded px-2 py-1 text-beton-400 hover:text-beton-200"
+              onClick={() => setWeatherHintDismissed(true)}>Yoksay</button>
+          </div>
+        )}
         {delays.map((d, i) => {
           const set = (patch: Partial<DelayCause>) =>
             setDelays(delays.map((x, j) => (j === i ? { ...x, ...patch } : x)));
