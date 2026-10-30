@@ -309,7 +309,7 @@ func (h *Handler) ListActionTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := h.pool.Query(r.Context(), `
 		SELECT mat.action_index, mat.task_id FROM meeting_action_tasks mat
-		JOIN project_meetings m ON m.id = mat.meeting_id AND m.project_id = $2 AND m.deleted_at IS NULL
+		JOIN project_meetings m ON m.id = mat.meeting_id AND m.project_id = $2
 		WHERE mat.meeting_id = $1
 		ORDER BY mat.action_index`, mid, pid)
 	if err != nil {
@@ -354,7 +354,7 @@ func (h *Handler) CreateTaskFromAction(w http.ResponseWriter, r *http.Request) {
 	var raw string
 	if err := h.pool.QueryRow(r.Context(), `
 		SELECT aksiyon_maddeleri::text FROM project_meetings
-		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, mid, pid).Scan(&raw); errors.Is(err, pgx.ErrNoRows) {
+		WHERE id=$1 AND project_id=$2`, mid, pid).Scan(&raw); errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Toplantı bulunamadı.", nil)
 		return
 	} else if err != nil {
