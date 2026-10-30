@@ -18,6 +18,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/cashflow"
 	"github.com/ipks/ipks/backend/internal/changes"
 	"github.com/ipks/ipks/backend/internal/config"
+	"github.com/ipks/ipks/backend/internal/decisions"
 	"github.com/ipks/ipks/backend/internal/contracts"
 	"github.com/ipks/ipks/backend/internal/correspondence"
 	"github.com/ipks/ipks/backend/internal/customreports"
@@ -124,6 +125,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	procH := procurement.NewHandler(pool, eval, recorder, notifySvc, log)
 	riskH := risks.NewHandler(pool, recorder)
 	changeH := changes.NewHandler(pool, recorder)
+	decisionH := decisions.NewHandler(pool, recorder)
 	calendarH := calendarfeed.NewHandler(pool, recorder)
 
 	// --- Faz 8 bağımlılıkları (İSG: checklist, denetim, bulgu, ceza otomasyonu) ---
@@ -519,6 +521,10 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			// Faz 3.3 (E1, ilk adım): değişiklik olayı taslakları — onay akışı yok.
 			pr.With(mw.RequirePermission("changes.view")).Get("/projects/{projectID}/change-events", changeH.List)
 			pr.With(mw.RequirePermission("changes.create")).Post("/projects/{projectID}/change-events", changeH.Create)
+
+			// Faz 3.2 (E3): karar günlüğü — kayıt değiştirilmez, geçersiz kılınır.
+			pr.With(mw.RequirePermission("decisions.view")).Get("/projects/{projectID}/decisions", decisionH.List)
+			pr.With(mw.RequirePermission("decisions.record")).Post("/projects/{projectID}/decisions", decisionH.Create)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Post("/projects/{projectID}/procurement/plan", procH.CreatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Patch("/projects/{projectID}/procurement/plan/{id}", procH.UpdatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Delete("/projects/{projectID}/procurement/plan/{id}", procH.DeletePlanItem)

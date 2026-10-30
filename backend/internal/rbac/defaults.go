@@ -76,6 +76,8 @@ var AllPermissions = []PermissionDef{
 	{"changes", "view", "Değişiklik olaylarını görüntüle"},
 	{"changes", "create", "Değişiklik olayı (taslak) oluştur"},
 	{"calendar", "subscribe", "Kişisel takvim bağlantısı oluştur"},
+	{"decisions", "view", "Proje karar günlüğünü görüntüle"},
+	{"decisions", "record", "Karar kaydı oluştur (geçersiz kılma dahil)"},
 	{"procurement", "create_pr", "Satınalma talebi (PR) oluştur"},
 	{"procurement", "approve_pr", "PR onayla"},
 	{"procurement", "manage_po", "Sipariş (PO) yönet"},
@@ -142,6 +144,7 @@ var roleDefaults = map[string][]string{
 		"procurement.view", "procurement.create_pr", "procurement.approve_pr", "procurement.manage_po", "procurement.upload_delivery",
 		"payments.approve_plan_change",
 		"risks.view", "risks.manage", "changes.view", "changes.create", "calendar.subscribe",
+		"decisions.view", "decisions.record",
 		"equipment.approve_transfer",
 		"attendance.view", "attendance.view_location", "attendance.record",
 		"attendance.adjust", "attendance.approve", "attendance.manage_geofences",
@@ -152,6 +155,7 @@ var roleDefaults = map[string][]string{
 	"SiteManager": {
 		"projects.view",
 		"risks.view", "changes.view", "changes.create", "calendar.subscribe",
+		"decisions.view", "decisions.record",
 		"contracts.view",
 		"progress_payments.view", "progress_payments.approve", "progress_payments.view_financials",
 		"material_approvals.view", "material_approvals.create", "material_approvals.review", "material_approvals.decide",
@@ -170,7 +174,7 @@ var roleDefaults = map[string][]string{
 	},
 	"SiteEngineer": {
 		"projects.view",
-		"risks.view", "changes.view",
+		"risks.view", "changes.view", "decisions.view",
 		"contracts.view",
 		"progress_payments.view", "progress_payments.approve",
 		"material_approvals.view", "material_approvals.create", "material_approvals.review",
