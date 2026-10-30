@@ -511,6 +511,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			// zincirinden bağımsız), manuel ekleme + Excel/CSV toplu içe aktarma.
 			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/procurement/plan", procH.ListPlanItems)
 			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/procurement/plan/unmatched", procH.ListUnmatchedPlanItems)
+			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/procurement/supplier-performance", procH.SupplierPerformance)
 
 			// Faz 3.2 (E3): proje risk kaydı — silme yok, yalnız durum geçişi.
 			pr.With(mw.RequirePermission("risks.view")).Get("/projects/{projectID}/risks", riskH.List)

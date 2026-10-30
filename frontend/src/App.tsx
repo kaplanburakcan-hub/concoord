@@ -44,6 +44,7 @@ import DegisiklikOlaylariPage from "./pages/project/DegisiklikOlaylariPage";
 import KararlarPage from "./pages/project/KararlarPage";
 import UygunsuzluklarPage from "./pages/project/UygunsuzluklarPage";
 import SureUzatimPage from "./pages/project/SureUzatimPage";
+import TedarikciPerformansPage from "./pages/procurement/TedarikciPerformansPage";
 import RisklerPage from "./pages/project/RisklerPage";
 import ProjeKesfiPage from "./pages/project/ProjeKesfiPage";
 import IdariHakedisPage from "./pages/payments/IdariHakedisPage";
@@ -266,6 +267,14 @@ export default function App() {
                         element={
                           <RequirePerm perm="procurement.view">
                             <ProcurementBoardPage />
+                          </RequirePerm>
+                        }
+                      />
+                      <Route
+                        path="/satinalma/performans"
+                        element={
+                          <RequirePerm perm="procurement.view">
+                            <TedarikciPerformansPage />
                           </RequirePerm>
                         }
                       />

@@ -87,6 +87,7 @@ const GROUPS: NavGroup[] = [
           { to: "/satinalma", label: "Akış Panosu", end: true },
           { to: "/satinalma/talepler", label: "Talepler (PR)" },
           { to: "/satinalma/siparisler", label: "Siparişler (PO)" },
+          { to: "/satinalma/performans", label: "Tedarikçi Performansı" },
         ],
       },
       { to: "/malzeme-onaylari", label: "Malzeme Onayları", perm: "material_approvals.view", icon: I.malzeme },
