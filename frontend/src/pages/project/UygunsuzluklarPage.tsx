@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, describeLoadError } from "../../api/client";
+import { apiWithOfflineFallback } from "../../offline/queue";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../../projects/ProjectContext";
 
@@ -22,6 +23,7 @@ export default function UygunsuzluklarPage() {
 
   const [ncrs, setNcrs] = useState<NCR[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [poz, setPoz] = useState("");
@@ -57,14 +59,21 @@ export default function UygunsuzluklarPage() {
     if (!pid || !title.trim()) return;
     setSaving(true);
     try {
-      await api(`/projects/${pid}/ncrs`, {
-        method: "POST", projectId: pid,
+      // Çevrimdışıyken kayıt kuyruğa alınır ve bağlantı gelince gönderilir (E13).
+      // Sunucu iş hataları (örn. belge/taşeron doğrulaması) kuyruklanmaz, hemen gösterilir.
+      const res = await apiWithOfflineFallback({
+        method: "POST", path: `/projects/${pid}/ncrs`, projectId: pid,
         body: {
           title: title.trim(), poz_no: poz.trim() || undefined, description: description.trim() || undefined,
           subcontractor_id: subID || undefined,
         },
+        label: `Uygunsuzluk: ${title.trim()}`,
       });
       setTitle(""); setPoz(""); setDescription(""); setSubID(""); setShowForm(false);
+      if (res.queued) {
+        setInfo("Çevrimdışısınız. Uygunsuzluk kaydı kuyruğa alındı; bağlantı gelince otomatik gönderilir.");
+        return;
+      }
       await load();
     } catch (e) {
       setErr(describeLoadError(e, "Uygunsuzluk kaydı"));
@@ -113,6 +122,7 @@ export default function UygunsuzluklarPage() {
       </div>
 
       {err && <p className="text-sm text-red-400">{err}</p>}
+      {info && <p className="text-sm text-amber-300">{info}</p>}
 
       {showForm && (
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 grid gap-3 md:grid-cols-4">
