@@ -20,6 +20,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/config"
 	"github.com/ipks/ipks/backend/internal/contracts"
 	"github.com/ipks/ipks/backend/internal/correspondence"
+	"github.com/ipks/ipks/backend/internal/costcodes"
 	"github.com/ipks/ipks/backend/internal/customreports"
 	"github.com/ipks/ipks/backend/internal/dashboard"
 	"github.com/ipks/ipks/backend/internal/decisions"
@@ -130,6 +131,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	decisionH := decisions.NewHandler(pool, recorder)
 	ncrH := ncr.NewHandler(pool, recorder)
 	extH := extensions.NewHandler(pool, recorder)
+	costH := costcodes.NewHandler(pool, recorder)
 	calendarH := calendarfeed.NewHandler(pool, recorder)
 
 	// --- Faz 8 bağımlılıkları (İSG: checklist, denetim, bulgu, ceza otomasyonu) ---
@@ -539,6 +541,10 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			// Faz 3.4 (E2, ilk adım): süre uzatımı taslakları — onay ve program etkisi yok.
 			pr.With(mw.RequirePermission("claims.view")).Get("/projects/{projectID}/time-extensions", extH.List)
 			pr.With(mw.RequirePermission("claims.create")).Post("/projects/{projectID}/time-extensions", extH.Create)
+
+			// Faz 3.6 (E6, ilk adım): maliyet kodu tanım listesi — bütçeye bağlı değil.
+			pr.With(mw.RequirePermission("budget.view")).Get("/projects/{projectID}/cost-codes", costH.List)
+			pr.With(mw.RequirePermission("budget.edit")).Post("/projects/{projectID}/cost-codes", costH.Create)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Post("/projects/{projectID}/procurement/plan", procH.CreatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Patch("/projects/{projectID}/procurement/plan/{id}", procH.UpdatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Delete("/projects/{projectID}/procurement/plan/{id}", procH.DeletePlanItem)

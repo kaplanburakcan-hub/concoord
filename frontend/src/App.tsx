@@ -45,6 +45,7 @@ import KararlarPage from "./pages/project/KararlarPage";
 import UygunsuzluklarPage from "./pages/project/UygunsuzluklarPage";
 import SureUzatimPage from "./pages/project/SureUzatimPage";
 import TedarikciPerformansPage from "./pages/procurement/TedarikciPerformansPage";
+import MaliyetKodlariPage from "./pages/project/MaliyetKodlariPage";
 import RisklerPage from "./pages/project/RisklerPage";
 import ProjeKesfiPage from "./pages/project/ProjeKesfiPage";
 import IdariHakedisPage from "./pages/payments/IdariHakedisPage";
@@ -411,6 +412,7 @@ export default function App() {
                       <Route path="/proje/kararlar" element={<RequirePerm perm="decisions.view"><KararlarPage /></RequirePerm>} />
                       <Route path="/proje/uygunsuzluklar" element={<RequirePerm perm="ncr.view"><UygunsuzluklarPage /></RequirePerm>} />
                       <Route path="/proje/sure-uzatimi" element={<RequirePerm perm="claims.view"><SureUzatimPage /></RequirePerm>} />
+                      <Route path="/proje/maliyet-kodlari" element={<RequirePerm perm="budget.view"><MaliyetKodlariPage /></RequirePerm>} />
                       <Route path="/proje/riskler" element={<RequirePerm perm="risks.view"><RisklerPage /></RequirePerm>} />
                       <Route path="/proje/ana-sozlesme" element={<RequirePerm perm="projects.view"><AnaSozlesmePage /></RequirePerm>} />
                       <Route path="/proje/sigorta-policeler" element={<RequirePerm perm="projects.view"><SigortaPolicelerPage /></RequirePerm>} />
