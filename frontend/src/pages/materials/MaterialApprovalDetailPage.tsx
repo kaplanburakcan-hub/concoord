@@ -149,6 +149,16 @@ export default function MaterialApprovalDetailPage() {
         </button>
       )}
 
+      {mar.needed_by_date && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 text-sm text-beton-300 space-y-1">
+          <p>İhtiyaç tarihi: <span className="font-mono text-beton-100">{mar.needed_by_date}</span></p>
+          {mar.lead_time_days != null && <p>Tedarik süresi: <span className="font-mono">{mar.lead_time_days} gün</span></p>}
+          {mar.order_deadline && (
+            <p>Sipariş son tarihi: <span className="font-mono text-emniyet-500">{mar.order_deadline}</span></p>
+          )}
+        </div>
+      )}
+
       {(mar.status === "Approved" || mar.status === "ConditionallyApproved") && can("procurement.create_pr") && (
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 space-y-2">
           <p className="text-sm font-semibold text-beton-200">Satın alma</p>
