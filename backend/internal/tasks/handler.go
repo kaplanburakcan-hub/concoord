@@ -35,18 +35,19 @@ func NewHandler(pool *pgxpool.Pool, eval *rbac.Evaluator, rec *audit.Recorder, n
 }
 
 type taskDTO struct {
-	ID          uuid.UUID     `json:"id"`
-	ProjectID   uuid.UUID     `json:"project_id"`
-	Title       string        `json:"title"`
-	Description *string       `json:"description,omitempty"`
-	Status      string        `json:"status"`
-	Priority    string        `json:"priority"`
-	DueDate     *time.Time    `json:"due_date,omitempty"`
-	CreatedBy   uuid.UUID     `json:"created_by"`
-	KanbanOrder float64       `json:"kanban_order"`
-	RowVersion  int           `json:"row_version"`
-	CreatedAt   time.Time     `json:"created_at"`
-	Assignees   []assigneeDTO `json:"assignees"`
+	ID           uuid.UUID     `json:"id"`
+	ProjectID    uuid.UUID     `json:"project_id"`
+	Title        string        `json:"title"`
+	Description  *string       `json:"description,omitempty"`
+	Status       string        `json:"status"`
+	Priority     string        `json:"priority"`
+	DueDate      *time.Time    `json:"due_date,omitempty"`
+	CreatedBy    uuid.UUID     `json:"created_by"`
+	KanbanOrder  float64       `json:"kanban_order"`
+	RowVersion   int           `json:"row_version"`
+	CreatedAt    time.Time     `json:"created_at"`
+	Assignees    []assigneeDTO `json:"assignees"`
+	SourceModule string        `json:"source_module"`
 }
 
 type assigneeDTO struct {
@@ -56,11 +57,11 @@ type assigneeDTO struct {
 }
 
 const taskCols = `t.id, t.project_id, t.title, t.description, t.status, t.priority,
-	t.due_date, t.created_by, t.kanban_order, t.row_version, t.created_at`
+	t.due_date, t.created_by, t.kanban_order, t.row_version, t.created_at, t.source_module`
 
 func scanTask(row pgx.Row, t *taskDTO) error {
 	return row.Scan(&t.ID, &t.ProjectID, &t.Title, &t.Description, &t.Status, &t.Priority,
-		&t.DueDate, &t.CreatedBy, &t.KanbanOrder, &t.RowVersion, &t.CreatedAt)
+		&t.DueDate, &t.CreatedBy, &t.KanbanOrder, &t.RowVersion, &t.CreatedAt, &t.SourceModule)
 }
 
 func parseID(w http.ResponseWriter, r *http.Request, param string) (uuid.UUID, bool) {

@@ -77,8 +77,8 @@ func (h *Handler) CreateTaskFromFinding(w http.ResponseWriter, r *http.Request) 
 	var taskID uuid.UUID
 	err = tx.QueryRow(r.Context(), `
 		WITH t AS (
-		  INSERT INTO tasks (project_id, title, description, due_date, created_by)
-		  VALUES ($1, $2, $3, $4::date, $5)
+		  INSERT INTO tasks (project_id, title, description, due_date, created_by, source_module)
+		  VALUES ($1, $2, $3, $4::date, $5, 'isg')
 		  RETURNING id
 		)
 		INSERT INTO ohs_finding_tasks (finding_id, task_id, created_by)

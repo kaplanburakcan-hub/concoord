@@ -400,8 +400,8 @@ func (h *Handler) CreateTaskFromAction(w http.ResponseWriter, r *http.Request) {
 	var taskID uuid.UUID
 	err = tx.QueryRow(r.Context(), `
 		WITH t AS (
-		  INSERT INTO tasks (project_id, title, description, due_date, created_by)
-		  VALUES ($3, $4, $6, $7::date, $5)
+		  INSERT INTO tasks (project_id, title, description, due_date, created_by, source_module)
+		  VALUES ($3, $4, $6, $7::date, $5, 'toplanti')
 		  RETURNING id
 		)
 		INSERT INTO meeting_action_tasks (meeting_id, action_index, task_id, created_by)
