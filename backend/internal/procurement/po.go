@@ -92,6 +92,8 @@ type poDTO struct {
 	Status        string        `json:"status"`
 	ExpectedDate  *string       `json:"expected_date,omitempty"`
 	Note          *string       `json:"note,omitempty"`
+	CostCodeID    *uuid.UUID    `json:"cost_code_id,omitempty"`
+	CostCodeName  *string       `json:"cost_code_name,omitempty"`
 	CreatedBy     uuid.UUID     `json:"created_by"`
 	CreatedByName string        `json:"created_by_name"`
 	Overdue       bool          `json:"overdue"` // beklenen tarih geçti, kapanmadı
@@ -111,18 +113,20 @@ const poSelect = `
 	        AND o.status IN ('Ordered','PartiallyDelivered')),
 	       (SELECT count(*) FROM deliveries d
 	         WHERE d.po_id = o.id AND d.deleted_at IS NULL),
-	       o.row_version, o.created_at
+	       o.row_version, o.created_at, o.cost_code_id, cc.code || ' ' || cc.name
 	FROM purchase_orders o
 	JOIN users cu ON cu.id = o.created_by
 	LEFT JOIN purchase_requests pr ON pr.id = o.pr_id
-	LEFT JOIN tedarikciler t ON t.id = o.tedarikci_id`
+	LEFT JOIN tedarikciler t ON t.id = o.tedarikci_id
+	LEFT JOIN cost_codes cc ON cc.id = o.cost_code_id`
 
 func scanPO(row pgx.Row, o *poDTO) error {
 	var cnt int64
 	err := row.Scan(&o.ID, &o.ProjectID, &o.PRID, &o.PRNo, &o.PONo, &o.SupplierName,
 		&o.TedarikciID, &o.TedarikciName,
 		&o.Amount, &o.Currency, &o.Status, &o.ExpectedDate, &o.Note,
-		&o.CreatedBy, &o.CreatedByName, &o.Overdue, &cnt, &o.RowVersion, &o.CreatedAt)
+		&o.CreatedBy, &o.CreatedByName, &o.Overdue, &cnt, &o.RowVersion, &o.CreatedAt,
+		&o.CostCodeID, &o.CostCodeName)
 	o.DeliveryCount = int(cnt)
 	return err
 }
@@ -297,11 +301,12 @@ func (h *Handler) insertPO(ctx context.Context, tx pgx.Tx, pid uuid.UUID, prID *
 	var id uuid.UUID
 	err := tx.QueryRow(ctx, `
 		INSERT INTO purchase_orders
-			(project_id, pr_id, po_no, supplier_name, tedarikci_id, amount, currency, expected_date, note, created_by)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULLIF(btrim(coalesce($9,'')),''),$10)
+			(project_id, pr_id, po_no, supplier_name, tedarikci_id, amount, currency, expected_date, note, created_by,
+			 cost_code_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULLIF(btrim(coalesce($9,'')),''),$10,$11)
 		RETURNING id`,
 		pid, prID, poNo, strings.TrimSpace(req.SupplierName), tedarikciID, req.Amount, currency,
-		expected, req.Note, uid).Scan(&id)
+		expected, req.Note, uid, parseOptUUID(req.CostCodeID)).Scan(&id)
 	if err != nil {
 		return uuid.Nil, "", err
 	}
@@ -440,13 +445,14 @@ func (h *Handler) UpdatePO(w http.ResponseWriter, r *http.Request) {
 	ct, err := h.pool.Exec(r.Context(), `
 		UPDATE purchase_orders
 		SET supplier_name=$3, tedarikci_id=$8, amount=$4, currency=$5, expected_date=$6,
-		    note=NULLIF(btrim(coalesce($7,'')),''),
+		    note=NULLIF(btrim(coalesce($7,'')),''), cost_code_id=$9,
 		    overdue_notified_at=CASE WHEN expected_date IS DISTINCT FROM $6 THEN NULL
 		                             ELSE overdue_notified_at END,
 		    row_version=row_version+1
 		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL
 		  AND status IN ('Ordered','PartiallyDelivered')`,
-		id, pid, strings.TrimSpace(req.SupplierName), req.Amount, currency, expected, req.Note, tedarikciID)
+		id, pid, strings.TrimSpace(req.SupplierName), req.Amount, currency, expected, req.Note, tedarikciID,
+		parseOptUUID(req.CostCodeID))
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -972,4 +978,17 @@ func NotifyApproachingPOs(ctx context.Context, pool *pgxpool.Pool, nt *notify.Se
 			log.Error("yaklaşan teslim işareti yazılamadı", "po", x.id, "err", err)
 		}
 	}
+}
+
+// parseOptUUID — boş veya geçersiz metni nil'e çevirir; geçerli UUID'yi döndürür.
+// Geçersiz kimlik, veritabanına gitmeden yok sayılır (alan isteğe bağlıdır).
+func parseOptUUID(s *string) *uuid.UUID {
+	if s == nil || strings.TrimSpace(*s) == "" {
+		return nil
+	}
+	d, err := uuid.Parse(strings.TrimSpace(*s))
+	if err != nil {
+		return nil
+	}
+	return &d
 }

@@ -29,6 +29,7 @@ export type PO = {
   supplier_name: string; tedarikci_id?: string; tedarikci_name?: string;
   amount?: number; currency: string; status: string;
   expected_date?: string; note?: string; created_by_name: string;
+  cost_code_id?: string; cost_code_name?: string;
   overdue: boolean; delivery_count: number; deliveries?: Delivery[];
   row_version: number; created_at: string;
 };
@@ -60,6 +61,9 @@ export default function PurchaseOrdersPage() {
   const [supplier, setSupplier] = useState("");
   const [tedarikciId, setTedarikciId] = useState("");
   const [tedarikciler, setTedarikciler] = useState<{ id: string; company_name: string }[]>([]);
+  // Maliyet kodu (E6 / B6): isteğe bağlı; liste yalnız maliyet kodu izni olanlara gelir.
+  const [costCodeId, setCostCodeId] = useState("");
+  const [costCodes, setCostCodes] = useState<{ id: string; code: string; name: string }[]>([]);
   const [amount, setAmount] = useState("");
   const [expected, setExpected] = useState("");
   const [note, setNote] = useState("");
@@ -85,6 +89,9 @@ export default function PurchaseOrdersPage() {
     api<{ tedarikciler: { id: string; company_name: string }[] }>(`/projects/${pid}/tedarikciler`, { projectId: pid })
       .then((r) => setTedarikciler(r.tedarikciler ?? []))
       .catch(() => setTedarikciler([]));
+    api<{ cost_codes: { id: string; code: string; name: string }[] }>(`/projects/${pid}/cost-codes`, { projectId: pid })
+      .then((r) => setCostCodes(r.cost_codes ?? []))
+      .catch(() => setCostCodes([]));
   }, [pid]);
 
   // Akış panosundaki "Yeni ..." düğmesi buraya ?yeni=1 ile gelir ve formu açar.
@@ -112,9 +119,10 @@ export default function PurchaseOrdersPage() {
           amount: amount ? Number(amount) : undefined,
           expected_date: expected || undefined,
           note: note.trim() || undefined,
+          cost_code_id: costCodeId || undefined,
         },
       });
-      setSupplier(""); setTedarikciId(""); setAmount(""); setExpected(""); setNote(""); setShowForm(false);
+      setSupplier(""); setTedarikciId(""); setAmount(""); setExpected(""); setNote(""); setCostCodeId(""); setShowForm(false);
       load();
     } catch { setErr("Sipariş oluşturulamadı."); }
   }
@@ -156,6 +164,13 @@ export default function PurchaseOrdersPage() {
           </label>
           <label className="text-xs text-beton-300">
             Kayıtlı tedarikçi (ödeme planı için)
+            {costCodes.length > 0 && (
+              <select value={costCodeId} onChange={(e) => setCostCodeId(e.target.value)}
+                className="mt-1 block rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100">
+                <option value="">— maliyet kodu (isteğe bağlı) —</option>
+                {costCodes.map((c) => <option key={c.id} value={c.id}>{c.code} {c.name}</option>)}
+              </select>
+            )}
             <select value={tedarikciId}
               onChange={(e) => {
                 setTedarikciId(e.target.value);
@@ -198,6 +213,7 @@ export default function PurchaseOrdersPage() {
               <th className="px-3 py-2">No</th>
               <th className="px-3 py-2">Durum</th>
               <th className="px-3 py-2">Tedarikçi</th>
+              <th className="px-3 py-2">Maliyet Kodu</th>
               <th className="px-3 py-2">Tutar</th>
               <th className="px-3 py-2">Beklenen Teslim</th>
               <th className="px-3 py-2">Teslimat</th>
@@ -218,6 +234,7 @@ export default function PurchaseOrdersPage() {
                   </span>
                 </td>
                 <td className="px-3 py-2 text-beton-100">{o.supplier_name}</td>
+                <td className="px-3 py-2 text-beton-400 text-xs">{o.cost_code_name ?? "—"}</td>
                 <td className="px-3 py-2 text-beton-300">{fmtAmt(o)}</td>
                 <td className="px-3 py-2">
                   {o.expected_date ?? "—"}
@@ -228,7 +245,7 @@ export default function PurchaseOrdersPage() {
               </tr>
             ))}
             {pos.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-6 text-center text-beton-500">Kayıt yok.</td></tr>
+              <tr><td colSpan={8} className="px-3 py-6 text-center text-beton-500">Kayıt yok.</td></tr>
             )}
           </tbody>
         </table>

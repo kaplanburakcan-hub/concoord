@@ -64,6 +64,7 @@ type poReq struct {
 	Currency     *string  `json:"currency"`
 	ExpectedDate *string  `json:"expected_date"` // YYYY-MM-DD | null
 	Note         *string  `json:"note"`
+	CostCodeID   *string  `json:"cost_code_id"` // isteğe bağlı; boş = yok
 }
 
 // validatePO — PO başlık doğrulaması. expected nil olabilir (tarih belirsiz).
