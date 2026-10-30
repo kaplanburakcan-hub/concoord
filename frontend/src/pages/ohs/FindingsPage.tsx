@@ -163,6 +163,17 @@ export default function FindingsPage() {
     } finally { setBusy(false); }
   }
 
+  // Bulgudan düzeltici görev (B11). Bulgu başına en fazla bir görev; ikinci istek 409 döner.
+  async function makeTask(f: Finding) {
+    try {
+      await api(`/projects/${pid}/ohs/findings/${f.id}/task`, { method: "POST", projectId: pid });
+      setErr(null);
+      alert("Düzeltici görev oluşturuldu.");
+    } catch (e) {
+      setErr(e instanceof Error && e.message ? e.message : "Görev oluşturulamadı.");
+    }
+  }
+
   async function transition(f: Finding, action: "start" | "close") {
     let note = "";
     if (action === "close") {
@@ -364,6 +375,10 @@ export default function FindingsPage() {
                           className="text-emniyet-500 hover:underline">Fotoğraf</button>
                       )}
                     </div>
+                    {f.status !== "Closed" && can("tasks.create") && (
+                      <button onClick={() => makeTask(f)}
+                        className="text-[10.5px] text-blue-400 hover:underline">Göreve dönüştür</button>
+                    )}
                     <div className="flex items-center justify-between pt-0.5">
                       <span className={f.overdue ? "text-[10px] text-red-400 font-semibold" : "text-[10px] text-beton-500"}>
                         {f.overdue

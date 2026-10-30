@@ -573,6 +573,8 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("ohs.perform_inspection")).Post("/projects/{projectID}/ohs/findings", ohsH.CreateFinding)
 			pr.With(mw.RequirePermission("ohs.view")).Post("/projects/{projectID}/ohs/findings/{id}/start", ohsH.StartFinding)
 			pr.With(mw.RequirePermission("ohs.perform_inspection")).Post("/projects/{projectID}/ohs/findings/{id}/close", ohsH.CloseFinding)
+			// B11: İSG bulgusundan düzeltici görev (bulgu başına en fazla bir görev).
+			pr.With(mw.RequirePermission("tasks.create")).Post("/projects/{projectID}/ohs/findings/{id}/task", ohsH.CreateTaskFromFinding)
 
 			// Ceza tutanakları.
 			pr.With(mw.RequirePermission("ohs.view")).Get("/projects/{projectID}/ohs/penalties", ohsH.ListPenalties)
