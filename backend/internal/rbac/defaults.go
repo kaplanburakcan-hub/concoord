@@ -130,6 +130,7 @@ var Roles = []RoleDef{
 	{"Client", "İşveren / Müşteri"},
 	{"ProcurementOfficer", "Satınalma Sorumlusu"},
 	{"OHSExpert", "İSG Uzmanı"},
+	{"Consultant", "Müşavir"},
 }
 
 // roleDefaults — rol → varsayılan izin kodları. Admin tümünü alır (aşağıda
@@ -239,6 +240,10 @@ var roleDefaults = map[string][]string{
 		"reports.view",
 		"procurement.view", "procurement.create_pr", "procurement.approve_pr",
 		"procurement.manage_po", "procurement.upload_delivery",
+	},
+	// Müşavir: yalnız okuma. Yazma izinleri verilmez (E14, ilk adım).
+	"Consultant": {
+		"projects.view", "schedule.view", "risks.view", "ncr.view", "decisions.view",
 	},
 	"OHSExpert": {
 		"projects.view",
