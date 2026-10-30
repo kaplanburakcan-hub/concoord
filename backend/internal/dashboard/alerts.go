@@ -141,6 +141,44 @@ func RunControlAlerts(ctx context.Context, pool *pgxpool.Pool, nt *notify.Servic
 				fmt.Sprintf("Yaşlanan İSG bulgusu: %s", p.code),
 				fmt.Sprintf("[%s] %s — %d günden uzun süredir açık.", f.sev, d, settings.FindingAgingDays))
 		}
+
+		// --- Yanıt tarihi geçmiş yazışmalar (E5) ---
+		// Cevap bekleyen (cevap_gerekli) ve hâlâ 'Açık' olan kayıtlar; tarih
+		// geçmişse PY'ye bildirilir. Kayıt ay içinde bir kez uyarılır.
+		type rfi struct {
+			id    uuid.UUID
+			evrak string
+			konu  string
+			tarih time.Time
+		}
+		var overdue []rfi
+		orows, err := pool.Query(ctx, `
+			SELECT id, evrak_no, konu, cevap_tarihi FROM correspondences
+			WHERE project_id=$1 AND deleted_at IS NULL
+			  AND cevap_gerekli AND durum='Açık'
+			  AND cevap_tarihi IS NOT NULL AND cevap_tarihi < $2::date`,
+			p.id, now.Format("2006-01-02"))
+		if err != nil {
+			log.Error("uyarı taraması: yazışmalar okunamadı", "err", err, "project", p.id)
+			continue
+		}
+		for orows.Next() {
+			var r rfi
+			if orows.Scan(&r.id, &r.evrak, &r.konu, &r.tarih) == nil {
+				overdue = append(overdue, r)
+			}
+		}
+		orows.Close()
+		for _, r := range overdue {
+			k := r.konu
+			if len(k) > 80 {
+				k = k[:79] + "…"
+			}
+			raiseAlert(ctx, pool, nt, log, p.id, "rfi_overdue:"+r.id.String(), period,
+				notify.TypeRFIOverdue,
+				fmt.Sprintf("Yanıtı geciken yazışma: %s", r.evrak),
+				fmt.Sprintf("%s — yanıt tarihi %s geçti.", k, r.tarih.Format("02.01.2006")))
+		}
 	}
 }
 
