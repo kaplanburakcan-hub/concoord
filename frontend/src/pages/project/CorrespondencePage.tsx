@@ -35,6 +35,90 @@ type Correspondence = {
 };
 
 type Doc = { id: string; title: string; latest_version?: number };
+type LinkedDoc = { id: string; title: string; linked_by_name: string; linked_at: string };
+
+// Mevcut proje belgelerini yazışmaya çok-çoka bağlama (B18). Belge ve yazışma değişmez.
+function LinkedDocs({ projectId, correspondenceId, canEdit }: { projectId: string; correspondenceId: string; canEdit: boolean }) {
+  const [linked, setLinked] = useState<LinkedDoc[]>([]);
+  const [all, setAll] = useState<Doc[]>([]);
+  const [pick, setPick] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const r = await api<{ documents: LinkedDoc[] }>(
+        `/projects/${projectId}/correspondences/${correspondenceId}/document-links`, { projectId });
+      setLinked(r.documents ?? []);
+    } catch { setLinked([]); }
+  }, [projectId, correspondenceId]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!canEdit || !projectId) return;
+    api<{ documents: Doc[] }>(`/projects/${projectId}/documents`, { projectId })
+      .then((r) => setAll(r.documents ?? [])).catch(() => setAll([]));
+  }, [canEdit, projectId]);
+
+  async function link() {
+    if (!pick) return;
+    setErr(null);
+    try {
+      await api(`/projects/${projectId}/correspondences/${correspondenceId}/document-links`, {
+        method: "POST", projectId, body: { document_id: pick },
+      });
+      setPick(""); await load();
+    } catch (e) {
+      setErr(e instanceof Error && e.message ? e.message : "Belge bağlanamadı.");
+    }
+  }
+
+  async function unlink(id: string) {
+    try {
+      await api(`/projects/${projectId}/correspondences/${correspondenceId}/document-links/${id}`, {
+        method: "DELETE", projectId,
+      });
+      await load();
+    } catch { setErr("Bağ kaldırılamadı."); }
+  }
+
+  const linkedIds = new Set(linked.map((d) => d.id));
+  const candidates = all.filter((d) => !linkedIds.has(d.id));
+
+  return (
+    <div className="mb-3">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mb-1.5">İlişkili belgeler</p>
+      {linked.length === 0 ? (
+        <p className="text-beton-600 italic text-[11.5px] mb-2">Bağlı belge yok.</p>
+      ) : (
+        <ul className="space-y-1 mb-2">
+          {linked.map((d) => (
+            <li key={d.id} className="flex items-center gap-2 text-[12px]">
+              <span className="text-beton-200">🔗 {d.title}</span>
+              {canEdit && (
+                <button onClick={() => unlink(d.id)} className="text-[11px] text-red-400 hover:underline">Kaldır</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {canEdit && candidates.length > 0 && (
+        <div className="flex items-center gap-2">
+          <select value={pick} onChange={(e) => setPick(e.target.value)}
+            className="flex-1 rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-[11px] text-beton-100">
+            <option value="">— proje belgesi seç —</option>
+            {candidates.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+          </select>
+          <button onClick={link} disabled={!pick}
+            className="rounded-md border border-beton-700 px-2.5 py-1 text-[11px] text-beton-200 hover:border-emniyet-500 disabled:opacity-50">
+            Bağla
+          </button>
+        </div>
+      )}
+      {err && <p className="text-[11px] text-red-400 mt-1">{err}</p>}
+    </div>
+  );
+}
 type DocVersion = { id: string; version_no: number; original_name: string; size_bytes: number };
 
 const KATEGORILER = ["Genel", "Teknik", "İdari", "Mali", "İSG", "Onay Talebi"];
@@ -511,6 +595,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
                                     ))}
                                   </ul>
                                 )}
+                                <LinkedDocs projectId={pid ?? ""} correspondenceId={c.id} canEdit={canManage} />
                                 {canManage && can("documents.upload") && (
                                   <div className="flex items-center gap-2">
                                     <input ref={fileRef} type="file" className="text-[11px] text-beton-400 flex-1" />

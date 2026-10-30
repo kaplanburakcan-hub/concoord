@@ -788,6 +788,10 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("correspondence.view")).Get("/projects/{projectID}/correspondences", correspondenceH.List)
 			pr.With(mw.RequirePermission("correspondence.create")).Post("/projects/{projectID}/correspondences", correspondenceH.Create)
 			pr.With(mw.RequirePermission("correspondence.view")).Get("/projects/{projectID}/correspondences/{id}", correspondenceH.Get)
+			// B18: yazışma ↔ belge çok-çoka bağlantıları (belge ve yazışma değişmez).
+			pr.With(mw.RequirePermission("correspondence.view")).Get("/projects/{projectID}/correspondences/{id}/document-links", correspondenceH.ListDocLinks)
+			pr.With(mw.RequirePermission("correspondence.edit")).Post("/projects/{projectID}/correspondences/{id}/document-links", correspondenceH.AddDocLink)
+			pr.With(mw.RequirePermission("correspondence.edit")).Delete("/projects/{projectID}/correspondences/{id}/document-links/{docID}", correspondenceH.RemoveDocLink)
 			pr.With(mw.RequirePermission("correspondence.edit")).Patch("/projects/{projectID}/correspondences/{id}", correspondenceH.Update)
 			pr.With(mw.RequirePermission("correspondence.delete")).Delete("/projects/{projectID}/correspondences/{id}", correspondenceH.Delete)
 		})
