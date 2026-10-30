@@ -202,6 +202,29 @@ func RunControlAlerts(ctx context.Context, pool *pgxpool.Pool, nt *notify.Servic
 				fmt.Sprintf("Yanıt tarihi %s — 3 gün içinde.", x.tarih.Format("02.01.2006")))
 		}
 
+		// --- Haftalık proje özeti (E11): yalnız sayılar, hafta başına bir kez ---
+		var digest struct{ risks, lateTedarik, rfiOver, ncrOpen, tasksOver int }
+		if err := pool.QueryRow(ctx, `
+			SELECT
+			  (SELECT count(*) FROM project_risks WHERE project_id=$1 AND deleted_at IS NULL AND status<>'Kapandı'),
+			  (SELECT count(*) FROM procurement_plan_items WHERE project_id=$1 AND deleted_at IS NULL
+			     AND planned_delivery_date < CURRENT_DATE AND status<>'TeslimAlindi'),
+			  (SELECT count(*) FROM correspondences WHERE project_id=$1 AND deleted_at IS NULL
+			     AND cevap_gerekli AND durum='Açık' AND cevap_tarihi < CURRENT_DATE),
+			  (SELECT count(*) FROM ncrs WHERE project_id=$1 AND status='Açık'),
+			  (SELECT count(*) FROM tasks WHERE project_id=$1 AND deleted_at IS NULL
+			     AND status<>'Done' AND due_date < CURRENT_DATE)`, p.id).
+			Scan(&digest.risks, &digest.lateTedarik, &digest.rfiOver, &digest.ncrOpen, &digest.tasksOver); err != nil {
+			log.Error("haftalık özet: sayılar okunamadı", "err", err, "project", p.id)
+		} else {
+			year, week := now.ISOWeek()
+			raiseAlert(ctx, pool, nt, log, p.id, "weekly_digest", fmt.Sprintf("%04d-W%02d", year, week),
+				notify.TypeWeeklyDigest,
+				fmt.Sprintf("Haftalık proje özeti: %s", p.code),
+				fmt.Sprintf("Açık risk %d · geciken tedarik %d · yanıtı geciken yazışma %d · açık uygunsuzluk %d · vadesi geçen görev %d.",
+					digest.risks, digest.lateTedarik, digest.rfiOver, digest.ncrOpen, digest.tasksOver))
+		}
+
 		// --- Yüksek skorlu açık riskler (E3): olasılık × etki >= 15 ---
 		type hr struct {
 			id    uuid.UUID
