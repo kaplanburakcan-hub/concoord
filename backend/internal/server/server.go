@@ -34,6 +34,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/notify"
 	"github.com/ipks/ipks/backend/internal/ohs"
 	"github.com/ipks/ipks/backend/internal/ohsaccidents"
+	"github.com/ipks/ipks/backend/internal/changes"
 	"github.com/ipks/ipks/backend/internal/paymentplans"
 	"github.com/ipks/ipks/backend/internal/risks"
 	"github.com/ipks/ipks/backend/internal/payments"
@@ -121,6 +122,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	// --- Faz 7 bağımlılıkları (satınalma ve tedarik zinciri) ---
 	procH := procurement.NewHandler(pool, eval, recorder, notifySvc, log)
 	riskH := risks.NewHandler(pool, recorder)
+	changeH := changes.NewHandler(pool, recorder)
 
 	// --- Faz 8 bağımlılıkları (İSG: checklist, denetim, bulgu, ceza otomasyonu) ---
 	ohsH := ohs.NewHandler(pool, eval, recorder, notifySvc, store, log)
@@ -503,6 +505,10 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("risks.view")).Get("/projects/{projectID}/risks", riskH.List)
 			pr.With(mw.RequirePermission("risks.manage")).Post("/projects/{projectID}/risks", riskH.Create)
 			pr.With(mw.RequirePermission("risks.manage")).Patch("/projects/{projectID}/risks/{id}", riskH.Update)
+
+			// Faz 3.3 (E1, ilk adım): değişiklik olayı taslakları — onay akışı yok.
+			pr.With(mw.RequirePermission("changes.view")).Get("/projects/{projectID}/change-events", changeH.List)
+			pr.With(mw.RequirePermission("changes.create")).Post("/projects/{projectID}/change-events", changeH.Create)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Post("/projects/{projectID}/procurement/plan", procH.CreatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Patch("/projects/{projectID}/procurement/plan/{id}", procH.UpdatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Delete("/projects/{projectID}/procurement/plan/{id}", procH.DeletePlanItem)
