@@ -361,6 +361,15 @@ func (h *Handler) ConvertPR(w http.ResponseWriter, r *http.Request) {
 			"Yalnızca onaylanmış PR siparişe dönüştürülebilir.", nil)
 		return
 	}
+	// PR'da maliyet kodu varsa ve sipariş isteğinde ayrıca verilmemişse siparişe devredilir.
+	if req.CostCodeID == nil || strings.TrimSpace(*req.CostCodeID) == "" {
+		var prCode *uuid.UUID
+		if err := tx.QueryRow(r.Context(),
+			`SELECT cost_code_id FROM purchase_requests WHERE id=$1`, prID).Scan(&prCode); err == nil && prCode != nil {
+			code := prCode.String()
+			req.CostCodeID = &code
+		}
+	}
 	id, poNo, err := h.insertPO(r.Context(), tx, pid, &prID, uid, req, expected)
 	if err != nil {
 		httpx.Internal(w, r)

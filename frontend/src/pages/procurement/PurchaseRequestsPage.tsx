@@ -41,6 +41,9 @@ export default function PurchaseRequestsPage() {
   const [showForm, setShowForm] = useState(false);
   const [neededBy, setNeededBy] = useState("");
   const [note, setNote] = useState("");
+  // Maliyet kodu (E8 / E6): isteğe bağlı; liste yalnız maliyet kodu izni olanlara gelir.
+  const [costCodeId, setCostCodeId] = useState("");
+  const [costCodes, setCostCodes] = useState<{ id: string; code: string; name: string }[]>([]);
   const [items, setItems] = useState<PRItem[]>([{ ...EMPTY_ITEM }]);
   const pid = current?.id;
   const kesinKabul = useKesinKabulTarihi(pid);
@@ -56,6 +59,12 @@ export default function PurchaseRequestsPage() {
   }, [pid]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!pid) return;
+    api<{ cost_codes: { id: string; code: string; name: string }[] }>(`/projects/${pid}/cost-codes`, { projectId: pid })
+      .then((r) => setCostCodes(r.cost_codes ?? []))
+      .catch(() => setCostCodes([]));
+  }, [pid]);
 
   // Akış panosundaki "Yeni ..." düğmesi buraya ?yeni=1 ile gelir ve formu açar.
   // Parametre açıldıktan HEMEN SONRA temizlenir; iki sebeple:
@@ -91,6 +100,7 @@ export default function PurchaseRequestsPage() {
         method: "POST", projectId: pid,
         body: {
           needed_by_date: neededBy,
+          cost_code_id: costCodeId || undefined,
           note: note.trim() || undefined,
           items: items
             .filter((it) => it.material_name.trim())
@@ -103,7 +113,7 @@ export default function PurchaseRequestsPage() {
             })),
         },
       });
-      setNeededBy(""); setNote(""); setItems([{ ...EMPTY_ITEM }]); setShowForm(false);
+      setNeededBy(""); setNote(""); setCostCodeId(""); setItems([{ ...EMPTY_ITEM }]); setShowForm(false);
       load();
     } catch (e) {
       setErr(e instanceof Error && e.message ? e.message : "PR oluşturulamadı.");
@@ -151,6 +161,16 @@ export default function PurchaseRequestsPage() {
               <input value={note} onChange={(e) => setNote(e.target.value)}
                 className="mt-1 block w-full rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
             </label>
+            {costCodes.length > 0 && (
+              <label className="flex-1 min-w-[220px] text-xs text-beton-300">
+                Maliyet kodu (opsiyonel)
+                <select value={costCodeId} onChange={(e) => setCostCodeId(e.target.value)}
+                  className="mt-1 block w-full rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100">
+                  <option value="">— seçilmedi —</option>
+                  {costCodes.map((c) => <option key={c.id} value={c.id}>{c.code} {c.name}</option>)}
+                </select>
+              </label>
+            )}
           </div>
           <div className="space-y-2">
             {items.map((it, i) => (
