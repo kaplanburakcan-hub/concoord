@@ -330,9 +330,20 @@ func (h *Handler) decide(w http.ResponseWriter, r *http.Request, approve bool) {
 				httpx.Internal(w, r)
 				return
 			}
+			var newMachineID uuid.UUID
+			if err := tx.QueryRow(ctx,
+				`INSERT INTO project_machines (project_id, company_equipment_id, from_transfer_id) VALUES ($1,$2,$3)
+				 RETURNING id`,
+				toProjectID, equipmentID, id).Scan(&newMachineID); err != nil {
+				httpx.Internal(w, r)
+				return
+			}
+			// Makine günlüğüne taşıma kaydı (B23): hedef projede, bugünün tarihiyle.
+			// Yalnız giriş; çalışma miktarı 0'dır ve transfer akışı değişmez.
 			if _, err := tx.Exec(ctx,
-				`INSERT INTO project_machines (project_id, company_equipment_id, from_transfer_id) VALUES ($1,$2,$3)`,
-				toProjectID, equipmentID, id); err != nil {
+				`INSERT INTO project_machine_logs (project_id, machine_id, tarih, calisma_miktari, aciklama)
+				 VALUES ($1,$2,CURRENT_DATE,0,$3)`,
+				toProjectID, newMachineID, "Transfer ile projeye geldi (talep "+id.String()+")"); err != nil {
 				httpx.Internal(w, r)
 				return
 			}
