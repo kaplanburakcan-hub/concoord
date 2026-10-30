@@ -6,7 +6,7 @@ import { useProjects } from "../../projects/ProjectContext";
 // Maliyet kodu tanım listesi (E6, ilk adım). Yalnız tanım: bütçe, PO ve hakediş
 // ile bağlantı bu aşamada yoktur.
 
-type CostCode = { id: string; code: string; name: string; parent_id?: string; created_by_name: string; created_at: string };
+type CostCode = { id: string; code: string; name: string; parent_id?: string; budget?: number; created_by_name: string; created_at: string };
 
 const inp = "rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100 outline-none focus:border-emniyet-500";
 
@@ -23,6 +23,25 @@ export default function MaliyetKodlariPage() {
   const [name, setName] = useState("");
   const [parent, setParent] = useState("");
   const [saving, setSaving] = useState(false);
+  // Bütçe tutarı girişi (E6, ilk adım): yalnız giriş; EVM ve sapma hesabı yok.
+  const [budgetDraft, setBudgetDraft] = useState<Record<string, string>>({});
+
+  async function saveBudget(c: CostCode) {
+    if (!pid) return;
+    const raw = (budgetDraft[c.id] ?? "").trim();
+    const amount = Number(raw);
+    if (raw === "" || Number.isNaN(amount) || amount < 0) {
+      setErr("Bütçe için 0 veya daha büyük bir tutar girin.");
+      return;
+    }
+    try {
+      await api(`/projects/${pid}/cost-codes/${c.id}/budget`, { method: "PUT", projectId: pid, body: { amount } });
+      setBudgetDraft((d) => { const n = { ...d }; delete n[c.id]; return n; });
+      await load();
+    } catch (e) {
+      setErr(describeLoadError(e, "Bütçe"));
+    }
+  }
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -101,18 +120,34 @@ export default function MaliyetKodlariPage() {
               <th className="py-2 px-3">Kod</th>
               <th className="py-2 px-3">Ad</th>
               <th className="py-2 px-3">Üst kod</th>
+              <th className="py-2 px-3 text-right">Bütçe</th>
               <th className="py-2 px-3">Ekleyen</th>
             </tr>
           </thead>
           <tbody>
             {codes.length === 0 && (
-              <tr><td colSpan={4} className="py-6 text-center text-beton-500">Maliyet kodu tanımlı değil.</td></tr>
+              <tr><td colSpan={5} className="py-6 text-center text-beton-500">Maliyet kodu tanımlı değil.</td></tr>
             )}
             {codes.map((c) => (
               <tr key={c.id} className="border-b border-beton-800/60">
                 <td className="py-2 px-3 font-mono text-beton-200">{c.code}</td>
                 <td className="py-2 px-3 text-beton-100">{c.name}</td>
                 <td className="py-2 px-3 text-beton-400 text-xs">{c.parent_id ? nameOf[c.parent_id] ?? "—" : "—"}</td>
+                <td className="py-2 px-3 text-right">
+                  {canEdit ? (
+                    <div className="flex items-center justify-end gap-2">
+                      <input type="number" min={0} step="0.01"
+                        value={budgetDraft[c.id] ?? (c.budget != null ? String(c.budget) : "")}
+                        onChange={(e) => setBudgetDraft((d) => ({ ...d, [c.id]: e.target.value }))}
+                        className={`${inp} w-32 text-right font-mono`} placeholder="0,00" />
+                      {budgetDraft[c.id] !== undefined && (
+                        <button onClick={() => saveBudget(c)} className="text-xs text-emniyet-500 hover:underline">Kaydet</button>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="font-mono text-beton-300">{c.budget != null ? c.budget.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) : "—"}</span>
+                  )}
+                </td>
                 <td className="py-2 px-3 text-beton-500 text-xs">{c.created_by_name} · {c.created_at}</td>
               </tr>
             ))}

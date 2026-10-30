@@ -545,6 +545,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			// Faz 3.6 (E6, ilk adım): maliyet kodu tanım listesi — bütçeye bağlı değil.
 			pr.With(mw.RequirePermission("budget.view")).Get("/projects/{projectID}/cost-codes", costH.List)
 			pr.With(mw.RequirePermission("budget.edit")).Post("/projects/{projectID}/cost-codes", costH.Create)
+			pr.With(mw.RequirePermission("budget.edit")).Put("/projects/{projectID}/cost-codes/{codeID}/budget", costH.SetBudget)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Post("/projects/{projectID}/procurement/plan", procH.CreatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Patch("/projects/{projectID}/procurement/plan/{id}", procH.UpdatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Delete("/projects/{projectID}/procurement/plan/{id}", procH.DeletePlanItem)
