@@ -67,6 +67,7 @@ const GROUPS: NavGroup[] = [
       { to: "/proje/riskler", label: "Risk Kaydı", perm: "risks.view", icon: I.rapor },
       { to: "/proje/kararlar", label: "Karar Günlüğü", perm: "decisions.view", icon: I.rapor },
       { to: "/proje/uygunsuzluklar", label: "Uygunsuzluklar", perm: "ncr.view", icon: I.rapor },
+      { to: "/proje/sure-uzatimi", label: "Süre Uzatımı", perm: "claims.view", icon: I.gantt },
       { to: "/proje/degisiklikler", label: "Değişiklik Olayları", perm: "changes.view", icon: I.sozlesme },
       { to: "/verimlilik-normlari", label: "Verimlilik Normları", perm: "reports.view", icon: I.rapor },
       { to: "/proje/ana-sozlesme", label: "Ana Sözleşme", perm: "projects.view", icon: I.sozlesme },
