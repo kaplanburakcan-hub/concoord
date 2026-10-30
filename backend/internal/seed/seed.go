@@ -61,6 +61,8 @@ var registry = []Step{
 	{Name: "0015_plan_adimlari_izin_ve_musavir_sync", Run: stepPlanVeMusavirSync},
 	// Taşeron temsilcisi: uygunsuzluk ve bulgu görünümü (E14) izinlerinin senkronu.
 	{Name: "0016_taseron_gorunumu_izin_sync", Run: stepFaz2PermSync},
+	// İşveren (Client) salt okunur görünüm izinleri (E14, sahip görünümü).
+	{Name: "0017_sahip_gorunumu_izin_sync", Run: stepFaz2PermSync},
 }
 
 // stepFaz2PermSync — izin sözlüğünü ve rol varsayılanlarını yeniden senkronlar.

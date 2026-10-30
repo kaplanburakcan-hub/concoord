@@ -216,7 +216,7 @@ var roleDefaults = map[string][]string{
 		// Satır seviyesi güvenlik: yalnızca kendi firmasının kayıtları (backend'de zorunlu).
 	},
 	"Client": {
-		"projects.view",
+		"projects.view", "schedule.view", "decisions.view",
 		"contracts.view",
 		"progress_payments.view", "progress_payments.view_financials",
 		"material_approvals.view", "material_approvals.review", "material_approvals.decide",

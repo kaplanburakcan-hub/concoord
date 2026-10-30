@@ -137,3 +137,21 @@ func nullIfEmpty(s string) *string {
 	}
 	return &s
 }
+
+// isClientOnly — kullanıcı bu projede yalnız İşveren/Müşteri (Client) rolündeyse ve
+// hakediş onaylama yetkisi yoksa true. Bu kullanıcı yalnız kesinleşmiş hakedişleri görür.
+func (h *Handler) isClientOnly(r *http.Request, pid uuid.UUID) bool {
+	uid, ok := auth.UserIDFrom(r.Context())
+	if !ok {
+		return false
+	}
+	var isClient bool
+	if err := h.pool.QueryRow(r.Context(), `
+		SELECT EXISTS(SELECT 1 FROM project_members pm JOIN roles ro ON ro.id=pm.role_id
+		              WHERE pm.user_id=$1 AND pm.project_id=$2 AND pm.deleted_at IS NULL AND ro.code='Client')`,
+		uid, pid).Scan(&isClient); err != nil || !isClient {
+		return false
+	}
+	canApprove, err := h.eval.Can(r.Context(), uid, &pid, "progress_payments.approve")
+	return err == nil && !canApprove
+}
