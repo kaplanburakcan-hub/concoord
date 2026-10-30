@@ -80,7 +80,12 @@ export default function PurchaseRequestsPage() {
     if (sp.has("yeni")) {
       const kalem = sp.get("kalem");
       if (kalem) {
-        setItems([{ ...EMPTY_ITEM, material_name: kalem, spec: sp.get("spec") || undefined }]);
+        // Tedarik planından gelen miktar ve birim de (varsa) ön doldurulur.
+        const qty = Number(sp.get("miktar"));
+        setItems([{
+          ...EMPTY_ITEM, material_name: kalem, spec: sp.get("spec") || undefined,
+          qty: qty > 0 ? qty : EMPTY_ITEM.qty, unit: sp.get("birim") || EMPTY_ITEM.unit,
+        }]);
       }
       const not = sp.get("not");
       if (not) setNote(not);

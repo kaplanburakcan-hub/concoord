@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, apiUpload, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
@@ -320,7 +321,13 @@ export default function ProcurementPlanPage() {
                   )}
                 </td>
                 {canManage && (
-                  <td className="py-2 px-3 text-right">
+                  <td className="py-2 px-3 text-right whitespace-nowrap">
+                    <Link
+                      to={`/satinalma/talepler?${new URLSearchParams({
+                        yeni: "1", kalem: it.description, miktar: it.quantity != null ? String(it.quantity) : "",
+                        birim: it.unit ?? "", not: `Tedarik planı${it.poz_no ? ` · poz ${it.poz_no}` : ""}`,
+                      }).toString()}`}
+                      className="text-xs text-emniyet-500 hover:underline mr-3">PR taslağı</Link>
                     <button onClick={() => setConfirmDeleteId(it.id)} className="text-xs text-red-400 hover:underline">Sil</button>
                   </td>
                 )}
