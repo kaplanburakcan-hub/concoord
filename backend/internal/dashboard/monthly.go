@@ -94,6 +94,10 @@ type MonthlySnapshot struct {
 		PenaltiesTotal float64 `json:"penalties_total"`
 	} `json:"ohs"`
 
+	// Gecikme nedenleri (E16): ay içindeki gönderilmiş günlük raporların
+	// yapılandırılmış gecikme kayıtları, nedene göre toplanır.
+	DelayCauses []MonthlyDelayCause `json:"delay_causes"`
+
 	// Tedarik.
 	Procurement struct {
 		POsOrdered   int `json:"pos_ordered"`
@@ -101,6 +105,22 @@ type MonthlySnapshot struct {
 		POsOverdue   int `json:"pos_overdue"`
 		PRsPending   int `json:"prs_pending"`
 	} `json:"procurement"`
+}
+
+// MonthlyDelayCause — bir gecikme nedeninin ay içindeki toplamı.
+type MonthlyDelayCause struct {
+	ReasonCode string  `json:"reason_code"`
+	Label      string  `json:"label"`
+	Hours      float64 `json:"hours"`
+	Reports    int     `json:"reports"` // bu nedenin geçtiği farklı rapor sayısı
+}
+
+// delayReasonTR — gecikme nedeni kodunun Türkçe etiketi (rapor ekranıyla aynı).
+var delayReasonTR = map[string]string{
+	"Hava": "Hava koşulları", "Sahip": "Sahip / müşteri kaynaklı",
+	"Tasarim": "Tasarım / proje değişikliği", "Taseron": "Taşeron kaynaklı",
+	"Malzeme": "Malzeme tedarik", "Ekipman": "Ekipman arızası",
+	"Idari": "İdari / resmi işlem", "Diger": "Diğer",
 }
 
 // buildMonthlySnapshot — ayın tüm verisini derler (Plan Faz 9: EVM + finansal
@@ -241,6 +261,32 @@ func (h *Handler) buildMonthlySnapshot(ctx context.Context, pid uuid.UUID, year,
 		pid, start, start.AddDate(0, 1, 0)).
 		Scan(&sn.Procurement.POsOrdered, &sn.Procurement.POsDelivered,
 			&sn.Procurement.POsOverdue, &sn.Procurement.PRsPending); err != nil {
+		return nil, err
+	}
+	// Gecikme nedenleri: yalnızca gönderilmiş (Submitted) günlük raporlar sayılır.
+	drows, err := h.pool.Query(ctx, `
+		SELECT elem->>'reason_code', sum((elem->>'hours')::numeric)::float8, count(DISTINCT dr.id)
+		FROM daily_reports dr, jsonb_array_elements(dr.delay_causes) elem
+		WHERE dr.project_id=$1 AND dr.deleted_at IS NULL AND dr.status='Submitted'
+		  AND dr.report_date BETWEEN $2 AND $3
+		GROUP BY elem->>'reason_code'
+		ORDER BY sum((elem->>'hours')::numeric) DESC`, pid, start, end)
+	if err != nil {
+		return nil, err
+	}
+	defer drows.Close()
+	for drows.Next() {
+		var c MonthlyDelayCause
+		if err := drows.Scan(&c.ReasonCode, &c.Hours, &c.Reports); err != nil {
+			return nil, err
+		}
+		c.Label = delayReasonTR[c.ReasonCode]
+		if c.Label == "" {
+			c.Label = c.ReasonCode
+		}
+		sn.DelayCauses = append(sn.DelayCauses, c)
+	}
+	if err := drows.Err(); err != nil {
 		return nil, err
 	}
 	return sn, nil

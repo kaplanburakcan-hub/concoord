@@ -32,6 +32,26 @@ type CashExpense = { description: string; category: string; amount: number; rece
 
 const CASH_CATEGORIES = ["Yakıt", "Yemek", "Nakliye", "Küçük Malzeme", "Diğer"];
 
+// Gecikme nedeni (E16): sabit kodlar, kullanıcıya Türkçe etiket gösterilir.
+type DelayCause = { reason_code: string; hours: number; note?: string };
+const DELAY_REASONS: [string, string][] = [
+  ["Hava", "Hava koşulları"],
+  ["Sahip", "Sahip / müşteri kaynaklı"],
+  ["Tasarim", "Tasarım / proje değişikliği"],
+  ["Taseron", "Taşeron kaynaklı"],
+  ["Malzeme", "Malzeme tedarik"],
+  ["Ekipman", "Ekipman arızası"],
+  ["Idari", "İdari / resmi işlem"],
+  ["Diger", "Diğer"],
+];
+const DELAY_LABEL = Object.fromEntries(DELAY_REASONS);
+
+// Hava gecikmesi önerisi (E2): bu eşiklerin üzerindeki günlerde form, "Hava"
+// gecikmesi ekleyebileceğini sorar. Kayda yalnız kullanıcı eklerse girer.
+// Eşikler varsayımdır; proje bazında ayarlanabilir hale getirilebilir.
+const RAIN_SUGGEST_MM = 10;
+const WIND_SUGGEST_KPH = 50;
+
 type Detail = {
   id: string;
   report_date: string;
@@ -41,6 +61,8 @@ type Detail = {
   temperature_min?: number;
   temperature_max?: number;
   notes?: string;
+  delay_causes?: DelayCause[];
+  issue_flagged?: boolean;
   author_name: string;
   cover_photo_file_id?: string;
   manpower?: (Manpower & { subcontractor_name?: string })[];
@@ -93,6 +115,13 @@ export default function DailyReportFormPage() {
   const [tempMin, setTempMin] = useState("");
   const [tempMax, setTempMax] = useState("");
   const [notes, setNotes] = useState("");
+  const [delays, setDelays] = useState<DelayCause[]>([]);
+  const [issueFlagged, setIssueFlagged] = useState(false);
+  // Hava ölçümleri (öneri ve kayıt için): ön doldurmadan veya kayıttan gelir.
+  const [windKph, setWindKph] = useState<number | undefined>(undefined);
+  const [weatherSource, setWeatherSource] = useState<string>("manual");
+  const [precipMM, setPrecipMM] = useState<number | undefined>(undefined);
+  const [weatherHintDismissed, setWeatherHintDismissed] = useState(false);
   const [manpower, setManpower] = useState<Manpower[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
@@ -124,6 +153,10 @@ export default function DailyReportFormPage() {
       setTempMin(d.temperature_min != null ? String(d.temperature_min) : "");
       setTempMax(d.temperature_max != null ? String(d.temperature_max) : "");
       setNotes(d.notes ?? "");
+      setDelays((d.delay_causes ?? []).map(({ reason_code, hours, note }) => ({ reason_code, hours, note })));
+      setIssueFlagged(!!d.issue_flagged);
+      setWindKph(d.weather?.wind_kph);
+      setPrecipMM(d.weather?.precipitation_mm);
       setManpower((d.manpower ?? []).map(({ subcontractor_id, trade, headcount }) => ({ subcontractor_id, trade, headcount })));
       setStaff((d.staff ?? []).map(({ stakeholder_id, grup, ad_soyad, unvan, durum }) => ({ stakeholder_id, grup, ad_soyad, unvan, durum })));
       setEquipment((d.equipment ?? []).map(({ equipment_name, count, working_hours, idle_reason }) => ({ equipment_name, count, working_hours, idle_reason })));
@@ -255,10 +288,14 @@ export default function DailyReportFormPage() {
   function buildBody() {
     return {
       report_date: reportDate,
-      weather: condition ? { condition, source: "manual" } : null,
+      weather: condition
+        ? { condition, wind_kph: windKph, precipitation_mm: precipMM, source: weatherSource }
+        : null,
       temperature_min: tempMin === "" ? null : Number(tempMin),
       temperature_max: tempMax === "" ? null : Number(tempMax),
       notes,
+      delay_causes: delays,
+      issue_flagged: issueFlagged,
       manpower,
       staff,
       equipment,
@@ -360,11 +397,16 @@ export default function DailyReportFormPage() {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
-          const r = await api<{ weather: { condition: string; temperature_min?: number; temperature_max?: number } }>(
+          const r = await api<{ weather: { condition: string; temperature_min?: number; temperature_max?: number;
+            wind_kph?: number; precipitation_mm?: number; source?: string } }>(
             `/projects/${pid}/daily-reports/weather?date=${reportDate}&lat=${pos.coords.latitude.toFixed(4)}&lng=${pos.coords.longitude.toFixed(4)}`,
             { projectId: pid }
           );
           setCondition(r.weather.condition);
+          setWindKph(r.weather.wind_kph);
+          setPrecipMM(r.weather.precipitation_mm);
+          setWeatherSource(r.weather.source ?? "manual");
+          setWeatherHintDismissed(false);
           if (r.weather.temperature_min != null) setTempMin(String(r.weather.temperature_min));
           if (r.weather.temperature_max != null) setTempMax(String(r.weather.temperature_max));
           setInfo("Hava durumu ön dolduruldu; kaydetmeden önce kontrol edin.");
@@ -746,6 +788,58 @@ export default function DailyReportFormPage() {
         <label className={label}>Genel notlar</label>
         <textarea rows={3} className={input} value={notes} disabled={readOnly || !canEdit}
           onChange={(e) => setNotes(e.target.value)} />
+        <label className="flex items-center gap-2 text-xs text-beton-300">
+          <input type="checkbox" checked={issueFlagged} disabled={readOnly || !canEdit}
+            onChange={(e) => setIssueFlagged(e.target.checked)} />
+          Bu raporda sorun var (gönderilince proje yöneticisine bildirim gider)
+        </label>
+      </div>
+
+      {/* Gecikme nedenleri (E16) */}
+      <div className={section}>
+        <h2 className="font-medium text-white text-sm">Gecikme nedenleri</h2>
+        <p className="text-xs text-beton-500">Kaybedilen süreyi nedenine göre girin. Gecikme yoksa bu bölüm boş kalır.</p>
+        {!readOnly && canEdit && !weatherHintDismissed && !delays.some((d) => d.reason_code === "Hava") &&
+          ((precipMM ?? 0) >= RAIN_SUGGEST_MM || (windKph ?? 0) >= WIND_SUGGEST_KPH) && (
+          <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-3 text-xs text-sky-200 flex flex-wrap items-center gap-2">
+            <span className="flex-1">
+              Hava koşulları çalışmayı etkilemiş olabilir
+              {(precipMM ?? 0) >= RAIN_SUGGEST_MM ? ` (yağış ${precipMM} mm)` : ""}
+              {(windKph ?? 0) >= WIND_SUGGEST_KPH ? ` (rüzgâr ${windKph} km/sa)` : ""}. Hava gecikmesi eklensin mi?
+            </span>
+            <button className="rounded border border-sky-400 px-2 py-1 hover:bg-sky-500/20"
+              onClick={() => setDelays([...delays, { reason_code: "Hava", hours: 1 }])}>Ekle (1 saat)</button>
+            <button className="rounded px-2 py-1 text-beton-400 hover:text-beton-200"
+              onClick={() => setWeatherHintDismissed(true)}>Yoksay</button>
+          </div>
+        )}
+        {delays.map((d, i) => {
+          const set = (patch: Partial<DelayCause>) =>
+            setDelays(delays.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+          return (
+            <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_7rem_1fr_auto] gap-2 items-start">
+              <select className={input} value={d.reason_code} disabled={readOnly || !canEdit}
+                onChange={(e) => set({ reason_code: e.target.value })}>
+                {DELAY_REASONS.map(([code, text]) => <option key={code} value={code}>{text}</option>)}
+              </select>
+              <input type="number" min={0.5} max={24} step={0.5} className={input} value={d.hours}
+                disabled={readOnly || !canEdit} onChange={(e) => set({ hours: Number(e.target.value) })} />
+              <input type="text" className={input} placeholder="Açıklama (isteğe bağlı)" value={d.note ?? ""}
+                disabled={readOnly || !canEdit} onChange={(e) => set({ note: e.target.value })} />
+              {!readOnly && canEdit && (
+                <button className="text-xs text-red-400 hover:underline py-2"
+                  onClick={() => setDelays(delays.filter((_, j) => j !== i))}>
+                  Kaldır
+                </button>
+              )}
+            </div>
+          );
+        })}
+        {!readOnly && canEdit && (
+          <button className={addBtn} onClick={() => setDelays([...delays, { reason_code: "Hava", hours: 1 }])}>
+            + Gecikme ekle
+          </button>
+        )}
       </div>
 
       {/* Depo-Stok Özeti */}
@@ -1217,6 +1311,27 @@ function ReadOnlyView({
         <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
           <SecHeader color="#4e6a87" title="Notlar & Açıklamalar" />
           <p className="px-4 py-3 text-sm text-beton-300 leading-relaxed">{detail.notes}</p>
+        </div>
+      )}
+
+      {detail.issue_flagged && (
+        <div className="rounded-md border border-red-500/40 bg-red-500/10 px-4 py-2 text-xs text-red-200">
+          Bu rapor sorun olarak işaretlendi.
+        </div>
+      )}
+
+      {detail.delay_causes && detail.delay_causes.length > 0 && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
+          <SecHeader color="#f59e0b" title="Gecikme nedenleri" count={detail.delay_causes.length} />
+          <div className="divide-y divide-beton-800/60">
+            {detail.delay_causes.map((d, i) => (
+              <div key={i} className="px-4 py-2.5 flex items-center gap-3 text-sm">
+                <span className="flex-1 text-beton-100">{DELAY_LABEL[d.reason_code] ?? d.reason_code}</span>
+                <span className="font-mono text-beton-300">{d.hours} sa</span>
+                {d.note && <span className="text-beton-400 truncate max-w-[40%]">{d.note}</span>}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

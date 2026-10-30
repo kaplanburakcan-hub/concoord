@@ -2,6 +2,7 @@ package schedule
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -229,4 +230,40 @@ func (h *Handler) ComputeSCurve(ctx context.Context, projectID uuid.UUID, from, 
 		})
 	}
 	return out, nil
+}
+
+// PlannedPhysicalFromSnapshot — dondurulmuş bir baseline anlık görüntüsünden
+// `at` anındaki planlanan fiziksel ilerlemeyi (0-100) döndürür. ComputeSCurve
+// ile AYNI ilke (plannedPhysicalAt) kullanılır; böylece EVM'nin PV'si ile iş
+// programındaki S-eğrisi aynı sayıya çıkar. Dashboard, PV kaynağı "baseline"
+// seçildiğinde bu fonksiyonu kullanır.
+func PlannedPhysicalFromSnapshot(snapshot []byte, at time.Time) (float64, error) {
+	var snap []baselineSnapshotItem
+	if err := json.Unmarshal(snapshot, &snap); err != nil {
+		return 0, err
+	}
+	dates := make([]itemDates, 0, len(snap))
+	for _, s := range snap {
+		dates = append(dates, itemDates{
+			ID:             s.ID,
+			ParentID:       s.ParentID,
+			Weight:         s.Weight,
+			BaselineStart:  snapshotDate(s.BaselineStart),
+			BaselineFinish: snapshotDate(s.BaselineFinish),
+		})
+	}
+	return plannedPhysicalAt(dates, at), nil
+}
+
+// snapshotDate — anlık görüntüdeki "YYYY-MM-DD" (veya tarih öneki taşıyan)
+// metni zamana çevirir; boş veya bozuksa nil.
+func snapshotDate(s *string) *time.Time {
+	if s == nil || len(*s) < 10 {
+		return nil
+	}
+	t, err := time.Parse("2006-01-02", (*s)[:10])
+	if err != nil {
+		return nil
+	}
+	return &t
 }

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { api } from "../../api/client";
 import { useProjects } from "../ProjectContext";
 import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
@@ -65,6 +65,35 @@ const taCls =
 // ── Detay Paneli ─────────────────────────────────────────────────────────────
 function MeetingDetail({ m, onClose }: { m: Meeting; onClose: () => void }) {
   const aksiyonlar = parseAksiyon(m.aksiyon_maddeleri);
+  // Hangi aksiyon satırından görev açılmış (E15). Satır başına en fazla bir görev.
+  const [linked, setLinked] = useState<Record<number, string>>({});
+  const [taskErr, setTaskErr] = useState<string | null>(null);
+  const [taskBusy, setTaskBusy] = useState<number | null>(null);
+  const loadLinked = useCallback(async () => {
+    try {
+      const r = await api<{ action_tasks: { action_index: number; task_id: string }[] }>(
+        `/projects/${m.project_id}/meetings/${m.id}/action-tasks`, { projectId: m.project_id });
+      const map: Record<number, string> = {};
+      for (const x of r.action_tasks ?? []) map[x.action_index] = x.task_id;
+      setLinked(map);
+    } catch { /* yetkisi yoksa gizlenir */ }
+  }, [m.id, m.project_id]);
+  useEffect(() => { loadLinked(); }, [loadLinked]);
+  async function makeTask(i: number) {
+    setTaskBusy(i); setTaskErr(null);
+    try {
+      const r = await api<{ task_id: string }>(
+        `/projects/${m.project_id}/meetings/${m.id}/actions/${i}/task`,
+        { method: "POST", projectId: m.project_id });
+      setLinked((prev) => ({ ...prev, [i]: r.task_id }));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Görev oluşturulamadı.";
+      setTaskErr(msg);
+      await loadLinked();
+    } finally {
+      setTaskBusy(null);
+    }
+  }
   const turuMeta   = TURU_META[m.toplanti_turu] ?? TURU_META.ilerleme;
   const durumMeta  = DURUM_META[m.durum] ?? DURUM_META.planli;
 
@@ -125,12 +154,21 @@ function MeetingDetail({ m, onClose }: { m: Meeting; onClose: () => void }) {
             <div className="text-xs font-semibold text-beton-400 uppercase tracking-wide mb-2">
               Aksiyon Maddeleri ({aksiyonlar.length})
             </div>
+            {taskErr && <div className="text-xs text-red-400 mb-2">{taskErr}</div>}
             <div className="space-y-2">
               {aksiyonlar.map((a, i) => (
                 <div key={i} className="flex items-start gap-3 bg-[var(--bg-hover)] rounded-lg p-3">
                   <span className="text-xs font-bold text-beton-400 w-5 mt-0.5 shrink-0">{i + 1}.</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-beton-100">{a.aksiyon}</div>
+                    {linked[i] ? (
+                      <div className="text-xs text-green-400 mt-0.5">✓ Göreve dönüştürüldü</div>
+                    ) : (
+                      <button onClick={() => makeTask(i)} disabled={taskBusy === i}
+                        className="text-xs text-blue-400 hover:underline mt-0.5 disabled:opacity-50">
+                        Göreve dönüştür
+                      </button>
+                    )}
                     <div className="flex flex-wrap gap-2 mt-1">
                       {a.sorumlu && (
                         <span className="text-xs text-beton-400">👤 {a.sorumlu}</span>

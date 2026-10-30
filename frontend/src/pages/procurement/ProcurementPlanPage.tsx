@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, apiUpload, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
@@ -66,6 +67,10 @@ export default function ProcurementPlanPage() {
   const [saving, setSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Salt okunur "PO'ya bağlanmamış" görünümü (E8): plan kalemi, aynı malzeme
+  // adıyla iptal edilmemiş bir PO'da yoksa listelenir.
+  const [view, setView] = useState<"all" | "unmatched">("all");
+  const [unmatched, setUnmatched] = useState<PlanItem[]>([]);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -79,6 +84,25 @@ export default function ProcurementPlanPage() {
   }, [pid]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Gecikmiş: teslim tarihi bugünden önce ve kalem teslim alınmamış. Tarih
+  // karşılaştırması yerel takvim gününe göre yapılır (sv-SE → YYYY-MM-DD).
+  const today = new Date().toLocaleDateString("sv-SE");
+  const isLate = (it: PlanItem) =>
+    !!it.planned_delivery_date && it.planned_delivery_date < today && it.status !== "TeslimAlindi";
+  const lateCount = items.filter(isLate).length;
+
+  const loadUnmatched = useCallback(async () => {
+    if (!pid) return;
+    try {
+      const r = await api<{ items: PlanItem[] }>(`/projects/${pid}/procurement/plan/unmatched`, { projectId: pid });
+      setUnmatched(r.items ?? []);
+    } catch (e) {
+      setErr(describeLoadError(e, "Eşleşmeyen kalemler"));
+    }
+  }, [pid]);
+
+  useEffect(() => { if (view === "unmatched") loadUnmatched(); }, [view, loadUnmatched, items]);
 
   async function create() {
     if (!pid || !form.description.trim()) return;
@@ -235,6 +259,23 @@ export default function ProcurementPlanPage() {
         </div>
       )}
 
+      {lateCount > 0 && (
+        <p className="text-xs text-red-300">
+          Gecikmiş kalem: <span className="font-semibold">{lateCount}</span>
+          <span className="text-beton-500"> (teslim tarihi geçmiş, teslim alınmamış)</span>
+        </p>
+      )}
+
+      <div className="flex gap-2 text-xs">
+        {(["all", "unmatched"] as const).map((v) => (
+          <button key={v} onClick={() => setView(v)}
+            className={`rounded-md px-3 py-1.5 border ${view === v
+              ? "border-emniyet-500 text-emniyet-500" : "border-beton-800 text-beton-400 hover:text-beton-200"}`}>
+            {v === "all" ? "Tüm kalemler" : `PO'ya bağlanmamış (${unmatched.length})`}
+          </button>
+        ))}
+      </div>
+
       <div className="overflow-x-auto rounded-lg border border-beton-800">
         <table className="w-full text-sm">
           <thead>
@@ -252,8 +293,8 @@ export default function ProcurementPlanPage() {
             </tr>
           </thead>
           <tbody>
-            {items.map((it) => (
-              <tr key={it.id} className="border-b border-beton-800/60 hover:bg-beton-900/30">
+            {(view === "all" ? items : unmatched).map((it) => (
+              <tr key={it.id} className={`border-b border-beton-800/60 hover:bg-beton-900/30 ${isLate(it) ? "bg-red-500/10" : ""}`}>
                 <td className="py-2 px-3 text-beton-400 text-xs font-mono">{it.poz_no ?? "—"}</td>
                 <td className="py-2 px-3 text-beton-100">
                   {it.description}
@@ -280,7 +321,13 @@ export default function ProcurementPlanPage() {
                   )}
                 </td>
                 {canManage && (
-                  <td className="py-2 px-3 text-right">
+                  <td className="py-2 px-3 text-right whitespace-nowrap">
+                    <Link
+                      to={`/satinalma/talepler?${new URLSearchParams({
+                        yeni: "1", kalem: it.description, miktar: it.quantity != null ? String(it.quantity) : "",
+                        birim: it.unit ?? "", not: `Tedarik planı${it.poz_no ? ` · poz ${it.poz_no}` : ""}`,
+                      }).toString()}`}
+                      className="text-xs text-emniyet-500 hover:underline mr-3">PR taslağı</Link>
                     <button onClick={() => setConfirmDeleteId(it.id)} className="text-xs text-red-400 hover:underline">Sil</button>
                   </td>
                 )}

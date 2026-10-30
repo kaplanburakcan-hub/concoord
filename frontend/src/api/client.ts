@@ -59,7 +59,21 @@ export function describeLoadError(e: unknown, resource: string): string {
   return `${resource} yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.`;
 }
 
-async function refresh(): Promise<boolean> {
+// Yenileme tek uçuşta (single-flight): aynı anda gelen birden çok 401, tek bir
+// yenileme isteği paylaşır. Refresh token döndürüldüğünden (rotasyon) eşzamanlı
+// ikinci bir yenileme eski belirteçle başarısız olur ve oturumu düşürürdü.
+let refreshInflight: Promise<boolean> | null = null;
+
+function refresh(): Promise<boolean> {
+  if (!refreshInflight) {
+    refreshInflight = doRefresh().finally(() => {
+      refreshInflight = null;
+    });
+  }
+  return refreshInflight;
+}
+
+async function doRefresh(): Promise<boolean> {
   const rt = getRefreshToken();
   if (!rt) return false;
   const res = await fetch(`${BASE}/api/v1/auth/refresh`, {

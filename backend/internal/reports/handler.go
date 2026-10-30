@@ -108,6 +108,14 @@ type cashExpenseDTO struct {
 	ReceiptNo   *string   `json:"receipt_no,omitempty"`
 }
 
+// delayCauseDTO — günlük rapordaki bir gecikme kaydı (E16). Kodlar sabit
+// listedir (bkz. validate.go delayReasonCodes); saatler günün en fazla 24 saatidir.
+type delayCauseDTO struct {
+	ReasonCode string  `json:"reason_code"`
+	Hours      float64 `json:"hours"`
+	Note       string  `json:"note,omitempty"`
+}
+
 type dailyDTO struct {
 	ID               uuid.UUID       `json:"id"`
 	ProjectID        uuid.UUID       `json:"project_id"`
@@ -125,6 +133,8 @@ type dailyDTO struct {
 	RowVersion       int             `json:"row_version"`
 	CreatedAt        time.Time       `json:"created_at"`
 	CoverPhotoFileID *uuid.UUID      `json:"cover_photo_file_id,omitempty"`
+	DelayCauses      []delayCauseDTO `json:"delay_causes"`
+	IssueFlagged     bool            `json:"issue_flagged"`
 
 	Manpower     []manpowerDTO    `json:"manpower,omitempty"`
 	Staff        []staffDTO       `json:"staff,omitempty"`
@@ -144,6 +154,8 @@ type dailyInput struct {
 	Equipment    []equipmentDTO   `json:"equipment"`
 	WorkEntries  []workEntryDTO   `json:"work_entries"`
 	CashExpenses []cashExpenseDTO `json:"cash_expenses"`
+	DelayCauses  []delayCauseDTO  `json:"delay_causes"`
+	IssueFlagged bool             `json:"issue_flagged"`
 }
 
 // ---------------------------------------------------------------------------
@@ -189,14 +201,14 @@ const drSelect = `
 	SELECT dr.id, dr.project_id, to_char(dr.report_date,'YYYY-MM-DD'), dr.revision_no,
 	       dr.parent_report_id, dr.weather, dr.temperature_min, dr.temperature_max,
 	       dr.notes, dr.status, dr.author_id, u.full_name, dr.submitted_at,
-	       dr.row_version, dr.created_at, dr.cover_photo_file_id
+	       dr.row_version, dr.created_at, dr.cover_photo_file_id, dr.delay_causes, dr.issue_flagged
 	FROM daily_reports dr
 	JOIN users u ON u.id = dr.author_id`
 
 func scanDaily(row pgx.Row, d *dailyDTO) error {
 	return row.Scan(&d.ID, &d.ProjectID, &d.ReportDate, &d.RevisionNo, &d.ParentReportID,
 		&d.Weather, &d.TempMin, &d.TempMax, &d.Notes, &d.Status,
-		&d.AuthorID, &d.AuthorName, &d.SubmittedAt, &d.RowVersion, &d.CreatedAt, &d.CoverPhotoFileID)
+		&d.AuthorID, &d.AuthorName, &d.SubmittedAt, &d.RowVersion, &d.CreatedAt, &d.CoverPhotoFileID, &d.DelayCauses, &d.IssueFlagged)
 }
 
 // loadLines — bir raporun satırlarını doldurur.
@@ -533,10 +545,11 @@ func (h *Handler) CreateDaily(w http.ResponseWriter, r *http.Request) {
 	var id uuid.UUID
 	err = tx.QueryRow(r.Context(), `
 		INSERT INTO daily_reports (project_id, report_date, weather, temperature_min,
-		                           temperature_max, notes, author_id)
-		VALUES ($1,$2::date,$3,$4,$5,NULLIF(btrim($6),''),$7)
+		                           temperature_max, notes, author_id, delay_causes, issue_flagged)
+		VALUES ($1,$2::date,$3,$4,$5,NULLIF(btrim($6),''),$7,$8::jsonb,$9)
 		RETURNING id`,
-		pid, in.ReportDate, nullJSON(in.Weather), in.TempMin, in.TempMax, in.Notes, uid).Scan(&id)
+		pid, in.ReportDate, nullJSON(in.Weather), in.TempMin, in.TempMax, in.Notes, uid,
+		delayCausesJSON(in.DelayCauses), in.IssueFlagged).Scan(&id)
 	if isUniqueViolation(err) {
 		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
 			"Bu tarih için rapor zaten var. Gönderilmiş raporu düzeltmek için revizyon açın.", nil)
@@ -605,9 +618,9 @@ func (h *Handler) UpdateDaily(w http.ResponseWriter, r *http.Request) {
 	ct, err := tx.Exec(r.Context(), `
 		UPDATE daily_reports
 		SET weather=$3, temperature_min=$4, temperature_max=$5,
-		    notes=NULLIF(btrim($6),''), row_version=row_version+1
+		    notes=NULLIF(btrim($6),''), delay_causes=$7::jsonb, issue_flagged=$8, row_version=row_version+1
 		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`,
-		id, pid, nullJSON(in.Weather), in.TempMin, in.TempMax, in.Notes)
+		id, pid, nullJSON(in.Weather), in.TempMin, in.TempMax, in.Notes, delayCausesJSON(in.DelayCauses), in.IssueFlagged)
 	if isLockViolation(err) {
 		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
 			"Gönderilmiş rapor değiştirilemez; düzeltme için revizyon açın.", nil)
@@ -687,9 +700,10 @@ func (h *Handler) SubmitDaily(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 
 	var status string
+	var flagged bool
 	err = tx.QueryRow(r.Context(), `
-		SELECT status FROM daily_reports
-		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL FOR UPDATE`, id, pid).Scan(&status)
+		SELECT status, issue_flagged FROM daily_reports
+		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL FOR UPDATE`, id, pid).Scan(&status, &flagged)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Günlük rapor bulunamadı.", nil)
 		return
@@ -725,6 +739,9 @@ func (h *Handler) SubmitDaily(w http.ResponseWriter, r *http.Request) {
 	if err := tx.Commit(r.Context()); err != nil {
 		httpx.Internal(w, r)
 		return
+	}
+	if flagged {
+		h.notifyIssueReport(r.Context(), pid, id, uid)
 	}
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "Submitted"})
 }
@@ -790,11 +807,11 @@ func (h *Handler) ReviseDaily(w http.ResponseWriter, r *http.Request) {
 	var newID uuid.UUID
 	err = tx.QueryRow(r.Context(), `
 		INSERT INTO daily_reports (project_id, report_date, revision_no, parent_report_id,
-		                           weather, temperature_min, temperature_max, notes, author_id)
+		                           weather, temperature_min, temperature_max, notes, delay_causes, issue_flagged, author_id)
 		SELECT project_id, report_date,
 		       (SELECT max(revision_no)+1 FROM daily_reports x
 		        WHERE x.project_id=$2 AND x.report_date=$3::date AND x.deleted_at IS NULL),
-		       id, weather, temperature_min, temperature_max, notes, $4
+		       id, weather, temperature_min, temperature_max, notes, delay_causes, issue_flagged, $4
 		FROM daily_reports WHERE id=$1
 		RETURNING id`, id, pid, reportDate, uid).Scan(&newID)
 	if isUniqueViolation(err) {
@@ -1053,6 +1070,19 @@ func (h *Handler) GetCoverPhoto(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, obj.Body)
 }
 
+// delayCausesJSON — gecikme listesini jsonb parametresine çevirir; nil liste
+// veritabanında boş dizi olarak saklanır.
+func delayCausesJSON(causes []delayCauseDTO) string {
+	if causes == nil {
+		return "[]"
+	}
+	b, err := json.Marshal(causes)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
+}
+
 func nullJSON(raw json.RawMessage) interface{} {
 	s := strings.TrimSpace(string(raw))
 	if s == "" || s == "null" {
@@ -1153,4 +1183,42 @@ func (h *Handler) DailyContext(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.JSON(w, http.StatusOK, out)
+}
+
+// notifyIssueReport — 'sorun' işaretli günlük rapor gönderildiğinde proje
+// yöneticilerine (progress_payments.finalize varsayılanı) bildirim gönderir.
+// Yalnız bildirimdir; rapor değişmez, görev veya kayıt açılmaz.
+func (h *Handler) notifyIssueReport(ctx context.Context, pid, reportID, actor uuid.UUID) {
+	var date string
+	if err := h.pool.QueryRow(ctx, `
+		SELECT to_char(report_date,'DD.MM.YYYY') FROM daily_reports WHERE id=$1`, reportID).Scan(&date); err != nil {
+		slog.Error("sorun bildirimi: rapor okunamadı", "err", err, "report", reportID)
+		return
+	}
+	rows, err := h.pool.Query(ctx, `
+		SELECT pm.user_id, r.code FROM project_members pm
+		JOIN roles r ON r.id = pm.role_id
+		WHERE pm.project_id=$1 AND pm.deleted_at IS NULL`, pid)
+	if err != nil {
+		slog.Error("sorun bildirimi: üyeler okunamadı", "err", err, "project", pid)
+		return
+	}
+	defer rows.Close()
+	var targets []uuid.UUID
+	for rows.Next() {
+		var uid uuid.UUID
+		var role string
+		if rows.Scan(&uid, &role) == nil && uid != actor && rbac.RoleHasDefault(role, "progress_payments.finalize") {
+			targets = append(targets, uid)
+		}
+	}
+	if len(targets) == 0 {
+		return
+	}
+	h.nt.Send(ctx, notify.Input{
+		UserIDs: targets, Type: notify.TypeDailyIssueReported,
+		Title:      "Günlük rapor sorun olarak işaretlendi — " + date,
+		Body:       "Rapor gönderildi; sorun notu içeriyor. Ayrıntı için günlük rapora bakın.",
+		EntityType: "daily_reports", EntityID: &reportID, ProjectID: &pid,
+	})
 }

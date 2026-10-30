@@ -60,6 +60,8 @@ type prDTO struct {
 	DecidedByName   *string     `json:"decided_by_name,omitempty"`
 	DecidedAt       *time.Time  `json:"decided_at,omitempty"`
 	DecisionNote    *string     `json:"decision_note,omitempty"`
+	CostCodeID      *uuid.UUID  `json:"cost_code_id,omitempty"`
+	CostCodeName    *string     `json:"cost_code_name,omitempty"`
 	POID            *uuid.UUID  `json:"po_id,omitempty"` // Converted ise bağlı sipariş
 	PONo            *string     `json:"po_no,omitempty"`
 	Overdue         bool        `json:"overdue"` // ihtiyaç tarihi geçti, sipariş yok
@@ -77,18 +79,20 @@ const prSelect = `
 	       (p.needed_by_date < CURRENT_DATE AND p.status IN ('Submitted','Approved')),
 	       (SELECT count(*) FROM purchase_request_items i
 	         WHERE i.pr_id = p.id AND i.deleted_at IS NULL),
-	       p.row_version, p.created_at
+	       p.row_version, p.created_at, p.cost_code_id, cc.code || ' ' || cc.name
 	FROM purchase_requests p
 	JOIN users ru ON ru.id = p.requested_by
 	LEFT JOIN users du ON du.id = p.decided_by
-	LEFT JOIN purchase_orders po ON po.pr_id = p.id AND po.deleted_at IS NULL`
+	LEFT JOIN purchase_orders po ON po.pr_id = p.id AND po.deleted_at IS NULL
+	LEFT JOIN cost_codes cc ON cc.id = p.cost_code_id`
 
 func scanPR(row pgx.Row, p *prDTO) error {
 	var cnt int64
 	err := row.Scan(&p.ID, &p.ProjectID, &p.PRNo, &p.Status, &p.NeededByDate,
 		&p.Note, &p.RequestedBy, &p.RequestedByName, &p.SubmittedAt,
 		&p.DecidedBy, &p.DecidedByName, &p.DecidedAt, &p.DecisionNote,
-		&p.POID, &p.PONo, &p.Overdue, &cnt, &p.RowVersion, &p.CreatedAt)
+		&p.POID, &p.PONo, &p.Overdue, &cnt, &p.RowVersion, &p.CreatedAt,
+		&p.CostCodeID, &p.CostCodeName)
 	p.ItemCount = int(cnt)
 	return err
 }
@@ -213,9 +217,9 @@ func (h *Handler) CreatePR(w http.ResponseWriter, r *http.Request) {
 
 	var id uuid.UUID
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO purchase_requests (project_id, pr_no, requested_by, needed_by_date, note)
-		VALUES ($1,$2,$3,$4,NULLIF(btrim(coalesce($5,'')),''))
-		RETURNING id`, pid, prNo, uid, needed, req.Note).Scan(&id)
+		INSERT INTO purchase_requests (project_id, pr_no, requested_by, needed_by_date, note, cost_code_id)
+		VALUES ($1,$2,$3,$4,NULLIF(btrim(coalesce($5,'')),''),$6)
+		RETURNING id`, pid, prNo, uid, needed, req.Note, parseOptUUID(req.CostCodeID)).Scan(&id)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -333,9 +337,9 @@ func (h *Handler) UpdatePR(w http.ResponseWriter, r *http.Request) {
 
 	ct, err := tx.Exec(r.Context(), `
 		UPDATE purchase_requests
-		SET needed_by_date=$3, note=NULLIF(btrim(coalesce($4,'')),''), row_version=row_version+1
+		SET needed_by_date=$3, note=NULLIF(btrim(coalesce($4,'')),''), cost_code_id=$5, row_version=row_version+1
 		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL AND status='Draft'`,
-		id, pid, needed, req.Note)
+		id, pid, needed, req.Note, parseOptUUID(req.CostCodeID))
 	if err != nil || ct.RowsAffected() == 0 {
 		httpx.Internal(w, r)
 		return

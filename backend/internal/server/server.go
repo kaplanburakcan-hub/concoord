@@ -14,15 +14,20 @@ import (
 	"github.com/ipks/ipks/backend/internal/attendance"
 	"github.com/ipks/ipks/backend/internal/audit"
 	"github.com/ipks/ipks/backend/internal/auth"
+	"github.com/ipks/ipks/backend/internal/calendarfeed"
 	"github.com/ipks/ipks/backend/internal/cashflow"
+	"github.com/ipks/ipks/backend/internal/changes"
 	"github.com/ipks/ipks/backend/internal/config"
 	"github.com/ipks/ipks/backend/internal/contracts"
 	"github.com/ipks/ipks/backend/internal/correspondence"
+	"github.com/ipks/ipks/backend/internal/costcodes"
 	"github.com/ipks/ipks/backend/internal/customreports"
 	"github.com/ipks/ipks/backend/internal/dashboard"
+	"github.com/ipks/ipks/backend/internal/decisions"
 	"github.com/ipks/ipks/backend/internal/design"
 	"github.com/ipks/ipks/backend/internal/documents"
 	"github.com/ipks/ipks/backend/internal/equipmenttransfers"
+	"github.com/ipks/ipks/backend/internal/extensions"
 	"github.com/ipks/ipks/backend/internal/fixedexpenses"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/idarihakedis"
@@ -31,6 +36,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/manhour"
 	"github.com/ipks/ipks/backend/internal/materials"
 	"github.com/ipks/ipks/backend/internal/meetings"
+	"github.com/ipks/ipks/backend/internal/ncr"
 	"github.com/ipks/ipks/backend/internal/notify"
 	"github.com/ipks/ipks/backend/internal/ohs"
 	"github.com/ipks/ipks/backend/internal/ohsaccidents"
@@ -41,6 +47,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/projects"
 	"github.com/ipks/ipks/backend/internal/rbac"
 	"github.com/ipks/ipks/backend/internal/reports"
+	"github.com/ipks/ipks/backend/internal/risks"
 	"github.com/ipks/ipks/backend/internal/schedule"
 	"github.com/ipks/ipks/backend/internal/stakeholders"
 	"github.com/ipks/ipks/backend/internal/statements"
@@ -119,6 +126,13 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 	// --- Faz 7 bağımlılıkları (satınalma ve tedarik zinciri) ---
 	procH := procurement.NewHandler(pool, eval, recorder, notifySvc, log)
+	riskH := risks.NewHandler(pool, recorder)
+	changeH := changes.NewHandler(pool, recorder)
+	decisionH := decisions.NewHandler(pool, recorder)
+	ncrH := ncr.NewHandler(pool, recorder)
+	extH := extensions.NewHandler(pool, recorder)
+	costH := costcodes.NewHandler(pool, recorder)
+	calendarH := calendarfeed.NewHandler(pool, recorder)
 
 	// --- Faz 8 bağımlılıkları (İSG: checklist, denetim, bulgu, ceza otomasyonu) ---
 	ohsH := ohs.NewHandler(pool, eval, recorder, notifySvc, store, log)
@@ -139,7 +153,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	// --- Faz 20: Tasarım ve Projeler ---
 	designH := design.NewHandler(pool)
 	warehouseH := warehouse.NewHandler(pool)
-	meetingsH := meetings.NewHandler(pool)
+	meetingsH := meetings.NewHandler(pool, recorder)
 	tutanaklarH := tutanaklar.NewHandler(pool, notifySvc)
 	stakeholdersH := stakeholders.NewHandler(pool)
 	customReportsH := customreports.NewHandler(pool)
@@ -227,6 +241,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			// Blok 2 Aşama 2: PDKS konum verisi KVKK saklama süresi (varsayılan 730 gün).
 			cr.Post("/purge-attendance-location", attendanceH.PurgeStaleLocations)
 		})
+
+		// ---- Kişisel takvim akışı (E12): oturum değil, süreli belirteç ister ----
+		api.Get("/calendar/{token}", calendarH.Serve)
 
 		// ---- Admin Paneli v1 (tümü kimlik doğrulamalı + izin korumalı) ----
 		api.Route("/admin", func(ad chi.Router) {
@@ -345,6 +362,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("progress_payments.view")).Get("/payments/{id}/approvals", payH.ApprovalChain)
 			pr.With(mw.RequirePermission("progress_payments.view")).Post("/payments/{id}/approvals", payH.ApproveStep)
 			pr.With(mw.RequirePermission("progress_payments.view")).Get("/projects/{projectID}/payments", payH.ListPayments)
+			pr.With(mw.RequirePermission("progress_payments.view")).Get("/projects/{projectID}/payments/pending-count", payH.PendingCount)
 			pr.With(mw.RequirePermission("progress_payments.create_draft")).Post("/projects/{projectID}/payments", payH.CreatePayment)
 			pr.With(mw.RequirePermission("progress_payments.view")).Get("/projects/{projectID}/payments/{id}", payH.GetPayment)
 			pr.With(mw.RequirePermission("progress_payments.edit_draft")).Patch("/projects/{projectID}/payments/{id}", payH.UpdatePaymentDraft)
@@ -494,6 +512,40 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			// Tedarik Planı — zorunlu olmayan planlama/takip referansı (PR/PO
 			// zincirinden bağımsız), manuel ekleme + Excel/CSV toplu içe aktarma.
 			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/procurement/plan", procH.ListPlanItems)
+			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/procurement/plan/unmatched", procH.ListUnmatchedPlanItems)
+			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/procurement/supplier-performance", procH.SupplierPerformance)
+
+			// Faz 3.2 (E3): proje risk kaydı — silme yok, yalnız durum geçişi.
+			pr.With(mw.RequirePermission("risks.view")).Get("/projects/{projectID}/risks", riskH.List)
+			pr.With(mw.RequirePermission("risks.manage")).Post("/projects/{projectID}/risks", riskH.Create)
+			pr.With(mw.RequirePermission("risks.manage")).Patch("/projects/{projectID}/risks/{id}", riskH.Update)
+
+			// Faz 3.4 (E12): kişisel takvim bağlantısı (oturumlu yönetim uçları).
+			pr.With(mw.RequirePermission("calendar.subscribe")).Post("/projects/{projectID}/calendar-feeds", calendarH.Create)
+			pr.With(mw.RequirePermission("calendar.subscribe")).Delete("/projects/{projectID}/calendar-feeds/{feedID}", calendarH.Revoke)
+			pr.With(mw.RequirePermission("calendar.subscribe")).Get("/projects/{projectID}/calendar-feeds", calendarH.List)
+
+			// Faz 3.3 (E1, ilk adım): değişiklik olayı taslakları — onay akışı yok.
+			pr.With(mw.RequirePermission("changes.view")).Get("/projects/{projectID}/change-events", changeH.List)
+			pr.With(mw.RequirePermission("changes.create")).Post("/projects/{projectID}/change-events", changeH.Create)
+
+			// Faz 3.2 (E3): karar günlüğü — kayıt değiştirilmez, geçersiz kılınır.
+			pr.With(mw.RequirePermission("decisions.view")).Get("/projects/{projectID}/decisions", decisionH.List)
+			pr.With(mw.RequirePermission("decisions.record")).Post("/projects/{projectID}/decisions", decisionH.Create)
+
+			// Faz 3.5 (E4): uygunsuzluk kaydı — silme yok, yalnız kapatma.
+			pr.With(mw.RequirePermission("ncr.view")).Get("/projects/{projectID}/ncrs", ncrH.List)
+			pr.With(mw.RequirePermission("ncr.manage")).Post("/projects/{projectID}/ncrs", ncrH.Create)
+			pr.With(mw.RequirePermission("ncr.manage")).Post("/projects/{projectID}/ncrs/{id}/close", ncrH.Close)
+
+			// Faz 3.4 (E2, ilk adım): süre uzatımı taslakları — onay ve program etkisi yok.
+			pr.With(mw.RequirePermission("claims.view")).Get("/projects/{projectID}/time-extensions", extH.List)
+			pr.With(mw.RequirePermission("claims.create")).Post("/projects/{projectID}/time-extensions", extH.Create)
+
+			// Faz 3.6 (E6, ilk adım): maliyet kodu tanım listesi — bütçeye bağlı değil.
+			pr.With(mw.RequirePermission("budget.view")).Get("/projects/{projectID}/cost-codes", costH.List)
+			pr.With(mw.RequirePermission("budget.edit")).Post("/projects/{projectID}/cost-codes", costH.Create)
+			pr.With(mw.RequirePermission("budget.edit")).Put("/projects/{projectID}/cost-codes/{codeID}/budget", costH.SetBudget)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Post("/projects/{projectID}/procurement/plan", procH.CreatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Patch("/projects/{projectID}/procurement/plan/{id}", procH.UpdatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Delete("/projects/{projectID}/procurement/plan/{id}", procH.DeletePlanItem)
@@ -522,6 +574,8 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("ohs.perform_inspection")).Post("/projects/{projectID}/ohs/findings", ohsH.CreateFinding)
 			pr.With(mw.RequirePermission("ohs.view")).Post("/projects/{projectID}/ohs/findings/{id}/start", ohsH.StartFinding)
 			pr.With(mw.RequirePermission("ohs.perform_inspection")).Post("/projects/{projectID}/ohs/findings/{id}/close", ohsH.CloseFinding)
+			// B11: İSG bulgusundan düzeltici görev (bulgu başına en fazla bir görev).
+			pr.With(mw.RequirePermission("tasks.create")).Post("/projects/{projectID}/ohs/findings/{id}/task", ohsH.CreateTaskFromFinding)
 
 			// Ceza tutanakları.
 			pr.With(mw.RequirePermission("ohs.view")).Get("/projects/{projectID}/ohs/penalties", ohsH.ListPenalties)
@@ -547,6 +601,10 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 			// Rol duyarlı proje dashboard'u.
 			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/dashboard", dashH.ProjectDashboard)
+			// Panel dikkat sayaçları (E11): her biri kendi izniyle korunur.
+			pr.With(mw.RequirePermission("correspondence.view")).Get("/projects/{projectID}/attention/rfi-overdue", dashH.RFIOverdueCount)
+			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/attention/plan-late", dashH.PlanLateCount)
+			pr.With(mw.RequirePermission("tasks.view")).Get("/projects/{projectID}/attention/tasks-overdue", dashH.TasksOverdueCount)
 
 			// PV aylık dağılım girişi (EVM S-eğrisini zenginleştirir).
 			pr.With(mw.RequirePermission("reports.view_financial_reports")).Get("/projects/{projectID}/pv-plan", dashH.GetPVPlan)
@@ -674,6 +732,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/meetings", meetingsH.Create)
 			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/meetings/{id}", meetingsH.Update)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/meetings/{id}", meetingsH.Delete)
+			// Faz 3.2 (E15): toplantı aksiyon satırından görev (satır başına en fazla bir görev).
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/meetings/{id}/action-tasks", meetingsH.ListActionTasks)
+			pr.With(mw.RequirePermission("tasks.create")).Post("/projects/{projectID}/meetings/{id}/actions/{index}/task", meetingsH.CreateTaskFromAction)
 		})
 
 		// Saha Tutanakları (kaza/yangın/hırsızlık, ek imalat, mesai, yevmiyeli
@@ -728,6 +789,10 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("correspondence.view")).Get("/projects/{projectID}/correspondences", correspondenceH.List)
 			pr.With(mw.RequirePermission("correspondence.create")).Post("/projects/{projectID}/correspondences", correspondenceH.Create)
 			pr.With(mw.RequirePermission("correspondence.view")).Get("/projects/{projectID}/correspondences/{id}", correspondenceH.Get)
+			// B18: yazışma ↔ belge çok-çoka bağlantıları (belge ve yazışma değişmez).
+			pr.With(mw.RequirePermission("correspondence.view")).Get("/projects/{projectID}/correspondences/{id}/document-links", correspondenceH.ListDocLinks)
+			pr.With(mw.RequirePermission("correspondence.edit")).Post("/projects/{projectID}/correspondences/{id}/document-links", correspondenceH.AddDocLink)
+			pr.With(mw.RequirePermission("correspondence.edit")).Delete("/projects/{projectID}/correspondences/{id}/document-links/{docID}", correspondenceH.RemoveDocLink)
 			pr.With(mw.RequirePermission("correspondence.edit")).Patch("/projects/{projectID}/correspondences/{id}", correspondenceH.Update)
 			pr.With(mw.RequirePermission("correspondence.delete")).Delete("/projects/{projectID}/correspondences/{id}", correspondenceH.Delete)
 		})

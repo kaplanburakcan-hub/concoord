@@ -115,6 +115,17 @@ func BuildMonthlyPDF(sn MonthlySnapshot) []byte {
 	add(false, 9, kv("Ceza toplami", num(sn.OHS.PenaltiesTotal, 2)+cur))
 	gap()
 
+	// Gecikme nedenleri (günlük raporlardan, ay toplamı).
+	add(true, 10, "GECIKME NEDENLERI")
+	if len(sn.DelayCauses) == 0 {
+		add(false, 9, "Ay icinde kayitli gecikme yok.")
+	} else {
+		for _, c := range sn.DelayCauses {
+			add(false, 9, kv(trunc(c.Label, 34), num(c.Hours, 1)+" saat  ("+itoa(c.Reports)+" rapor)"))
+		}
+	}
+	gap()
+
 	// Tedarik.
 	add(true, 10, "TEDARIK OZETI")
 	add(false, 9, kv("Ay icinde acilan siparis (PO)", itoa(sn.Procurement.POsOrdered)))

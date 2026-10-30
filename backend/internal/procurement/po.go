@@ -25,6 +25,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/notify"
+	"github.com/ipks/ipks/backend/internal/rbac"
 	"github.com/ipks/ipks/backend/internal/validate"
 )
 
@@ -91,6 +92,8 @@ type poDTO struct {
 	Status        string        `json:"status"`
 	ExpectedDate  *string       `json:"expected_date,omitempty"`
 	Note          *string       `json:"note,omitempty"`
+	CostCodeID    *uuid.UUID    `json:"cost_code_id,omitempty"`
+	CostCodeName  *string       `json:"cost_code_name,omitempty"`
 	CreatedBy     uuid.UUID     `json:"created_by"`
 	CreatedByName string        `json:"created_by_name"`
 	Overdue       bool          `json:"overdue"` // beklenen tarih geçti, kapanmadı
@@ -110,18 +113,20 @@ const poSelect = `
 	        AND o.status IN ('Ordered','PartiallyDelivered')),
 	       (SELECT count(*) FROM deliveries d
 	         WHERE d.po_id = o.id AND d.deleted_at IS NULL),
-	       o.row_version, o.created_at
+	       o.row_version, o.created_at, o.cost_code_id, cc.code || ' ' || cc.name
 	FROM purchase_orders o
 	JOIN users cu ON cu.id = o.created_by
 	LEFT JOIN purchase_requests pr ON pr.id = o.pr_id
-	LEFT JOIN tedarikciler t ON t.id = o.tedarikci_id`
+	LEFT JOIN tedarikciler t ON t.id = o.tedarikci_id
+	LEFT JOIN cost_codes cc ON cc.id = o.cost_code_id`
 
 func scanPO(row pgx.Row, o *poDTO) error {
 	var cnt int64
 	err := row.Scan(&o.ID, &o.ProjectID, &o.PRID, &o.PRNo, &o.PONo, &o.SupplierName,
 		&o.TedarikciID, &o.TedarikciName,
 		&o.Amount, &o.Currency, &o.Status, &o.ExpectedDate, &o.Note,
-		&o.CreatedBy, &o.CreatedByName, &o.Overdue, &cnt, &o.RowVersion, &o.CreatedAt)
+		&o.CreatedBy, &o.CreatedByName, &o.Overdue, &cnt, &o.RowVersion, &o.CreatedAt,
+		&o.CostCodeID, &o.CostCodeName)
 	o.DeliveryCount = int(cnt)
 	return err
 }
@@ -296,11 +301,12 @@ func (h *Handler) insertPO(ctx context.Context, tx pgx.Tx, pid uuid.UUID, prID *
 	var id uuid.UUID
 	err := tx.QueryRow(ctx, `
 		INSERT INTO purchase_orders
-			(project_id, pr_id, po_no, supplier_name, tedarikci_id, amount, currency, expected_date, note, created_by)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULLIF(btrim(coalesce($9,'')),''),$10)
+			(project_id, pr_id, po_no, supplier_name, tedarikci_id, amount, currency, expected_date, note, created_by,
+			 cost_code_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULLIF(btrim(coalesce($9,'')),''),$10,$11)
 		RETURNING id`,
 		pid, prID, poNo, strings.TrimSpace(req.SupplierName), tedarikciID, req.Amount, currency,
-		expected, req.Note, uid).Scan(&id)
+		expected, req.Note, uid, parseOptUUID(req.CostCodeID)).Scan(&id)
 	if err != nil {
 		return uuid.Nil, "", err
 	}
@@ -354,6 +360,15 @@ func (h *Handler) ConvertPR(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
 			"Yalnızca onaylanmış PR siparişe dönüştürülebilir.", nil)
 		return
+	}
+	// PR'da maliyet kodu varsa ve sipariş isteğinde ayrıca verilmemişse siparişe devredilir.
+	if req.CostCodeID == nil || strings.TrimSpace(*req.CostCodeID) == "" {
+		var prCode *uuid.UUID
+		if err := tx.QueryRow(r.Context(),
+			`SELECT cost_code_id FROM purchase_requests WHERE id=$1`, prID).Scan(&prCode); err == nil && prCode != nil {
+			code := prCode.String()
+			req.CostCodeID = &code
+		}
 	}
 	id, poNo, err := h.insertPO(r.Context(), tx, pid, &prID, uid, req, expected)
 	if err != nil {
@@ -439,13 +454,14 @@ func (h *Handler) UpdatePO(w http.ResponseWriter, r *http.Request) {
 	ct, err := h.pool.Exec(r.Context(), `
 		UPDATE purchase_orders
 		SET supplier_name=$3, tedarikci_id=$8, amount=$4, currency=$5, expected_date=$6,
-		    note=NULLIF(btrim(coalesce($7,'')),''),
+		    note=NULLIF(btrim(coalesce($7,'')),''), cost_code_id=$9,
 		    overdue_notified_at=CASE WHEN expected_date IS DISTINCT FROM $6 THEN NULL
 		                             ELSE overdue_notified_at END,
 		    row_version=row_version+1
 		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL
 		  AND status IN ('Ordered','PartiallyDelivered')`,
-		id, pid, strings.TrimSpace(req.SupplierName), req.Amount, currency, expected, req.Note, tedarikciID)
+		id, pid, strings.TrimSpace(req.SupplierName), req.Amount, currency, expected, req.Note, tedarikciID,
+		parseOptUUID(req.CostCodeID))
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -697,6 +713,9 @@ func (h *Handler) AddDelivery(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w, r)
 		return
 	}
+	if req.Condition != "" && req.Condition != "Complete" {
+		h.notifyDiscrepancy(r.Context(), pid, poID, uid, req.Condition, strings.TrimSpace(req.DeliveryNoteNo))
+	}
 	out, err := h.getPO(r.Context(), pid, poID, true)
 	if err != nil {
 		httpx.JSON(w, http.StatusCreated, map[string]string{"id": did.String()})
@@ -855,4 +874,130 @@ func NotifyOverduePOs(ctx context.Context, pool *pgxpool.Pool, nt *notify.Servic
 	if len(items) > 0 {
 		log.Info("geciken sipariş uyarıları üretildi", "count", len(items))
 	}
+}
+
+// notifyDiscrepancy — eksik/hasarlı mal kabulü kaydedildiğinde PO sahibine ve
+// satın alma yetkisi olanlara bildirim gönderir. Kayıt zaten commit edilmiştir;
+// bildirim hatası teslimat kaydını geri almaz (yalnızca loglanır).
+func (h *Handler) notifyDiscrepancy(ctx context.Context, pid, poID, actor uuid.UUID, condition, deliveryNo string) {
+	var poNo string
+	var owner uuid.UUID
+	if err := h.pool.QueryRow(ctx, `
+		SELECT po.po_no, po.created_by FROM purchase_orders po
+		WHERE po.id=$1 AND po.project_id=$2`, poID, pid).Scan(&poNo, &owner); err != nil {
+		h.log.Error("uygunsuzluk bildirimi: PO okunamadı", "err", err, "po", poID)
+		return
+	}
+	targets := map[uuid.UUID]bool{}
+	if owner != actor {
+		targets[owner] = true
+	}
+	rows, err := h.pool.Query(ctx, `
+		SELECT pm.user_id, r.code FROM project_members pm
+		JOIN roles r ON r.id = pm.role_id
+		WHERE pm.project_id=$1 AND pm.deleted_at IS NULL`, pid)
+	if err != nil {
+		h.log.Error("uygunsuzluk bildirimi: üyeler okunamadı", "err", err, "project", pid)
+	} else {
+		for rows.Next() {
+			var uid uuid.UUID
+			var role string
+			if rows.Scan(&uid, &role) == nil && uid != actor && rbac.RoleHasDefault(role, "procurement.manage_po") {
+				targets[uid] = true
+			}
+		}
+		rows.Close()
+	}
+	if len(targets) == 0 {
+		return
+	}
+	ids := make([]uuid.UUID, 0, len(targets))
+	for id := range targets {
+		ids = append(ids, id)
+	}
+	label := map[string]string{"Short": "eksik", "Damaged": "hasarlı", "Defective": "kusurlu", "Rejected": "reddedildi"}[condition]
+	if label == "" {
+		label = condition
+	}
+	title := poNo + " — teslimatta uygunsuzluk"
+	if deliveryNo != "" {
+		title += " (irsaliye " + deliveryNo + ")"
+	}
+	h.nt.Send(ctx, notify.Input{
+		UserIDs: ids, Type: notify.TypeDeliveryDiscrepancy,
+		Title: title, Body: "Teslim durumu: " + label,
+		EntityType: "purchase_orders", EntityID: &poID, ProjectID: &pid,
+	})
+}
+
+// NotifyApproachingPOs — beklenen teslim tarihine 7 gün (dahil) kalan, kapanmamış
+// siparişler için bildirim üretir. Tekilleştirme approaching_notified_at ile
+// yapılır; teslim tarihi değişirse alan sıfırlanır ve uyarı yeniden kurulur.
+// Yalnız bildirimdir; sipariş durumu değişmez.
+func NotifyApproachingPOs(ctx context.Context, pool *pgxpool.Pool, nt *notify.Service, log *slog.Logger) {
+	rows, err := pool.Query(ctx, `
+		SELECT o.id, o.project_id, o.po_no, o.supplier_name,
+		       to_char(o.expected_date,'DD.MM.YYYY'), o.created_by, pr.requested_by
+		FROM purchase_orders o
+		LEFT JOIN purchase_requests pr ON pr.id = o.pr_id
+		WHERE o.deleted_at IS NULL
+		  AND o.status IN ('Ordered','PartiallyDelivered')
+		  AND o.expected_date IS NOT NULL
+		  AND o.expected_date >= CURRENT_DATE
+		  AND o.expected_date <= CURRENT_DATE + 7
+		  AND o.approaching_notified_at IS NULL
+		LIMIT 200`)
+	if err != nil {
+		log.Error("yaklaşan teslim taraması başarısız", "err", err)
+		return
+	}
+	type row struct {
+		id, pid   uuid.UUID
+		poNo, sup string
+		expected  string
+		createdBy uuid.UUID
+		requester *uuid.UUID
+	}
+	items := []row{}
+	for rows.Next() {
+		var x row
+		if err := rows.Scan(&x.id, &x.pid, &x.poNo, &x.sup, &x.expected, &x.createdBy, &x.requester); err != nil {
+			rows.Close()
+			log.Error("yaklaşan teslim satırı okunamadı", "err", err)
+			return
+		}
+		items = append(items, x)
+	}
+	rows.Close()
+
+	for _, x := range items {
+		targets := []uuid.UUID{x.createdBy}
+		if x.requester != nil && *x.requester != x.createdBy {
+			targets = append(targets, *x.requester)
+		}
+		poID, pid := x.id, x.pid
+		nt.Send(ctx, notify.Input{
+			UserIDs: targets, Type: notify.TypePOApproaching,
+			Title:      x.poNo + " — teslim tarihi yaklaşıyor",
+			Body:       x.sup + " · beklenen: " + x.expected,
+			EntityType: "purchase_orders", EntityID: &poID, ProjectID: &pid,
+		})
+		if _, err := pool.Exec(ctx,
+			`UPDATE purchase_orders SET approaching_notified_at=now() WHERE id=$1`, x.id); err != nil {
+			log.Error("yaklaşan teslim işareti yazılamadı", "po", x.id, "err", err)
+		}
+	}
+}
+
+// parseOptUUID — boş veya geçersiz metni nil'e çevirir; geçerli UUID'yi döndürür.
+// Geçersiz kimlik, veritabanına gitmeden yok sayılır (alan isteğe bağlıdır).
+func parseOptUUID(s *string) *uuid.UUID {
+	if s == nil || strings.TrimSpace(*s) == "" {
+		return nil
+	}
+	d, err := uuid.Parse(strings.TrimSpace(*s))
+	if err != nil {
+		return nil
+	}
+	return &d
 }

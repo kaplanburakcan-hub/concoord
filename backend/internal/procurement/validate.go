@@ -24,6 +24,7 @@ type prReq struct {
 	NeededByDate string      `json:"needed_by_date"` // YYYY-MM-DD
 	Note         *string     `json:"note"`
 	Items        []prItemReq `json:"items"`
+	CostCodeID   *string     `json:"cost_code_id"` // isteğe bağlı; boş = yok
 }
 
 // validatePR — PR başlık + kalem doğrulaması. Alan bazlı hata haritası döner
@@ -64,6 +65,7 @@ type poReq struct {
 	Currency     *string  `json:"currency"`
 	ExpectedDate *string  `json:"expected_date"` // YYYY-MM-DD | null
 	Note         *string  `json:"note"`
+	CostCodeID   *string  `json:"cost_code_id"` // isteğe bağlı; boş = yok
 }
 
 // validatePO — PO başlık doğrulaması. expected nil olabilir (tarih belirsiz).

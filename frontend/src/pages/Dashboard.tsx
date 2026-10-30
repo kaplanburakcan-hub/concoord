@@ -5,6 +5,8 @@ import { api, apiFetchBlob, apiUpload } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { Can } from "../auth/guards";
 import { useProjects } from "../projects/ProjectContext";
+import AttentionCards from "./dashboard/AttentionCards";
+import CalendarFeedCard from "./dashboard/CalendarFeedCard";
 import SCurve from "./dashboard/SCurve";
 import type { SCurvePoint } from "./dashboard/SCurve";
 import SegmentedDonut from "./dashboard/SegmentedDonut";
@@ -318,6 +320,18 @@ export default function Dashboard() {
             <PanelCell title="Proje Görseli" noPad>
               <CoverImageCard projectId={current.id} coverImage={dash.cover_image} canUpload={can("documents.upload")} onChanged={load} />
             </PanelCell>
+          </PanelRow>
+
+          {/* ── Dikkat sayaçları + takvim bağlantısı (E11 / E12) ── */}
+          <PanelRow cols={can("calendar.subscribe") ? "1fr 1fr" : "1fr"}>
+            <PanelCell title="Dikkat Gerektirenler">
+              <AttentionCards projectId={current.id} canRfi={can("correspondence.view")} canPlan={can("procurement.view")} canTasks={can("tasks.view")} />
+            </PanelCell>
+            {can("calendar.subscribe") && (
+              <PanelCell title="Takvim Bağlantısı">
+                <CalendarFeedCard projectId={current.id} />
+              </PanelCell>
+            )}
           </PanelRow>
 
           {/* ── Row B: Satınalma Özeti + Maliyet Durumu ── */}
@@ -675,6 +689,7 @@ function cpiHint(v: number): string {
   return "Bütçe üzerinde";
 }
 function planSourceTR(s: string) {
+  if (s.startsWith("baseline:")) return `iş programı baseline'ı (${s.slice("baseline:".length)})`;
   if (s === "manual") return "aylık dağılım girişi";
   if (s === "milestones") return "milestone ağırlıkları";
   return "doğrusal dağılım";

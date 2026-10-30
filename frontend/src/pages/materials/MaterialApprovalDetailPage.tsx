@@ -149,6 +149,36 @@ export default function MaterialApprovalDetailPage() {
         </button>
       )}
 
+      {mar.needed_by_date && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 text-sm text-beton-300 space-y-1">
+          <p>İhtiyaç tarihi: <span className="font-mono text-beton-100">{mar.needed_by_date}</span></p>
+          {mar.lead_time_days != null && <p>Tedarik süresi: <span className="font-mono">{mar.lead_time_days} gün</span></p>}
+          {mar.order_deadline && (
+            <p>Sipariş son tarihi: <span className="font-mono text-emniyet-500">{mar.order_deadline}</span></p>
+          )}
+        </div>
+      )}
+
+      {(mar.status === "Approved" || mar.status === "ConditionallyApproved") && can("procurement.create_pr") && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 space-y-2">
+          <p className="text-sm font-semibold text-beton-200">Satın alma</p>
+          <p className="text-xs text-beton-400">
+            Malzeme bilgileri dolu bir satın alma talebi taslağı açılır; ihtiyaç tarihi ve miktar sizin girişinizle tamamlanır.
+          </p>
+          <Link
+            to={`/satinalma/talepler?${new URLSearchParams({
+              yeni: "1",
+              kalem: mar.material_name,
+              spec: mar.spec_ref ?? "",
+              not: `${mar.mar_no} onaylı malzeme${mar.decision_note ? ` — ${mar.decision_note}` : ""}`,
+            }).toString()}`}
+            className="inline-block rounded border border-emniyet-500/60 px-4 py-2 text-sm text-emniyet-500 hover:bg-emniyet-500/10"
+          >
+            Satın alma talebi taslağı oluştur
+          </Link>
+        </div>
+      )}
+
       {mar.status === "UnderReview" && can("material_approvals.decide") && (
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 space-y-2">
           <p className="text-sm font-semibold text-beton-200">Karar</p>

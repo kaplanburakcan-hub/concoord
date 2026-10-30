@@ -2,6 +2,7 @@ package warehouse
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -234,15 +235,26 @@ func (h *Handler) CreateMovement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var b struct {
-		ItemID      string  `json:"item_id"`
-		HareketTuru string  `json:"hareket_turu"`
-		Miktar      float64 `json:"miktar"`
-		Tarih       string  `json:"tarih"`
-		BelgeNo     *string `json:"belge_no"`
-		Aciklama    *string `json:"aciklama"`
+		ItemID          string  `json:"item_id"`
+		HareketTuru     string  `json:"hareket_turu"`
+		Miktar          float64 `json:"miktar"`
+		Tarih           string  `json:"tarih"`
+		BelgeNo         *string `json:"belge_no"`
+		Aciklama        *string `json:"aciklama"`
+		PurchaseOrderID *string `json:"purchase_order_id"`
 	}
 	if !httpx.DecodeJSON(w, r, &b) {
 		return
+	}
+	// İsteğe bağlı sipariş referansı (B25): boşsa NULL, geçersizse doğrulama hatası.
+	var poID *uuid.UUID
+	if b.PurchaseOrderID != nil && strings.TrimSpace(*b.PurchaseOrderID) != "" {
+		d, perr := uuid.Parse(strings.TrimSpace(*b.PurchaseOrderID))
+		if perr != nil {
+			httpx.ValidationFailed(w, r, map[string]string{"purchase_order_id": "geçersiz kimlik"})
+			return
+		}
+		poID = &d
 	}
 	itemID, err := uuid.Parse(b.ItemID)
 	if err != nil {
@@ -280,11 +292,11 @@ func (h *Handler) CreateMovement(w http.ResponseWriter, r *http.Request) {
 	var mv Movement
 	err = tx.QueryRow(r.Context(),
 		`INSERT INTO site_warehouse_movements
-		    (project_id, item_id, hareket_turu, miktar, tarih, belge_no, aciklama)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7)
+		    (project_id, item_id, hareket_turu, miktar, tarih, belge_no, aciklama, purchase_order_id)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 		 RETURNING id, project_id, item_id, hareket_turu, miktar::float8,
 		           TO_CHAR(tarih,'YYYY-MM-DD'), belge_no, aciklama, created_at`,
-		pid, itemID, b.HareketTuru, b.Miktar, b.Tarih, b.BelgeNo, b.Aciklama,
+		pid, itemID, b.HareketTuru, b.Miktar, b.Tarih, b.BelgeNo, b.Aciklama, poID,
 	).Scan(&mv.ID, &mv.ProjectID, &mv.ItemID, &mv.HareketTuru, &mv.Miktar,
 		&mv.Tarih, &mv.BelgeNo, &mv.Aciklama, &mv.CreatedAt)
 	if err != nil {

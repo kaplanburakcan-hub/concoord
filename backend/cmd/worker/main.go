@@ -91,6 +91,7 @@ func main() {
 	// Açılışta bir kez deadline taraması (worker uzun süre kapalı kaldıysa).
 	w.remindDeadlines(ctx)
 	procurement.NotifyOverduePOs(ctx, pool, nt, log)
+	procurement.NotifyApproachingPOs(ctx, pool, nt, log)
 	// Faz 8: açılışta bir kez İSG termin taraması.
 	ohs.NotifyOverdueFindings(ctx, pool, nt, log)
 	// Faz 9: açılışta bir kez kontrol eşiği taraması (CPI/SPI, milestone, bulgu).
@@ -107,6 +108,7 @@ func main() {
 			w.remindDeadlines(ctx)
 		case <-overdueTick.C:
 			procurement.NotifyOverduePOs(ctx, pool, w.nt, log)
+			procurement.NotifyApproachingPOs(ctx, pool, w.nt, log)
 			// Faz 8: termini geçen İSG bulguları (aynı saatlik ritim).
 			ohs.NotifyOverdueFindings(ctx, pool, w.nt, log)
 		case <-alertTick.C:

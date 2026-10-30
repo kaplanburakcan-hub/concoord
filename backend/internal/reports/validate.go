@@ -4,7 +4,36 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
+
+// delayReasonCodes — günlük rapordaki gecikme nedeni kodları (E16). Sabit
+// liste: rapor ve hakediş/EVM tarafında aynı sınıflandırma kullanılır.
+var delayReasonCodes = map[string]bool{
+	"Hava": true, "Sahip": true, "Tasarim": true, "Taseron": true,
+	"Malzeme": true, "Ekipman": true, "Idari": true, "Diger": true,
+}
+
+// validateDelayCauses — gecikme kayıtlarını doğrular; hata alanları fields'a yazılır.
+func validateDelayCauses(causes []delayCauseDTO, fields map[string]string) {
+	total := 0.0
+	for i, c := range causes {
+		key := fmt.Sprintf("delay_causes[%d]", i)
+		if !delayReasonCodes[c.ReasonCode] {
+			fields[key+".reason_code"] = "geçerli bir gecikme nedeni seçin"
+		}
+		if c.Hours <= 0 || c.Hours > 24 {
+			fields[key+".hours"] = "0 ile 24 saat arasında olmalı"
+		}
+		if utf8.RuneCountInString(c.Note) > 500 {
+			fields[key+".note"] = "en fazla 500 karakter"
+		}
+		total += c.Hours
+	}
+	if total > 24 {
+		fields["delay_causes"] = "toplam gecikme 24 saati aşamaz"
+	}
+}
 
 // validateDaily — günlük rapor girdisi doğrulaması. Alan adı → hata mesajı.
 func validateDaily(in dailyInput) map[string]string {
@@ -66,5 +95,6 @@ func validateDaily(in dailyInput) map[string]string {
 			fields[fmt.Sprintf("work_entries[%d].qty", i)] = "miktar negatif olamaz"
 		}
 	}
+	validateDelayCauses(in.DelayCauses, fields)
 	return fields
 }

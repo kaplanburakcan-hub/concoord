@@ -11,6 +11,7 @@ import { useProjects } from "../ProjectContext";
 export type MAR = {
   id: string; mar_no: string; material_name: string; status: string;
   spec_ref?: string; manufacturer?: string;
+  lead_time_days?: number; needed_by_date?: string; order_deadline?: string;
   subcontractor_id?: string; subcontractor_name?: string;
   decision_note?: string; decided_by_name?: string; decided_at?: string;
   created_by_name: string; attachment_count: number; created_at: string;
@@ -41,6 +42,8 @@ export default function MaterialApprovalsPage() {
   const [name, setName] = useState("");
   const [specRef, setSpecRef] = useState("");
   const [manufacturer, setManufacturer] = useState("");
+  const [leadDays, setLeadDays] = useState("");
+  const [neededBy, setNeededBy] = useState("");
   const [subID, setSubID] = useState("");
   const pid = current?.id;
 
@@ -69,9 +72,11 @@ export default function MaterialApprovalsPage() {
           spec_ref: specRef.trim() || undefined,
           manufacturer: manufacturer.trim() || undefined,
           subcontractor_id: subID || undefined,
+          lead_time_days: leadDays === "" ? undefined : Number(leadDays),
+          needed_by_date: neededBy || undefined,
         },
       });
-      setName(""); setSpecRef(""); setManufacturer(""); setSubID(""); setShowForm(false);
+      setName(""); setSpecRef(""); setManufacturer(""); setSubID(""); setLeadDays(""); setNeededBy(""); setShowForm(false);
       load();
     } catch { setErr("MAR oluşturulamadı."); }
   }
@@ -107,6 +112,11 @@ export default function MaterialApprovalsPage() {
           <input value={specRef} onChange={(e) => setSpecRef(e.target.value)} placeholder="Şartname referansı"
             className="rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100 outline-none focus:border-emniyet-500" />
           <input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="Üretici"
+            className="rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100 outline-none focus:border-emniyet-500" />
+          <input type="number" min={0} max={365} value={leadDays} onChange={(e) => setLeadDays(e.target.value)}
+            placeholder="Tedarik süresi (gün)" title="Siparişten teslime kadar gün"
+            className="rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100 outline-none focus:border-emniyet-500" />
+          <input type="date" value={neededBy} onChange={(e) => setNeededBy(e.target.value)} title="Sahada ihtiyaç tarihi"
             className="rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100 outline-none focus:border-emniyet-500" />
           {subs.length > 0 && (
             <select value={subID} onChange={(e) => setSubID(e.target.value)}

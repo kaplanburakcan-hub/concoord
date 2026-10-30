@@ -60,12 +60,21 @@ function MovementModal({
   onClose: () => void;
 }) {
   const kesinKabul = useKesinKabulTarihi(projectId);
+  useEffect(() => {
+    api<{ purchase_orders: { id: string; po_no: string; supplier_name: string }[] }>(
+      `/projects/${projectId}/purchase-orders`, { projectId })
+      .then(r => setPos(r.purchase_orders ?? []))
+      .catch(() => setPos([]));
+  }, [projectId]);
   const [itemId, setItemId]   = useState(items[0]?.id ?? "");
   const [turu, setTuru]       = useState<"giris" | "cikis" | "sayim" | "iade">("giris");
   const [miktar, setMiktar]   = useState("");
   const [tarih, setTarih]     = useState(new Date().toISOString().slice(0, 10));
   const [belgeNo, setBelgeNo] = useState("");
   const [aciklama, setAciklama] = useState("");
+  // Giriş hareketinde isteğe bağlı sipariş referansı (B25).
+  const [poId, setPoId]       = useState("");
+  const [pos, setPos]         = useState<{ id: string; po_no: string; supplier_name: string }[]>([]);
   const [saving, setSaving]   = useState(false);
   const [err, setErr]         = useState("");
 
@@ -79,7 +88,11 @@ function MovementModal({
       await api(`/projects/${projectId}/warehouse-movements`, {
         projectId,
         method: "POST",
-        body: { item_id: itemId, hareket_turu: turu, miktar: m, tarih, belge_no: belgeNo || undefined, aciklama: aciklama || undefined },
+        body: {
+          item_id: itemId, hareket_turu: turu, miktar: m, tarih,
+          belge_no: belgeNo || undefined, aciklama: aciklama || undefined,
+          purchase_order_id: turu === "giris" && poId ? poId : undefined,
+        },
       });
       onSave();
     } catch {
@@ -133,6 +146,15 @@ function MovementModal({
               <input className={inpCls + " w-full"} type="text" value={belgeNo} onChange={e => setBelgeNo(e.target.value)} placeholder="İrsaliye, fatura…" />
             </div>
           </div>
+          {turu === "giris" && pos.length > 0 && (
+            <div>
+              <label className="text-xs text-beton-400 mb-1 block">Sipariş (isteğe bağlı)</label>
+              <select className={inpCls + " w-full"} value={poId} onChange={e => setPoId(e.target.value)}>
+                <option value="">— sipariş bağlama —</option>
+                {pos.map(p => <option key={p.id} value={p.id}>{p.po_no} · {p.supplier_name}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label className="text-xs text-beton-400 mb-1 block">Açıklama</label>
             <input className={inpCls + " w-full"} type="text" value={aciklama} onChange={e => setAciklama(e.target.value)} placeholder="Opsiyonel…" />

@@ -19,6 +19,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -62,6 +63,10 @@ type marDTO struct {
 	DecidedBy        *uuid.UUID `json:"decided_by,omitempty"`
 	DecidedByName    *string    `json:"decided_by_name,omitempty"`
 	DecidedAt        *time.Time `json:"decided_at,omitempty"`
+	LeadTimeDays     *int       `json:"lead_time_days,omitempty"`
+	NeededByDate     *string    `json:"needed_by_date,omitempty"`
+	// OrderDeadline — ihtiyaç tarihi − tedarik süresi; ikisi de girilmişse dolu.
+	OrderDeadline    *string    `json:"order_deadline,omitempty"`
 	CreatedBy        uuid.UUID  `json:"created_by"`
 	CreatedByName    string     `json:"created_by_name"`
 	SubcontractorName *string   `json:"subcontractor_name,omitempty"`
@@ -77,7 +82,7 @@ const marSelect = `
 	       m.created_by, cu.full_name, s.company_name,
 	       (SELECT count(*) FROM documents d
 	         WHERE d.entity_type='material_approval' AND d.entity_id=m.id AND d.deleted_at IS NULL),
-	       m.row_version, m.created_at
+	       m.row_version, m.created_at, m.lead_time_days, to_char(m.needed_by_date,'YYYY-MM-DD')
 	FROM material_approvals m
 	JOIN users cu ON cu.id = m.created_by
 	LEFT JOIN users du ON du.id = m.decided_by
@@ -89,9 +94,57 @@ func scanMAR(row pgx.Row, m *marDTO) error {
 		&m.SpecRef, &m.Manufacturer, &m.Status, &m.DecisionNote,
 		&m.DecidedBy, &m.DecidedByName, &m.DecidedAt,
 		&m.CreatedBy, &m.CreatedByName, &m.SubcontractorName,
-		&cnt, &m.RowVersion, &m.CreatedAt)
+		&cnt, &m.RowVersion, &m.CreatedAt, &m.LeadTimeDays, &m.NeededByDate)
 	m.AttachmentCount = int(cnt)
+	m.OrderDeadline = orderDeadline(m.NeededByDate, m.LeadTimeDays)
 	return err
+}
+
+// orderDeadline — "YYYY-MM-DD" ihtiyaç tarihinden tedarik süresi kadar geri
+// sayarak sipariş son tarihini verir. Girdilerden biri yoksa ya da bozuksa nil.
+func orderDeadline(needed *string, lead *int) *string {
+	if needed == nil || lead == nil {
+		return nil
+	}
+	t, err := time.Parse("2006-01-02", *needed)
+	if err != nil {
+		return nil
+	}
+	out := t.AddDate(0, 0, -*lead).Format("2006-01-02")
+	return &out
+}
+
+// parseOptionalDate — isteğe bağlı YYYY-MM-DD; boş ise (nil, true) döner.
+func parseOptionalDate(s *string) (*string, bool) {
+	if s == nil || strings.TrimSpace(*s) == "" {
+		return nil, true
+	}
+	v := strings.TrimSpace(*s)
+	if _, err := time.Parse("2006-01-02", v); err != nil {
+		return nil, false
+	}
+	return &v, true
+}
+
+// neededOrNil — boş tarihi SQL NULL olarak gönderir.
+func neededOrNil(s *string) interface{} {
+	v, ok := parseOptionalDate(s)
+	if !ok || v == nil {
+		return nil
+	}
+	return *v
+}
+
+// validateMARInput — malzeme adı + isteğe bağlı tedarik süresi ve ihtiyaç tarihi.
+func validateMARInput(req marReq) map[string]string {
+	errs := validateMAR(req.MaterialName)
+	if req.LeadTimeDays != nil && (*req.LeadTimeDays < 0 || *req.LeadTimeDays > 365) {
+		errs["lead_time_days"] = "0 ile 365 gün arasında olmalı"
+	}
+	if _, ok := parseOptionalDate(req.NeededByDate); !ok {
+		errs["needed_by_date"] = "geçerli bir tarih (YYYY-MM-DD) girin"
+	}
+	return errs
 }
 
 func parseID(w http.ResponseWriter, r *http.Request, param string) (uuid.UUID, bool) {
@@ -234,6 +287,8 @@ type marReq struct {
 	MaterialName    string  `json:"material_name"`
 	SpecRef         *string `json:"spec_ref"`
 	Manufacturer    *string `json:"manufacturer"`
+	LeadTimeDays    *int    `json:"lead_time_days"`
+	NeededByDate    *string `json:"needed_by_date"`
 }
 
 func (h *Handler) CreateMAR(w http.ResponseWriter, r *http.Request) {
@@ -249,7 +304,7 @@ func (h *Handler) CreateMAR(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &req) {
 		return
 	}
-	if errs := validateMAR(req.MaterialName); len(errs) > 0 {
+	if errs := validateMARInput(req); len(errs) > 0 {
 		httpx.ValidationFailed(w, r, errs)
 		return
 	}
@@ -299,10 +354,12 @@ func (h *Handler) CreateMAR(w http.ResponseWriter, r *http.Request) {
 	var id uuid.UUID
 	err = tx.QueryRow(r.Context(), `
 		INSERT INTO material_approvals
-			(project_id, subcontractor_id, mar_no, material_name, spec_ref, manufacturer, created_by)
-		VALUES ($1,$2,$3,$4,NULLIF(btrim(coalesce($5,'')),''),NULLIF(btrim(coalesce($6,'')),''),$7)
+			(project_id, subcontractor_id, mar_no, material_name, spec_ref, manufacturer, created_by,
+			 lead_time_days, needed_by_date)
+		VALUES ($1,$2,$3,$4,NULLIF(btrim(coalesce($5,'')),''),NULLIF(btrim(coalesce($6,'')),''),$7,$8,$9::date)
 		RETURNING id`,
-		pid, subID, marNo, req.MaterialName, req.SpecRef, req.Manufacturer, sc.uid).Scan(&id)
+		pid, subID, marNo, req.MaterialName, req.SpecRef, req.Manufacturer, sc.uid,
+		req.LeadTimeDays, neededOrNil(req.NeededByDate)).Scan(&id)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -372,7 +429,7 @@ func (h *Handler) UpdateMAR(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &req) {
 		return
 	}
-	if errs := validateMAR(req.MaterialName); len(errs) > 0 {
+	if errs := validateMARInput(req); len(errs) > 0 {
 		httpx.ValidationFailed(w, r, errs)
 		return
 	}
@@ -381,9 +438,10 @@ func (h *Handler) UpdateMAR(w http.ResponseWriter, r *http.Request) {
 		SET material_name=$3,
 		    spec_ref=NULLIF(btrim(coalesce($4,'')),''),
 		    manufacturer=NULLIF(btrim(coalesce($5,'')),''),
+		    lead_time_days=$6, needed_by_date=$7::date,
 		    row_version=row_version+1
 		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL AND status='Submitted'`,
-		id, pid, req.MaterialName, req.SpecRef, req.Manufacturer)
+		id, pid, req.MaterialName, req.SpecRef, req.Manufacturer, req.LeadTimeDays, neededOrNil(req.NeededByDate))
 	if err != nil || ct.RowsAffected() == 0 {
 		httpx.Internal(w, r)
 		return

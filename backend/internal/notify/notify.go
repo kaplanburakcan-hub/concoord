@@ -33,9 +33,12 @@ const (
 	TypeWeeklyReportFailed = "weekly_report_failed" // PDF üretimi başarısız → üreten kullanıcı
 
 	// Faz 7 — Satınalma ve tedarik zinciri
-	TypePRSubmitted = "pr_submitted" // PR onaya sunuldu → onay yetkilileri
-	TypePRDecided   = "pr_decided"   // PR onaylandı/reddedildi → talep sahibi
-	TypePOOverdue   = "po_overdue"   // beklenen teslim tarihi geçti → sipariş sahibi + PR sahibi
+	TypePRSubmitted         = "pr_submitted"         // PR onaya sunuldu → onay yetkilileri
+	TypePRDecided           = "pr_decided"           // PR onaylandı/reddedildi → talep sahibi
+	TypePOOverdue           = "po_overdue"           // beklenen teslim tarihi geçti → sipariş sahibi + PR sahibi
+	TypePOApproaching       = "po_approaching"       // beklenen teslim tarihine 7 gün kaldı → sipariş sahibi + PR sahibi
+	TypeDailyIssueReported  = "daily_issue_reported" // sorun işaretli günlük rapor gönderildi → PY
+	TypeDeliveryDiscrepancy = "delivery_discrepancy" // mal kabulde eksik/hasarlı teslimat → sipariş sahibi + satın alma yetkilileri
 
 	// Faz 8 — İSG
 	TypeOHSPenaltyIssued  = "ohs_penalty_issued"  // ceza tutanağı kesildi → taşeron temsilcisi + PY
@@ -51,6 +54,8 @@ const (
 	TypeEVMThresholdAlert   = "evm_threshold_alert"   // CPI/SPI eşik ihlali → PY
 	TypeMilestoneLateAlert  = "milestone_late_alert"  // geciken milestone → PY
 	TypeFindingAgingAlert   = "finding_aging_alert"   // yaşlanan açık İSG bulgusu → PY
+	TypeRFIOverdue          = "rfi_overdue_alert"     // yanıt tarihi geçmiş, cevabı beklenen yazışma → PY
+	TypeRiskHighAlert       = "risk_high_alert"       // skoru 15+ açık risk → PY
 
 	// Makine/Ekipman/Araç Envanteri Faz B — proje-arası transfer talebi
 	TypeEquipmentTransferRequested = "equipment_transfer_requested" // talep açıldı → kaynak projenin onay yetkilileri
