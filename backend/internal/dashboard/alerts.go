@@ -169,6 +169,39 @@ func RunControlAlerts(ctx context.Context, pool *pgxpool.Pool, nt *notify.Servic
 			}
 		}
 		orows.Close()
+		// --- Yüksek skorlu açık riskler (E3): olasılık × etki >= 15 ---
+		type hr struct {
+			id    uuid.UUID
+			title string
+			score int
+		}
+		var high []hr
+		hrows, err := pool.Query(ctx, `
+			SELECT id, title, probability*impact FROM project_risks
+			WHERE project_id=$1 AND deleted_at IS NULL AND status <> 'Kapandı'
+			  AND probability*impact >= 15`, p.id)
+		if err != nil {
+			log.Error("uyarı taraması: riskler okunamadı", "err", err, "project", p.id)
+			continue
+		}
+		for hrows.Next() {
+			var x hr
+			if hrows.Scan(&x.id, &x.title, &x.score) == nil {
+				high = append(high, x)
+			}
+		}
+		hrows.Close()
+		for _, x := range high {
+			t := x.title
+			if len([]rune(t)) > 80 {
+				t = string([]rune(t)[:79]) + "…"
+			}
+			raiseAlert(ctx, pool, nt, log, p.id, "risk_high:"+x.id.String(), period,
+				notify.TypeRiskHighAlert,
+				fmt.Sprintf("Yüksek skorlu risk: %s", p.code),
+				fmt.Sprintf("%s — skor %d (olasılık × etki ≥ 15).", t, x.score))
+		}
+
 		for _, r := range overdue {
 			k := r.konu
 			if len(k) > 80 {
