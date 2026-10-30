@@ -66,6 +66,10 @@ export default function ProcurementPlanPage() {
   const [saving, setSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Salt okunur "PO'ya bağlanmamış" görünümü (E8): plan kalemi, aynı malzeme
+  // adıyla iptal edilmemiş bir PO'da yoksa listelenir.
+  const [view, setView] = useState<"all" | "unmatched">("all");
+  const [unmatched, setUnmatched] = useState<PlanItem[]>([]);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -79,6 +83,18 @@ export default function ProcurementPlanPage() {
   }, [pid]);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadUnmatched = useCallback(async () => {
+    if (!pid) return;
+    try {
+      const r = await api<{ items: PlanItem[] }>(`/projects/${pid}/procurement/plan/unmatched`, { projectId: pid });
+      setUnmatched(r.items ?? []);
+    } catch (e) {
+      setErr(describeLoadError(e, "Eşleşmeyen kalemler"));
+    }
+  }, [pid]);
+
+  useEffect(() => { if (view === "unmatched") loadUnmatched(); }, [view, loadUnmatched, items]);
 
   async function create() {
     if (!pid || !form.description.trim()) return;
@@ -235,6 +251,16 @@ export default function ProcurementPlanPage() {
         </div>
       )}
 
+      <div className="flex gap-2 text-xs">
+        {(["all", "unmatched"] as const).map((v) => (
+          <button key={v} onClick={() => setView(v)}
+            className={`rounded-md px-3 py-1.5 border ${view === v
+              ? "border-emniyet-500 text-emniyet-500" : "border-beton-800 text-beton-400 hover:text-beton-200"}`}>
+            {v === "all" ? "Tüm kalemler" : `PO'ya bağlanmamış (${unmatched.length})`}
+          </button>
+        ))}
+      </div>
+
       <div className="overflow-x-auto rounded-lg border border-beton-800">
         <table className="w-full text-sm">
           <thead>
@@ -252,7 +278,7 @@ export default function ProcurementPlanPage() {
             </tr>
           </thead>
           <tbody>
-            {items.map((it) => (
+            {(view === "all" ? items : unmatched).map((it) => (
               <tr key={it.id} className="border-b border-beton-800/60 hover:bg-beton-900/30">
                 <td className="py-2 px-3 text-beton-400 text-xs font-mono">{it.poz_no ?? "—"}</td>
                 <td className="py-2 px-3 text-beton-100">

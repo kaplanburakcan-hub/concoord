@@ -494,6 +494,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			// Tedarik Planı — zorunlu olmayan planlama/takip referansı (PR/PO
 			// zincirinden bağımsız), manuel ekleme + Excel/CSV toplu içe aktarma.
 			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/procurement/plan", procH.ListPlanItems)
+			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/procurement/plan/unmatched", procH.ListUnmatchedPlanItems)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Post("/projects/{projectID}/procurement/plan", procH.CreatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Patch("/projects/{projectID}/procurement/plan/{id}", procH.UpdatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Delete("/projects/{projectID}/procurement/plan/{id}", procH.DeletePlanItem)
