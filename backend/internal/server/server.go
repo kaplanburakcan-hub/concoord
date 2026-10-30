@@ -35,6 +35,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/ohs"
 	"github.com/ipks/ipks/backend/internal/ohsaccidents"
 	"github.com/ipks/ipks/backend/internal/paymentplans"
+	"github.com/ipks/ipks/backend/internal/risks"
 	"github.com/ipks/ipks/backend/internal/payments"
 	"github.com/ipks/ipks/backend/internal/personnel"
 	"github.com/ipks/ipks/backend/internal/procurement"
@@ -119,6 +120,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 
 	// --- Faz 7 bağımlılıkları (satınalma ve tedarik zinciri) ---
 	procH := procurement.NewHandler(pool, eval, recorder, notifySvc, log)
+	riskH := risks.NewHandler(pool, recorder)
 
 	// --- Faz 8 bağımlılıkları (İSG: checklist, denetim, bulgu, ceza otomasyonu) ---
 	ohsH := ohs.NewHandler(pool, eval, recorder, notifySvc, store, log)
@@ -496,6 +498,11 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			// zincirinden bağımsız), manuel ekleme + Excel/CSV toplu içe aktarma.
 			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/procurement/plan", procH.ListPlanItems)
 			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/procurement/plan/unmatched", procH.ListUnmatchedPlanItems)
+
+			// Faz 3.2 (E3): proje risk kaydı — silme yok, yalnız durum geçişi.
+			pr.With(mw.RequirePermission("risks.view")).Get("/projects/{projectID}/risks", riskH.List)
+			pr.With(mw.RequirePermission("risks.manage")).Post("/projects/{projectID}/risks", riskH.Create)
+			pr.With(mw.RequirePermission("risks.manage")).Patch("/projects/{projectID}/risks/{id}", riskH.Update)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Post("/projects/{projectID}/procurement/plan", procH.CreatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Patch("/projects/{projectID}/procurement/plan/{id}", procH.UpdatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Delete("/projects/{projectID}/procurement/plan/{id}", procH.DeletePlanItem)

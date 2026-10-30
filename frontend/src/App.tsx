@@ -40,6 +40,7 @@ import PenaltiesPage from "./pages/ohs/PenaltiesPage";
 import ChecklistTemplatesPage from "./pages/ohs/ChecklistTemplatesPage";
 import ProjectSummaryPage from "./pages/project/ProjectSummaryPage";
 import ProjePaydaslariPage from "./pages/project/ProjePaydaslariPage";
+import RisklerPage from "./pages/project/RisklerPage";
 import ProjeKesfiPage from "./pages/project/ProjeKesfiPage";
 import IdariHakedisPage from "./pages/payments/IdariHakedisPage";
 import PersonelPage from "./pages/project/PersonelPage";
@@ -393,6 +394,7 @@ export default function App() {
                       <Route path="/proje/depo" element={<RequirePerm perm="reports.view"><DepoPage /></RequirePerm>} />
                       <Route path="/proje/toplanti" element={<RequirePerm perm="reports.view"><ToplantiPage /></RequirePerm>} />
                       <Route path="/proje/fotograflar" element={<RequirePerm perm="documents.view"><FotograflarPage /></RequirePerm>} />
+                      <Route path="/proje/riskler" element={<RequirePerm perm="risks.view"><RisklerPage /></RequirePerm>} />
                       <Route path="/proje/ana-sozlesme" element={<RequirePerm perm="projects.view"><AnaSozlesmePage /></RequirePerm>} />
                       <Route path="/proje/sigorta-policeler" element={<RequirePerm perm="projects.view"><SigortaPolicelerPage /></RequirePerm>} />
                       <Route path="/proje/tasarim-projeler" element={<RequirePerm perm="projects.view"><TasarimVeProjelerPage /></RequirePerm>} />

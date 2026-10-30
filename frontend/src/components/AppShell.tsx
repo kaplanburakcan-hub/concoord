@@ -64,6 +64,7 @@ const GROUPS: NavGroup[] = [
       { to: "/proje/ozet", label: "Özet / Dashboard", perm: "projects.view", icon: I.ozet },
       { to: "/proje/paydaslar", label: "Proje Paydaşları", perm: "projects.view", icon: I.kullanici },
       { to: "/proje/kesif", label: "Proje Keşfi", perm: "projects.view", icon: I.dok },
+      { to: "/proje/riskler", label: "Risk Kaydı", perm: "risks.view", icon: I.rapor },
       { to: "/verimlilik-normlari", label: "Verimlilik Normları", perm: "reports.view", icon: I.rapor },
       { to: "/proje/ana-sozlesme", label: "Ana Sözleşme", perm: "projects.view", icon: I.sozlesme },
       { to: "/proje/tasarim-projeler", label: "Tasarım ve Projeler", perm: "projects.view", icon: I.tasarim },
