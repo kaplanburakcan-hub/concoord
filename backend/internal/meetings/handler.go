@@ -1,20 +1,32 @@
 package meetings
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/ipks/ipks/backend/internal/audit"
+	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/validate"
 )
 
-type Handler struct{ pool *pgxpool.Pool }
+type Handler struct {
+	pool *pgxpool.Pool
+	rec  *audit.Recorder
+}
 
-func NewHandler(pool *pgxpool.Pool) *Handler { return &Handler{pool: pool} }
+func NewHandler(pool *pgxpool.Pool, rec *audit.Recorder) *Handler {
+	return &Handler{pool: pool, rec: rec}
+}
 
 type Meeting struct {
 	ID               uuid.UUID `json:"id"`
@@ -277,4 +289,147 @@ func nilStr(s *string) any {
 		return nil
 	}
 	return *s
+}
+
+// ActionTaskDTO — bir aksiyon satırının bağlı olduğu görev (varsa).
+type ActionTaskDTO struct {
+	ActionIndex int       `json:"action_index"`
+	TaskID      uuid.UUID `json:"task_id"`
+}
+
+// ListActionTasks — toplantının hangi aksiyon satırlarından görev açıldığını döner.
+func (h *Handler) ListActionTasks(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	mid, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+	rows, err := h.pool.Query(r.Context(), `
+		SELECT mat.action_index, mat.task_id FROM meeting_action_tasks mat
+		JOIN project_meetings m ON m.id = mat.meeting_id AND m.project_id = $2 AND m.deleted_at IS NULL
+		WHERE mat.meeting_id = $1
+		ORDER BY mat.action_index`, mid, pid)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	defer rows.Close()
+	out := []ActionTaskDTO{}
+	for rows.Next() {
+		var d ActionTaskDTO
+		if err := rows.Scan(&d.ActionIndex, &d.TaskID); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		out = append(out, d)
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"action_tasks": out})
+}
+
+// CreateTaskFromAction — toplantının N. aksiyon satırından bir görev oluşturur.
+// Aynı satırdan ikinci kez görev açılamaz (409 ve mevcut görev kimliği döner).
+func (h *Handler) CreateTaskFromAction(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	mid, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+	idx, err := strconv.Atoi(chi.URLParam(r, "index"))
+	if err != nil || idx < 0 {
+		httpx.Error(w, r, http.StatusBadRequest, httpx.CodeValidation, "Geçersiz aksiyon sırası.", nil)
+		return
+	}
+	uid, ok := auth.UserIDFrom(r.Context())
+	if !ok {
+		httpx.Error(w, r, http.StatusUnauthorized, httpx.CodeUnauthorized, "Oturum gerekli.", nil)
+		return
+	}
+
+	var raw string
+	if err := h.pool.QueryRow(r.Context(), `
+		SELECT aksiyon_maddeleri::text FROM project_meetings
+		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, mid, pid).Scan(&raw); errors.Is(err, pgx.ErrNoRows) {
+		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Toplantı bulunamadı.", nil)
+		return
+	} else if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	var items []struct {
+		Aksiyon  string `json:"aksiyon"`
+		Sorumlu  string `json:"sorumlu"`
+		SonTarih string `json:"son_tarih"`
+	}
+	if err := json.Unmarshal([]byte(raw), &items); err != nil || idx >= len(items) {
+		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Aksiyon satırı bulunamadı.", nil)
+		return
+	}
+	item := items[idx]
+	title := strings.TrimSpace(item.Aksiyon)
+	if title == "" {
+		httpx.ValidationFailed(w, r, map[string]string{"aksiyon": "boş aksiyon görev olarak açılamaz"})
+		return
+	}
+	if len([]rune(title)) > 200 {
+		title = string([]rune(title)[:200])
+	}
+	desc := "Toplantı aksiyonu."
+	if s := strings.TrimSpace(item.Sorumlu); s != "" {
+		desc += " Sorumlu: " + s + "."
+	}
+	var due *string
+	if d := strings.TrimSpace(item.SonTarih); d != "" {
+		if _, perr := time.Parse("2006-01-02", d); perr == nil {
+			due = &d
+		}
+	}
+
+	tx, err := h.pool.Begin(r.Context())
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var taskID uuid.UUID
+	err = tx.QueryRow(r.Context(), `
+		WITH t AS (
+		  INSERT INTO tasks (project_id, title, description, due_date, created_by)
+		  VALUES ($3, $4, $6, $7::date, $5)
+		  RETURNING id
+		)
+		INSERT INTO meeting_action_tasks (meeting_id, action_index, task_id, created_by)
+		SELECT $1, $2, t.id, $5 FROM t
+		RETURNING task_id`, mid, idx, pid, title, uid, desc, due).Scan(&taskID)
+	if err != nil {
+		// Aynı satırdan ikinci görev: birincil anahtar çakışması.
+		var existing uuid.UUID
+		if qerr := h.pool.QueryRow(r.Context(), `
+			SELECT task_id FROM meeting_action_tasks WHERE meeting_id=$1 AND action_index=$2`,
+			mid, idx).Scan(&existing); qerr == nil {
+			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
+				"Bu aksiyon için görev zaten açılmış.", map[string]interface{}{"task_id": existing})
+			return
+		}
+		httpx.Internal(w, r)
+		return
+	}
+	m := audit.MetaFrom(r.Context())
+	_ = h.rec.RecordTx(r.Context(), tx, audit.Entry{
+		ActorID: m.ActorID, Entity: "meeting_action_tasks", EntityID: mid.String(), Action: audit.ActionInsert,
+		After: map[string]interface{}{"action_index": idx, "task_id": taskID.String()}, IP: m.IP, ReqID: m.ReqID,
+	})
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, map[string]interface{}{
+		"action_index": idx, "task_id": taskID,
+	})
 }

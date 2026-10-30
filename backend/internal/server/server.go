@@ -153,7 +153,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	// --- Faz 20: Tasarım ve Projeler ---
 	designH := design.NewHandler(pool)
 	warehouseH := warehouse.NewHandler(pool)
-	meetingsH := meetings.NewHandler(pool)
+	meetingsH := meetings.NewHandler(pool, recorder)
 	tutanaklarH := tutanaklar.NewHandler(pool, notifySvc)
 	stakeholdersH := stakeholders.NewHandler(pool)
 	customReportsH := customreports.NewHandler(pool)
@@ -728,6 +728,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/meetings", meetingsH.Create)
 			pr.With(mw.RequirePermission("projects.edit")).Patch("/projects/{projectID}/meetings/{id}", meetingsH.Update)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/meetings/{id}", meetingsH.Delete)
+			// Faz 3.2 (E15): toplantı aksiyon satırından görev (satır başına en fazla bir görev).
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/meetings/{id}/action-tasks", meetingsH.ListActionTasks)
+			pr.With(mw.RequirePermission("tasks.create")).Post("/projects/{projectID}/meetings/{id}/actions/{index}/task", meetingsH.CreateTaskFromAction)
 		})
 
 		// Saha Tutanakları (kaza/yangın/hırsızlık, ek imalat, mesai, yevmiyeli
