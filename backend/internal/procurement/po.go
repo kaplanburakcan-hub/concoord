@@ -914,3 +914,62 @@ func (h *Handler) notifyDiscrepancy(ctx context.Context, pid, poID, actor uuid.U
 		EntityType: "purchase_orders", EntityID: &poID, ProjectID: &pid,
 	})
 }
+
+// NotifyApproachingPOs — beklenen teslim tarihine 7 gün (dahil) kalan, kapanmamış
+// siparişler için bildirim üretir. Tekilleştirme approaching_notified_at ile
+// yapılır; teslim tarihi değişirse alan sıfırlanır ve uyarı yeniden kurulur.
+// Yalnız bildirimdir; sipariş durumu değişmez.
+func NotifyApproachingPOs(ctx context.Context, pool *pgxpool.Pool, nt *notify.Service, log *slog.Logger) {
+	rows, err := pool.Query(ctx, `
+		SELECT o.id, o.project_id, o.po_no, o.supplier_name,
+		       to_char(o.expected_date,'DD.MM.YYYY'), o.created_by, pr.requested_by
+		FROM purchase_orders o
+		LEFT JOIN purchase_requests pr ON pr.id = o.pr_id
+		WHERE o.deleted_at IS NULL
+		  AND o.status IN ('Ordered','PartiallyDelivered')
+		  AND o.expected_date IS NOT NULL
+		  AND o.expected_date >= CURRENT_DATE
+		  AND o.expected_date <= CURRENT_DATE + 7
+		  AND o.approaching_notified_at IS NULL
+		LIMIT 200`)
+	if err != nil {
+		log.Error("yaklaşan teslim taraması başarısız", "err", err)
+		return
+	}
+	type row struct {
+		id, pid   uuid.UUID
+		poNo, sup string
+		expected  string
+		createdBy uuid.UUID
+		requester *uuid.UUID
+	}
+	items := []row{}
+	for rows.Next() {
+		var x row
+		if err := rows.Scan(&x.id, &x.pid, &x.poNo, &x.sup, &x.expected, &x.createdBy, &x.requester); err != nil {
+			rows.Close()
+			log.Error("yaklaşan teslim satırı okunamadı", "err", err)
+			return
+		}
+		items = append(items, x)
+	}
+	rows.Close()
+
+	for _, x := range items {
+		targets := []uuid.UUID{x.createdBy}
+		if x.requester != nil && *x.requester != x.createdBy {
+			targets = append(targets, *x.requester)
+		}
+		poID, pid := x.id, x.pid
+		nt.Send(ctx, notify.Input{
+			UserIDs: targets, Type: notify.TypePOApproaching,
+			Title:      x.poNo + " — teslim tarihi yaklaşıyor",
+			Body:       x.sup + " · beklenen: " + x.expected,
+			EntityType: "purchase_orders", EntityID: &poID, ProjectID: &pid,
+		})
+		if _, err := pool.Exec(ctx,
+			`UPDATE purchase_orders SET approaching_notified_at=now() WHERE id=$1`, x.id); err != nil {
+			log.Error("yaklaşan teslim işareti yazılamadı", "po", x.id, "err", err)
+		}
+	}
+}

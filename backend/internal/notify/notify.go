@@ -36,6 +36,7 @@ const (
 	TypePRSubmitted         = "pr_submitted"         // PR onaya sunuldu → onay yetkilileri
 	TypePRDecided           = "pr_decided"           // PR onaylandı/reddedildi → talep sahibi
 	TypePOOverdue           = "po_overdue"           // beklenen teslim tarihi geçti → sipariş sahibi + PR sahibi
+	TypePOApproaching       = "po_approaching"       // beklenen teslim tarihine 7 gün kaldı → sipariş sahibi + PR sahibi
 	TypeDailyIssueReported  = "daily_issue_reported" // sorun işaretli günlük rapor gönderildi → PY
 	TypeDeliveryDiscrepancy = "delivery_discrepancy" // mal kabulde eksik/hasarlı teslimat → sipariş sahibi + satın alma yetkilileri
 
