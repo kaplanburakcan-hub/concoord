@@ -169,6 +169,39 @@ func RunControlAlerts(ctx context.Context, pool *pgxpool.Pool, nt *notify.Servic
 			}
 		}
 		orows.Close()
+		// --- Yanıt tarihine 3 gün kalan açık yazışmalar (E5) ---
+		// Vadesi geçenler yukarıdaki uyarıyla bildirilir; burada yalnız yaklaşanlar.
+		type dueSoon struct {
+			id    uuid.UUID
+			evrak string
+			tarih time.Time
+		}
+		var soon []dueSoon
+		srows, err := pool.Query(ctx, `
+			SELECT id, evrak_no, cevap_tarihi FROM correspondences
+			WHERE project_id=$1 AND deleted_at IS NULL
+			  AND cevap_gerekli AND durum='Açık'
+			  AND cevap_tarihi IS NOT NULL
+			  AND cevap_tarihi >= $2::date AND cevap_tarihi <= $2::date + 3`,
+			p.id, now.Format("2006-01-02"))
+		if err != nil {
+			log.Error("uyarı taraması: yaklaşan yazışmalar okunamadı", "err", err, "project", p.id)
+			continue
+		}
+		for srows.Next() {
+			var x dueSoon
+			if srows.Scan(&x.id, &x.evrak, &x.tarih) == nil {
+				soon = append(soon, x)
+			}
+		}
+		srows.Close()
+		for _, x := range soon {
+			raiseAlert(ctx, pool, nt, log, p.id, "rfi_due_soon:"+x.id.String(), period,
+				notify.TypeRFIDueSoon,
+				fmt.Sprintf("Yanıt tarihi yaklaşan yazışma: %s", x.evrak),
+				fmt.Sprintf("Yanıt tarihi %s — 3 gün içinde.", x.tarih.Format("02.01.2006")))
+		}
+
 		// --- Yüksek skorlu açık riskler (E3): olasılık × etki >= 15 ---
 		type hr struct {
 			id    uuid.UUID
