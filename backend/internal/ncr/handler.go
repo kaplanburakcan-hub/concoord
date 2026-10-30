@@ -144,7 +144,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	h.respond(w, r, pid, id, http.StatusCreated)
 }
 
-// Close — açık kaydı kapatır. Kapalı kayıt tekrar kapatılamaz ve açılamaz.
+// Close — açık kaydı kapatır. Kapatma, aynı projeye ait bir kanıt belgesi ister.
+// Kapalı kayıt tekrar kapatılamaz ve açılamaz.
 func (h *Handler) Close(w http.ResponseWriter, r *http.Request) {
 	pid, ok := parseID(w, r, "projectID")
 	if !ok {
@@ -159,9 +160,30 @@ func (h *Handler) Close(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, http.StatusUnauthorized, httpx.CodeUnauthorized, "Oturum gerekli.", nil)
 		return
 	}
+	var in struct {
+		DocumentID string `json:"document_id"`
+	}
+	if !httpx.DecodeJSON(w, r, &in) {
+		return
+	}
+	docID, err := uuid.Parse(strings.TrimSpace(in.DocumentID))
+	if err != nil {
+		httpx.ValidationFailed(w, r, map[string]string{"document_id": "kapanış için kanıt belgesi seçin"})
+		return
+	}
+	var one int
+	if err := h.pool.QueryRow(r.Context(), `
+		SELECT 1 FROM documents WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, docID, pid).Scan(&one); errors.Is(err, pgx.ErrNoRows) {
+		httpx.ValidationFailed(w, r, map[string]string{"document_id": "bu projede kayıtlı belge değil"})
+		return
+	} else if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
 	ct, err := h.pool.Exec(r.Context(), `
-		UPDATE ncrs SET status='Kapandı', closed_by=$3, closed_at=now(), row_version=row_version+1
-		WHERE id=$1 AND project_id=$2 AND status='Açık'`, id, pid, uid)
+		UPDATE ncrs SET status='Kapandı', closed_by=$3, closed_at=now(), closed_document_id=$4,
+		                row_version=row_version+1
+		WHERE id=$1 AND project_id=$2 AND status='Açık'`, id, pid, uid, docID)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -179,8 +201,9 @@ func (h *Handler) Close(w http.ResponseWriter, r *http.Request) {
 	m := audit.MetaFrom(r.Context())
 	h.rec.Record(r.Context(), audit.Entry{
 		ActorID: m.ActorID, Entity: "ncrs", EntityID: id.String(), Action: audit.ActionUpdate,
-		Before: map[string]interface{}{"status": "Açık"}, After: map[string]interface{}{"status": "Kapandı"},
-		IP: m.IP, ReqID: m.ReqID,
+		Before: map[string]interface{}{"status": "Açık"},
+		After:  map[string]interface{}{"status": "Kapandı", "closed_document_id": docID.String()},
+		IP:     m.IP, ReqID: m.ReqID,
 	})
 	h.respond(w, r, pid, id, http.StatusOK)
 }

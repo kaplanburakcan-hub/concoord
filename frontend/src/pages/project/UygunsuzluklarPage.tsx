@@ -27,6 +27,10 @@ export default function UygunsuzluklarPage() {
   const [poz, setPoz] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  // Kapatma akışı: önce kanıt belgesi seçilir (E4 kapanış kanıtı).
+  const [closingId, setClosingId] = useState<string | null>(null);
+  const [closeDoc, setCloseDoc] = useState("");
+  const [docs, setDocs] = useState<{ id: string; title: string }[]>([]);
 
   const load = useCallback(async () => {
     if (!pid) return;
@@ -58,11 +62,22 @@ export default function UygunsuzluklarPage() {
     }
   }
 
-  async function close(n: NCR) {
+  async function openClose(n: NCR) {
+    setClosingId(n.id); setCloseDoc(""); setErr(null);
     if (!pid) return;
-    if (!window.confirm(`${n.title} kaydı kapatılsın mı? Kayıt silinmez, kapalı olarak kalır.`)) return;
     try {
-      await api(`/projects/${pid}/ncrs/${n.id}/close`, { method: "POST", projectId: pid });
+      const r = await api<{ documents: { id: string; title: string }[] }>(`/projects/${pid}/documents`, { projectId: pid });
+      setDocs(r.documents ?? []);
+    } catch { setDocs([]); }
+  }
+
+  async function confirmClose(n: NCR) {
+    if (!pid || !closeDoc) return;
+    try {
+      await api(`/projects/${pid}/ncrs/${n.id}/close`, {
+        method: "POST", projectId: pid, body: { document_id: closeDoc },
+      });
+      setClosingId(null);
       await load();
     } catch (e) {
       setErr(describeLoadError(e, "Kapatma"));
@@ -136,8 +151,21 @@ export default function UygunsuzluklarPage() {
                     : <span className="text-xs text-beton-400">Kapandı · {n.closed_by_name} · {n.closed_at}</span>}
                 </td>
                 <td className="py-2 px-3 text-right">
-                  {canManage && n.status === "Açık" && (
-                    <button onClick={() => close(n)} className="text-xs text-emniyet-500 hover:underline">Kapat</button>
+                  {canManage && n.status === "Açık" && closingId !== n.id && (
+                    <button onClick={() => openClose(n)} className="text-xs text-emniyet-500 hover:underline">Kapat</button>
+                  )}
+                  {canManage && closingId === n.id && (
+                    <div className="flex flex-col items-end gap-1">
+                      <select value={closeDoc} onChange={(e) => setCloseDoc(e.target.value)} className={`${inp} text-xs max-w-[220px]`}>
+                        <option value="">— kanıt belgesi seç —</option>
+                        {docs.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+                      </select>
+                      <div className="flex gap-2">
+                        <button onClick={() => confirmClose(n)} disabled={!closeDoc}
+                          className="text-xs text-emniyet-500 hover:underline disabled:opacity-50">Kanıtla kapat</button>
+                        <button onClick={() => setClosingId(null)} className="text-xs text-beton-400 hover:underline">Vazgeç</button>
+                      </div>
+                    </div>
                   )}
                 </td>
               </tr>
