@@ -18,11 +18,11 @@ import (
 	"github.com/ipks/ipks/backend/internal/cashflow"
 	"github.com/ipks/ipks/backend/internal/changes"
 	"github.com/ipks/ipks/backend/internal/config"
-	"github.com/ipks/ipks/backend/internal/decisions"
 	"github.com/ipks/ipks/backend/internal/contracts"
 	"github.com/ipks/ipks/backend/internal/correspondence"
 	"github.com/ipks/ipks/backend/internal/customreports"
 	"github.com/ipks/ipks/backend/internal/dashboard"
+	"github.com/ipks/ipks/backend/internal/decisions"
 	"github.com/ipks/ipks/backend/internal/design"
 	"github.com/ipks/ipks/backend/internal/documents"
 	"github.com/ipks/ipks/backend/internal/equipmenttransfers"
@@ -34,6 +34,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/manhour"
 	"github.com/ipks/ipks/backend/internal/materials"
 	"github.com/ipks/ipks/backend/internal/meetings"
+	"github.com/ipks/ipks/backend/internal/ncr"
 	"github.com/ipks/ipks/backend/internal/notify"
 	"github.com/ipks/ipks/backend/internal/ohs"
 	"github.com/ipks/ipks/backend/internal/ohsaccidents"
@@ -126,6 +127,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	riskH := risks.NewHandler(pool, recorder)
 	changeH := changes.NewHandler(pool, recorder)
 	decisionH := decisions.NewHandler(pool, recorder)
+	ncrH := ncr.NewHandler(pool, recorder)
 	calendarH := calendarfeed.NewHandler(pool, recorder)
 
 	// --- Faz 8 bağımlılıkları (İSG: checklist, denetim, bulgu, ceza otomasyonu) ---
@@ -525,6 +527,11 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			// Faz 3.2 (E3): karar günlüğü — kayıt değiştirilmez, geçersiz kılınır.
 			pr.With(mw.RequirePermission("decisions.view")).Get("/projects/{projectID}/decisions", decisionH.List)
 			pr.With(mw.RequirePermission("decisions.record")).Post("/projects/{projectID}/decisions", decisionH.Create)
+
+			// Faz 3.5 (E4): uygunsuzluk kaydı — silme yok, yalnız kapatma.
+			pr.With(mw.RequirePermission("ncr.view")).Get("/projects/{projectID}/ncrs", ncrH.List)
+			pr.With(mw.RequirePermission("ncr.manage")).Post("/projects/{projectID}/ncrs", ncrH.Create)
+			pr.With(mw.RequirePermission("ncr.manage")).Post("/projects/{projectID}/ncrs/{id}/close", ncrH.Close)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Post("/projects/{projectID}/procurement/plan", procH.CreatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Patch("/projects/{projectID}/procurement/plan/{id}", procH.UpdatePlanItem)
 			pr.With(mw.RequirePermission("procurement.manage_po")).Delete("/projects/{projectID}/procurement/plan/{id}", procH.DeletePlanItem)
