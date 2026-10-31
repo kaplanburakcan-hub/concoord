@@ -57,6 +57,7 @@ const (
 	TypeRFIOverdue          = "rfi_overdue_alert"     // yanıt tarihi geçmiş, cevabı beklenen yazışma → PY
 	TypeRFIDueSoon          = "rfi_due_soon_alert"    // yanıt tarihine 3 gün kala veya cevap bekleyen yazışma → PY
 	TypeWeeklyDigest        = "weekly_project_digest" // haftalık proje özeti (sayılar) → PY
+	TypeStaleOpenAlert      = "stale_open_alert"      // uzun süredir açık NCR/risk → PY
 	TypeRiskHighAlert       = "risk_high_alert"       // skoru 15+ açık risk → PY
 
 	// Makine/Ekipman/Araç Envanteri Faz B — proje-arası transfer talebi

@@ -202,6 +202,57 @@ func RunControlAlerts(ctx context.Context, pool *pgxpool.Pool, nt *notify.Servic
 				fmt.Sprintf("Yanıt tarihi %s — 3 gün içinde.", x.tarih.Format("02.01.2006")))
 		}
 
+		// --- Uzun süredir açık uygunsuzluk ve riskler (E3/E4): 30 gün eşiği ---
+		// Kayıt ay içinde bir kez uyarılır (control_alerts); kayıtlar değişmez.
+		type stale struct {
+			key, kind, label string
+			id               uuid.UUID
+		}
+		var stales []stale
+		nrows, err := pool.Query(ctx, `
+			SELECT id, ncr_no, title FROM ncrs
+			WHERE project_id=$1 AND status='Açık' AND created_at < now() - interval '30 days'`, p.id)
+		if err != nil {
+			log.Error("uyarı taraması: eski uygunsuzluklar okunamadı", "err", err, "project", p.id)
+			continue
+		}
+		for nrows.Next() {
+			var id uuid.UUID
+			var no int
+			var t string
+			if nrows.Scan(&id, &no, &t) == nil {
+				stales = append(stales, stale{"stale_ncr:" + id.String(), "ncr", fmt.Sprintf("U-%03d %s", no, t), id})
+			}
+		}
+		nrows.Close()
+		rrows, err := pool.Query(ctx, `
+			SELECT id, risk_no, title FROM project_risks
+			WHERE project_id=$1 AND deleted_at IS NULL AND status<>'Kapandı'
+			  AND created_at < now() - interval '30 days'`, p.id)
+		if err != nil {
+			log.Error("uyarı taraması: eski riskler okunamadı", "err", err, "project", p.id)
+			continue
+		}
+		for rrows.Next() {
+			var id uuid.UUID
+			var no int
+			var t string
+			if rrows.Scan(&id, &no, &t) == nil {
+				stales = append(stales, stale{"stale_risk:" + id.String(), "risk", fmt.Sprintf("R-%03d %s", no, t), id})
+			}
+		}
+		rrows.Close()
+		for _, x := range stales {
+			label := x.label
+			if len([]rune(label)) > 80 {
+				label = string([]rune(label)[:79]) + "…"
+			}
+			raiseAlert(ctx, pool, nt, log, p.id, x.key, period,
+				notify.TypeStaleOpenAlert,
+				fmt.Sprintf("30 günden uzun açık %s: %s", map[string]string{"ncr": "uygunsuzluk", "risk": "risk"}[x.kind], p.code),
+				label)
+		}
+
 		// --- Haftalık proje özeti (E11): yalnız sayılar, hafta başına bir kez ---
 		var digest struct{ risks, lateTedarik, rfiOver, ncrOpen, tasksOver int }
 		if err := pool.QueryRow(ctx, `
