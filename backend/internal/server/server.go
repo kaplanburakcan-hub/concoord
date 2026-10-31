@@ -605,6 +605,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("correspondence.view")).Get("/projects/{projectID}/attention/rfi-overdue", dashH.RFIOverdueCount)
 			pr.With(mw.RequirePermission("procurement.view")).Get("/projects/{projectID}/attention/plan-late", dashH.PlanLateCount)
 			pr.With(mw.RequirePermission("tasks.view")).Get("/projects/{projectID}/attention/tasks-overdue", dashH.TasksOverdueCount)
+			pr.With(mw.RequirePermission("projects.view")).Get("/projects/{projectID}/attention/this-week", dashH.ThisWeekCounts)
 
 			// PV aylık dağılım girişi (EVM S-eğrisini zenginleştirir).
 			pr.With(mw.RequirePermission("reports.view_financial_reports")).Get("/projects/{projectID}/pv-plan", dashH.GetPVPlan)
