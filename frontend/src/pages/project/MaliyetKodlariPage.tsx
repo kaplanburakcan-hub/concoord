@@ -6,7 +6,7 @@ import { useProjects } from "../../projects/ProjectContext";
 // Maliyet kodu tanım listesi (E6, ilk adım). Yalnız tanım: bütçe, PO ve hakediş
 // ile bağlantı bu aşamada yoktur.
 
-type CostCode = { id: string; code: string; name: string; parent_id?: string; budget?: number; created_by_name: string; created_at: string };
+type CostCode = { id: string; code: string; name: string; parent_id?: string; budget?: number; committed: number; variance_pct?: number; created_by_name: string; created_at: string };
 
 const inp = "rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100 outline-none focus:border-emniyet-500";
 
@@ -120,19 +120,27 @@ export default function MaliyetKodlariPage() {
               <th className="py-2 px-3">Kod</th>
               <th className="py-2 px-3">Ad</th>
               <th className="py-2 px-3">Üst kod</th>
+              <th className="py-2 px-3 text-right">Taahhüt (PO)</th>
+              <th className="py-2 px-3 text-right">Fark %</th>
               <th className="py-2 px-3 text-right">Bütçe</th>
               <th className="py-2 px-3">Ekleyen</th>
             </tr>
           </thead>
           <tbody>
             {codes.length === 0 && (
-              <tr><td colSpan={5} className="py-6 text-center text-beton-500">Maliyet kodu tanımlı değil.</td></tr>
+              <tr><td colSpan={7} className="py-6 text-center text-beton-500">Maliyet kodu tanımlı değil.</td></tr>
             )}
             {codes.map((c) => (
               <tr key={c.id} className="border-b border-beton-800/60">
                 <td className="py-2 px-3 font-mono text-beton-200">{c.code}</td>
                 <td className="py-2 px-3 text-beton-100">{c.name}</td>
                 <td className="py-2 px-3 text-beton-400 text-xs">{c.parent_id ? nameOf[c.parent_id] ?? "—" : "—"}</td>
+                <td className="py-2 px-3 text-right font-mono text-beton-300">
+                  {c.committed > 0 ? c.committed.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) : "—"}
+                </td>
+                <td className={`py-2 px-3 text-right font-mono ${c.variance_pct != null && c.variance_pct < 0 ? "text-red-300" : "text-beton-300"}`}>
+                  {c.variance_pct != null ? `%${c.variance_pct.toFixed(1)}` : "—"}
+                </td>
                 <td className="py-2 px-3 text-right">
                   {canEdit ? (
                     <div className="flex items-center justify-end gap-2">
