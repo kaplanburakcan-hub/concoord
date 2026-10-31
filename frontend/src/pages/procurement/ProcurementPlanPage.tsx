@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, apiUpload, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
+import { exportXlsx } from "../../lib/exportXlsx";
 import { useProjects } from "../ProjectContext";
 
 // Tedarik Planı — Satın Alma altında, mevcut PR/PO onay zincirine
@@ -178,6 +179,20 @@ export default function ProcurementPlanPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
+        <button onClick={() => exportXlsx("tedarik-plani", "Tedarik Planı", [
+            { header: "Poz", value: (it: PlanItem) => it.poz_no ?? "" },
+            { header: "Tanım", value: (it: PlanItem) => it.description },
+            { header: "Kategori", value: (it: PlanItem) => it.category ?? "" },
+            { header: "Miktar", value: (it: PlanItem) => it.quantity ?? "" },
+            { header: "Birim", value: (it: PlanItem) => it.unit ?? "" },
+            { header: "Tedarikçi", value: (it: PlanItem) => it.supplier_name ?? "" },
+            { header: "Teslim tarihi", value: (it: PlanItem) => it.planned_delivery_date ?? "" },
+            { header: "Durum", value: (it: PlanItem) => it.status },
+          ], view === "all" ? items : unmatched)}
+          disabled={(view === "all" ? items : unmatched).length === 0}
+          className="rounded-md border border-beton-700 px-3 py-1.5 text-xs text-beton-200 hover:border-emniyet-500 disabled:opacity-50">
+          Excel indir
+        </button>
         <div>
           <h1 className="text-lg font-display font-medium text-beton-100">Tedarik Planı</h1>
           <p className="text-xs text-beton-500 mt-0.5">
