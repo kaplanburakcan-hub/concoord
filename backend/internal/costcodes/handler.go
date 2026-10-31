@@ -25,13 +25,17 @@ func NewHandler(pool *pgxpool.Pool, rec *audit.Recorder) *Handler {
 }
 
 type CodeDTO struct {
-	ID        uuid.UUID  `json:"id"`
-	Code      string     `json:"code"`
-	Name      string     `json:"name"`
-	ParentID  *uuid.UUID `json:"parent_id,omitempty"`
-	Budget    *float64   `json:"budget,omitempty"`
-	CreatedBy string     `json:"created_by_name"`
-	CreatedAt string     `json:"created_at"`
+	ID       uuid.UUID  `json:"id"`
+	Code     string     `json:"code"`
+	Name     string     `json:"name"`
+	ParentID *uuid.UUID `json:"parent_id,omitempty"`
+	Budget   *float64   `json:"budget,omitempty"`
+	// Committed — bu koda bağlı, iptal edilmemiş siparişlerin toplamı (taahhüt).
+	Committed float64 `json:"committed"`
+	// VariancePct — (bütçe − taahhüt) / bütçe × 100; bütçe yoksa boş.
+	VariancePct *float64 `json:"variance_pct,omitempty"`
+	CreatedBy   string   `json:"created_by_name"`
+	CreatedAt   string   `json:"created_at"`
 }
 
 type codeInput struct {
@@ -47,7 +51,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := h.pool.Query(r.Context(), `
 		SELECT c.id, c.code, c.name, c.parent_id, u.full_name, to_char(c.created_at,'YYYY-MM-DD'),
-		       b.amount::float8
+		       b.amount::float8,
+		       COALESCE((SELECT sum(po.amount)::float8 FROM purchase_orders po
+		                 WHERE po.cost_code_id = c.id AND po.deleted_at IS NULL AND po.status <> 'Cancelled'), 0)
 		FROM cost_codes c
 		JOIN users u ON u.id = c.created_by
 		LEFT JOIN cost_code_budgets b ON b.cost_code_id = c.id
@@ -60,9 +66,13 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	out := []CodeDTO{}
 	for rows.Next() {
 		var d CodeDTO
-		if err := rows.Scan(&d.ID, &d.Code, &d.Name, &d.ParentID, &d.CreatedBy, &d.CreatedAt, &d.Budget); err != nil {
+		if err := rows.Scan(&d.ID, &d.Code, &d.Name, &d.ParentID, &d.CreatedBy, &d.CreatedAt, &d.Budget, &d.Committed); err != nil {
 			httpx.Internal(w, r)
 			return
+		}
+		if d.Budget != nil && *d.Budget > 0 {
+			v := (*d.Budget - d.Committed) / *d.Budget * 100
+			d.VariancePct = &v
 		}
 		out = append(out, d)
 	}

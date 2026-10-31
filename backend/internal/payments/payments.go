@@ -99,12 +99,15 @@ func (h *Handler) ListPayments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	subFilter := r.URL.Query().Get("subcontractor_id")
+	// İşveren (Client) yalnız kesinleşmiş hakedişleri görür (E14).
+	clientOnly := h.isClientOnly(r, pid)
 	rows, err := h.pool.Query(r.Context(), `
 		SELECT `+paymentCols+` FROM progress_payments
 		WHERE project_id=$1 AND deleted_at IS NULL
+		  AND (NOT $4::bool OR status='Finalized')
 		  AND ($2::uuid IS NULL OR subcontractor_id=$2)
 		  AND ($3='' OR subcontractor_id=$3::uuid)
-		ORDER BY created_at DESC`, pid, scope, subFilter)
+		ORDER BY created_at DESC`, pid, scope, subFilter, clientOnly)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -321,6 +324,11 @@ func (h *Handler) GetPayment(w http.ResponseWriter, r *http.Request) {
 	}
 	p, ok := h.loadPayment(w, r, pid, ppID, scope)
 	if !ok {
+		return
+	}
+	// İşveren yalnız kesinleşmiş hakedişi açabilir; taslak için 404 (varlık sızdırmaz).
+	if p.Status != "Finalized" && h.isClientOnly(r, pid) {
+		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Hakediş bulunamadı.", nil)
 		return
 	}
 	fin := h.canFin(r, pid)

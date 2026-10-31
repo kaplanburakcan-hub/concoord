@@ -21,6 +21,10 @@ import (
 // ---------------------------------------------------------------------------
 
 type tedarikciDTO struct {
+	// OnTimeRate — kapanmış (teslim edilmiş) PO'larda zamanında oranı; kapanmış sipariş yoksa boş.
+	// Yalnız tedarikçi kimliği girili PO'lar sayılır.
+	OnTimeRate    *float64  `json:"on_time_rate,omitempty"`
+	ClosedOrders  int       `json:"closed_orders"`
 	ID            uuid.UUID `json:"id"`
 	ProjectID     uuid.UUID `json:"project_id"`
 	CompanyName   string    `json:"company_name"`
@@ -59,13 +63,43 @@ func (h *Handler) ListTedarikciler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 	out := []tedarikciDTO{}
+	index := map[uuid.UUID]int{}
 	for rows.Next() {
 		var t tedarikciDTO
 		if err := scanTed(rows, &t); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
+		index[t.ID] = len(out)
 		out = append(out, t)
+	}
+	// Teslim performansı: kapanmış PO'lar (son teslimat ≤ beklenen → zamanında).
+	prows, err := h.pool.Query(r.Context(), `
+		SELECT o.tedarikci_id,
+		       count(*) FILTER (WHERE (SELECT max(d.delivered_at)::date FROM deliveries d
+		                               WHERE d.po_id=o.id AND d.deleted_at IS NULL) <= o.expected_date)::int,
+		       count(*)::int
+		FROM purchase_orders o
+		WHERE o.project_id=$1 AND o.deleted_at IS NULL AND o.tedarikci_id IS NOT NULL
+		  AND o.status='Delivered' AND o.expected_date IS NOT NULL
+		GROUP BY o.tedarikci_id`, pid)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	defer prows.Close()
+	for prows.Next() {
+		var tid uuid.UUID
+		var onTime, closed int
+		if err := prows.Scan(&tid, &onTime, &closed); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		if i, ok := index[tid]; ok {
+			out[i].ClosedOrders = closed
+			rate := float64(onTime) / float64(closed)
+			out[i].OnTimeRate = &rate
+		}
 	}
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{"tedarikciler": out})
 }

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
+import { apiWithOfflineFallback } from "../../offline/queue";
+import { exportXlsx } from "../../lib/exportXlsx";
 import { useProjects } from "../../projects/ProjectContext";
 
 // Risk kaydı (E3, ilk sürüm). Kayıt silinmez; durum değişir. Skor = olasılık × etki.
@@ -53,11 +55,14 @@ export default function RisklerPage() {
     if (!pid || !title.trim()) return;
     setSaving(true);
     try {
-      await api(`/projects/${pid}/risks`, {
-        method: "POST", projectId: pid,
+      // Çevrimdışıyken kuyruğa alınır (E13); sunucu iş hataları kuyruklanmaz.
+      const res = await apiWithOfflineFallback({
+        method: "POST", path: `/projects/${pid}/risks`, projectId: pid,
         body: { title: title.trim(), description: description.trim() || undefined, probability, impact },
+        label: `Risk: ${title.trim()}`,
       });
       setTitle(""); setDescription(""); setProbability(3); setImpact(3); setShowForm(false);
+      if (res.queued) { setErr(null); alert("Çevrimdışısınız. Risk kuyruğa alındı; bağlantı gelince gönderilir."); return; }
       await load();
     } catch (e) {
       setErr(describeLoadError(e, "Risk kaydı"));
@@ -87,9 +92,22 @@ export default function RisklerPage() {
             Skor = olasılık × etki (1–25). Kayıtlar silinmez; durum değişir.
           </p>
         </div>
+        <button onClick={() => exportXlsx("riskler", "Riskler", [
+            { header: "No", value: (r) => `R-${String(r.no).padStart(3, "0")}` },
+            { header: "Başlık", value: (r) => r.title },
+            { header: "Olasılık", value: (r) => r.probability },
+            { header: "Etki", value: (r) => r.impact },
+            { header: "Skor", value: (r) => r.score },
+            { header: "Sahip", value: (r) => r.owner_name ?? "" },
+            { header: "Durum", value: (r) => r.status },
+          ], risks)}
+          disabled={risks.length === 0}
+          className="ml-auto rounded-md border border-beton-700 px-3 py-1.5 text-xs text-beton-200 hover:border-emniyet-500 disabled:opacity-50">
+          Excel indir
+        </button>
         {canManage && (
           <button onClick={() => setShowForm((v) => !v)}
-            className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-xs font-semibold px-3 py-1.5">
+            className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-xs font-semibold px-3 py-1.5">
             {showForm ? "Vazgeç" : "+ Risk ekle"}
           </button>
         )}

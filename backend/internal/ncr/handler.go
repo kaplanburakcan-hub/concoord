@@ -5,6 +5,7 @@
 package ncr
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -58,10 +59,26 @@ func scanNCR(row pgx.Row, d *NCRDTO) error {
 }
 
 type ncrInput struct {
-	Title       string     `json:"title"`
-	PozNo       *string    `json:"poz_no"`
-	Description *string    `json:"description"`
-	OwnerID     *uuid.UUID `json:"owner_id"`
+	Title           string     `json:"title"`
+	PozNo           *string    `json:"poz_no"`
+	Description     *string    `json:"description"`
+	OwnerID         *uuid.UUID `json:"owner_id"`
+	SubcontractorID *uuid.UUID `json:"subcontractor_id"`
+}
+
+// scopedSub — kullanıcının bu projedeki taşeron kapsamı (yoksa nil). Taşeron
+// temsilcisi yalnız kendi firmasının kayıtlarını görür; filtre backend'de zorunludur.
+func (h *Handler) scopedSub(ctx context.Context, uid, pid uuid.UUID) (*uuid.UUID, error) {
+	var sub *uuid.UUID
+	err := h.pool.QueryRow(ctx, `
+		SELECT subcontractor_id FROM project_members
+		WHERE user_id=$1 AND project_id=$2 AND deleted_at IS NULL
+		  AND subcontractor_id IS NOT NULL
+		LIMIT 1`, uid, pid).Scan(&sub)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return sub, err
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
@@ -69,9 +86,19 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	uid, ok := auth.UserIDFrom(r.Context())
+	if !ok {
+		httpx.Error(w, r, http.StatusUnauthorized, httpx.CodeUnauthorized, "Oturum gerekli.", nil)
+		return
+	}
+	sub, err := h.scopedSub(r.Context(), uid, pid)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
 	rows, err := h.pool.Query(r.Context(), ncrSelect+`
-		WHERE n.project_id=$1
-		ORDER BY (n.status='Kapandı'), n.ncr_no DESC`, pid)
+		WHERE n.project_id=$1 AND ($2::uuid IS NULL OR n.subcontractor_id=$2)
+		ORDER BY (n.status='Kapandı'), n.ncr_no DESC`, pid, sub)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -123,12 +150,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var id uuid.UUID
 	if err := tx.QueryRow(r.Context(), `
-		INSERT INTO ncrs (project_id, ncr_no, title, poz_no, description, owner_id, created_by)
+		INSERT INTO ncrs (project_id, ncr_no, title, poz_no, description, owner_id, created_by, subcontractor_id)
 		VALUES ($1,
 		        (SELECT COALESCE(max(ncr_no),0)+1 FROM ncrs WHERE project_id=$1),
-		        $2, NULLIF(btrim(coalesce($3,'')),''), NULLIF(btrim(coalesce($4,'')),''), $5, $6)
+		        $2, NULLIF(btrim(coalesce($3,'')),''), NULLIF(btrim(coalesce($4,'')),''), $5, $6, $7)
 		RETURNING id`,
-		pid, t, in.PozNo, in.Description, in.OwnerID, uid).Scan(&id); err != nil {
+		pid, t, in.PozNo, in.Description, in.OwnerID, uid, in.SubcontractorID).Scan(&id); err != nil {
 		httpx.Internal(w, r)
 		return
 	}
@@ -144,7 +171,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	h.respond(w, r, pid, id, http.StatusCreated)
 }
 
-// Close — açık kaydı kapatır. Kapalı kayıt tekrar kapatılamaz ve açılamaz.
+// Close — açık kaydı kapatır. Kapatma, aynı projeye ait bir kanıt belgesi ister.
+// Kapalı kayıt tekrar kapatılamaz ve açılamaz.
 func (h *Handler) Close(w http.ResponseWriter, r *http.Request) {
 	pid, ok := parseID(w, r, "projectID")
 	if !ok {
@@ -159,9 +187,30 @@ func (h *Handler) Close(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, http.StatusUnauthorized, httpx.CodeUnauthorized, "Oturum gerekli.", nil)
 		return
 	}
+	var in struct {
+		DocumentID string `json:"document_id"`
+	}
+	if !httpx.DecodeJSON(w, r, &in) {
+		return
+	}
+	docID, err := uuid.Parse(strings.TrimSpace(in.DocumentID))
+	if err != nil {
+		httpx.ValidationFailed(w, r, map[string]string{"document_id": "kapanış için kanıt belgesi seçin"})
+		return
+	}
+	var one int
+	if err := h.pool.QueryRow(r.Context(), `
+		SELECT 1 FROM documents WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, docID, pid).Scan(&one); errors.Is(err, pgx.ErrNoRows) {
+		httpx.ValidationFailed(w, r, map[string]string{"document_id": "bu projede kayıtlı belge değil"})
+		return
+	} else if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
 	ct, err := h.pool.Exec(r.Context(), `
-		UPDATE ncrs SET status='Kapandı', closed_by=$3, closed_at=now(), row_version=row_version+1
-		WHERE id=$1 AND project_id=$2 AND status='Açık'`, id, pid, uid)
+		UPDATE ncrs SET status='Kapandı', closed_by=$3, closed_at=now(), closed_document_id=$4,
+		                row_version=row_version+1
+		WHERE id=$1 AND project_id=$2 AND status='Açık'`, id, pid, uid, docID)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -179,8 +228,9 @@ func (h *Handler) Close(w http.ResponseWriter, r *http.Request) {
 	m := audit.MetaFrom(r.Context())
 	h.rec.Record(r.Context(), audit.Entry{
 		ActorID: m.ActorID, Entity: "ncrs", EntityID: id.String(), Action: audit.ActionUpdate,
-		Before: map[string]interface{}{"status": "Açık"}, After: map[string]interface{}{"status": "Kapandı"},
-		IP: m.IP, ReqID: m.ReqID,
+		Before: map[string]interface{}{"status": "Açık"},
+		After:  map[string]interface{}{"status": "Kapandı", "closed_document_id": docID.String()},
+		IP:     m.IP, ReqID: m.ReqID,
 	})
 	h.respond(w, r, pid, id, http.StatusOK)
 }
