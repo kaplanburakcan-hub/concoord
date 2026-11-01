@@ -20,61 +20,62 @@
    Renkler CSS değişkenlerine bağlıdır: beton/emniyet token'ları
    RGB kanal üçlüsü olarak tutulur (opaklık modifikatörleri —
    ör. bg-emniyet-500/15 — çalışmaya devam etsin diye).
-   Chrome (kenar çubuğu + üst bar) = Grafit (nötr koyu gri) — projeden ve
-   temadan bağımsız kalıcı marka rengi. Vurgu = azure; işlev alanı = uçuk
-   gökyüzü mavisi + nokta deseni. Grup başlıkları logo sarısıyla vurgulanır.
+   Chrome (kenar çubuğu + üst bar) = lacivert — hakediş raporundaki paletle
+   aynı; projeden ve temadan bağımsız kalıcı marka rengi. Vurgu = amber
+   (ana düğme, aktif menü işareti, logo C'si); sayfa zemini nötr açık gri.
+   Durum renkleri (yeşil/kehribar/gri) raporla aynı. Amber üstündeki metin
+   her iki temada da koyu lacivert (bkz. aşağıdaki text-beton-950 kuralı).
    ============================================================ */
 :root, [data-theme="light"] {
   /* beton ölçeği (yüzey/kenar/metin) — açık tema */
-  --beton-950: 232 241 251;  /* sayfa zemini (uçuk gökyüzü) */
+  --beton-950: 243 246 250;  /* sayfa zemini (nötr açık gri) */
   --beton-900: 255 255 255;  /* kart yüzeyi */
-  --beton-800: 217 228 241;  /* kenarlık / hafif dolgu */
-  --beton-700: 196 212 232;  /* güçlü kenarlık */
-  --beton-600: 132 150 173;
-  --beton-500: 132 150 173;  /* soluk metin */
-  --beton-400: 84 101 127;   /* ikincil metin */
-  --beton-300: 64 80 106;
-  --beton-200: 15 32 54;     /* gövde metni */
-  --beton-100: 15 32 54;     /* başlık */
-  /* vurgu (azure) + gökyüzü */
-  --emniyet-500: 47 111 237;
-  --emniyet-600: 31 87 201;
+  --beton-800: 213 220 229;  /* kenarlık / hafif dolgu */
+  --beton-700: 190 200 213;  /* güçlü kenarlık */
+  --beton-600: 136 149 166;
+  --beton-500: 136 149 166;  /* soluk metin */
+  --beton-400: 91 104 119;   /* ikincil metin */
+  --beton-300: 63 76 92;
+  --beton-200: 20 32 46;     /* gövde metni */
+  --beton-100: 20 32 46;     /* başlık */
+  /* vurgu (amber) + gökyüzü */
+  --emniyet-500: 224 180 0;
+  --emniyet-600: 190 152 0;
   --sky: 56 189 248;
-  /* chrome (Grafit) */
-  --chrome: #20242c; --chrome-2: #2a2f39; --chrome-active: #363c48;
-  --chrome-text: #eef0f4; --chrome-text-2: #9aa2b1; --chrome-text-3: #6b7383;
-  --chrome-border: rgba(255,255,255,.08);
-  /* grup başlığı — logo sarısı */
-  --group-accent: #f5a800; --group-fill: rgba(245,168,0,.14); --group-border: rgba(245,168,0,.28);
+  /* chrome (lacivert) */
+  --chrome: #0b2545; --chrome-top: #0b2545; --chrome-2: #1d3d68; --chrome-active: rgba(224,180,0,.14);
+  --chrome-text: #e8eef6; --chrome-text-2: #b3c3d8; --chrome-text-3: #8ca3c2;
+  --chrome-border: rgba(255,255,255,.10);
+  /* grup başlığı / aktif işaret — amber */
+  --group-accent: #e0b400; --group-fill: rgba(224,180,0,.14); --group-border: rgba(224,180,0,.30);
   /* çeşitli (hex — SVG/inline için) */
-  --accent: #2f6fed; --accent-sky: #38bdf8;
-  --grid: #e6eef8; --muted: #8496ad; --dot: rgba(24,58,120,.07);
+  --accent: #1d3d68; --accent-sky: #38bdf8;
+  --grid: #e3e8ef; --muted: #8895a6; --dot: rgba(24,58,120,.07);
   --shadow: 0 1px 2px rgba(16,40,80,.06);
 }
 [data-theme="dark"] {
-  /* beton ölçeği — nötr Grafit ailesi (eski lacivert tondan bilinçli
-     olarak ayrıldı; kart yüzeyi chrome ile aynı tonda, sayfa zemini
-     bir kademe koyu — sidebar ile bütünleşik tek bir koyu tema). */
-  --beton-950: 22 24 28;
-  --beton-900: 32 36 44;
-  --beton-800: 46 50 58;
-  --beton-700: 62 67 77;
-  --beton-600: 130 136 146;
-  --beton-500: 130 136 146;
-  --beton-400: 172 178 187;
-  --beton-300: 200 205 212;
-  --beton-200: 228 231 235;
-  --beton-100: 245 246 248;
-  /* vurgu — logo sarısı (sidebar'daki group-accent ile aynı) */
-  --emniyet-500: 245 168 0;
-  --emniyet-600: 214 145 0;
+  /* beton ölçeği — koyu lacivert ailesi (kart yüzeyi sayfa zemininden bir
+     kademe açık; chrome ikisinden de koyu) */
+  --beton-950: 15 24 36;
+  --beton-900: 23 35 52;
+  --beton-800: 38 54 75;
+  --beton-700: 52 72 98;
+  --beton-600: 108 125 146;
+  --beton-500: 108 125 146;
+  --beton-400: 147 163 183;
+  --beton-300: 190 202 217;
+  --beton-200: 228 235 243;
+  --beton-100: 245 248 251;
+  /* vurgu — amber (açık temayla aynı) */
+  --emniyet-500: 224 180 0;
+  --emniyet-600: 190 152 0;
   --sky: 95 199 251;
-  --chrome: #20242c; --chrome-2: #2a2f39; --chrome-active: #363c48;
-  --chrome-text: #eef0f4; --chrome-text-2: #9aa2b1; --chrome-text-3: #6b7383;
+  --chrome: #08162b; --chrome-top: #0a1c36; --chrome-2: #16294a; --chrome-active: rgba(224,180,0,.16);
+  --chrome-text: #e4ebf3; --chrome-text-2: #a9bbd2; --chrome-text-3: #7f93ae;
   --chrome-border: rgba(255,255,255,.08);
-  --group-accent: #f5a800; --group-fill: rgba(245,168,0,.14); --group-border: rgba(245,168,0,.28);
-  --accent: #f5a800; --accent-sky: #5fc7fb;
-  --grid: #2a2f39; --muted: #8a9099; --dot: rgba(180,190,200,.05);
+  --group-accent: #e0b400; --group-fill: rgba(224,180,0,.16); --group-border: rgba(224,180,0,.30);
+  --accent: #e0b400; --accent-sky: #5fc7fb;
+  --grid: #26364b; --muted: #6c7d92; --dot: rgba(180,190,200,.05);
   --shadow: 0 1px 2px rgba(0,0,0,.3);
 }
 
@@ -82,8 +83,8 @@
    :root, [data-theme] bloklarının DIŞINDA: light/dark hiçbiri bunu
    ezmeyecek, açık temada bile Panel koyu bir levha içinde kalacak. */
 :root {
-  --panel-bg: 13 15 20;
-  --panel-hairline: 32 37 47;
+  --panel-bg: 9 18 32;
+  --panel-hairline: 30 44 64;
   --panel-ink: 238 241 246;
   --panel-ink2: 150 158 173;
   --panel-ink3: 98 107 123;
@@ -114,11 +115,17 @@ body {
    kurallar katmanlı important kurallara göre daha DÜŞÜK önceliğe sahiptir —
    bu blok katmansız kalırsa aşağıdaki override'lar sessizce kaybedebilir. */
 @layer utilities {
-  /* Accent üstündeki metin: açık temada emniyet-500 mavi kaldığından beyaz
-     metin gerekir; koyu temada emniyet-500 artık sarı (--group-accent ile
-     aynı), bu yüzden text-beton-950 kendi koyu tonunda kalmalı — override
-     yalnızca açık temaya kısıtlanır. */
-  [data-theme="light"] body .text-beton-950 { color: #fff !important; }
+  /* Accent üstündeki metin: emniyet-500 her iki temada amber olduğundan
+     metin koyu lacivert olmalı. Açık temada beton-950 sayfa zemini (açık gri)
+     olduğu için text-beton-950 burada laciverte sabitlenir; koyu temada
+     beton-950 zaten koyu lacivert, override gerekmez. */
+  [data-theme="light"] body .text-beton-950 { color: #0b2545 !important; }
+  /* Amber metin açık zeminde okunmuyor; açık temada içerikteki amber bağlantı
+     ve vurgu metinleri lacivert ikincil renge döner (koyu temada amber kalır). */
+  [data-theme="light"] main .text-emniyet-500,
+  [data-theme="light"] main .text-emniyet-600,
+  [data-theme="light"] main .hover\:text-emniyet-500:hover,
+  [data-theme="light"] main .hover\:text-emniyet-600:hover { color: #1d3d68; }
   /* İçerikteki text-white başlıkları açık temada koyu mürekkebe döner
      (chrome/sidebar <main> dışında olduğundan beyaz kalır). */
   [data-theme="light"] main .text-white { color: rgb(15 32 54) !important; }
@@ -134,12 +141,12 @@ body {
      açık gri zeminde silik kalıyordu. .panel-scope koyu paleti yerel olarak
      geri getirir; böylece o bileşenler iki temada da aynı okunur. */
   .panel-scope {
-    --beton-950: 22 24 28; --beton-900: 32 36 44; --beton-800: 46 50 58; --beton-700: 62 67 77;
-    --beton-600: 130 136 146; --beton-500: 130 136 146; --beton-400: 172 178 187;
-    --beton-300: 200 205 212; --beton-200: 228 231 235; --beton-100: 245 246 248;
-    --emniyet-500: 245 168 0; --emniyet-600: 214 145 0;
+    --beton-950: 15 24 36; --beton-900: 23 35 52; --beton-800: 38 54 75; --beton-700: 52 72 98;
+    --beton-600: 108 125 146; --beton-500: 108 125 146; --beton-400: 147 163 183;
+    --beton-300: 190 202 217; --beton-200: 228 235 243; --beton-100: 245 248 251;
+    --emniyet-500: 224 180 0; --emniyet-600: 190 152 0;
   }
-  [data-theme="light"] body .panel-scope .text-beton-950 { color: rgb(22 24 28) !important; }
+  [data-theme="light"] body .panel-scope .text-beton-950 { color: #0b2545 !important; }
   [data-theme="light"] body .panel-scope .text-red-300,
   [data-theme="light"] body .panel-scope .text-red-400 { color: #fca5a5 !important; }
 

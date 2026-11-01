@@ -308,7 +308,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <div className="flex flex-col min-w-0 app-canvas">
         <header
           className="no-print h-16 flex items-center gap-3 px-5 sticky top-0 z-10 border-b"
-          style={{ background: "var(--chrome)", color: "var(--chrome-text)", borderColor: "var(--chrome-border)" }}
+          style={{ background: "var(--chrome-top)", color: "var(--chrome-text)", borderColor: "var(--chrome-border)" }}
         >
           <span className="md:hidden text-white"><Wordmark size={17} /></span>
 

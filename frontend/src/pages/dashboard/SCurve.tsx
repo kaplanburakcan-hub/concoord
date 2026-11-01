@@ -10,7 +10,7 @@
 
 export type SCurvePoint = { month: string; pv: number; ev: number; ac: number };
 
-const ACCENT = "#f5a800";
+const ACCENT = "#e0b400";
 const AC_COLOR = "#f87171";
 
 export default function SCurve({
