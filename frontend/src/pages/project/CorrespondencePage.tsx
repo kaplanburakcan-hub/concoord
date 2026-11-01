@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, apiDownload, apiUpload, RequestError, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
+import { exportXlsx } from "../../lib/exportXlsx";
 import { useProjects } from "../ProjectContext";
 import { useKesinKabulTarihi } from "../../hooks/useKesinKabulTarihi";
 
@@ -414,6 +415,19 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
             Projeye ait {direction === "gelen" ? "gelen" : "giden"} yazışma ve evrak kayıtları.
           </p>
         </div>
+        <button onClick={() => exportXlsx(direction === "gelen" ? "gelen-evrak" : "giden-evrak", title, [
+            { header: "Evrak No", value: (c: Correspondence) => c.evrak_no },
+            { header: "Tarih", value: (c: Correspondence) => c.tarih },
+            { header: "Kurum / Kişi", value: (c: Correspondence) => c.kurum_kisi },
+            { header: "Konu", value: (c: Correspondence) => c.konu },
+            { header: "Kategori", value: (c: Correspondence) => c.kategori },
+            { header: "Durum", value: (c: Correspondence) => c.durum },
+            { header: "Cevap tarihi", value: (c: Correspondence) => c.cevap_tarihi ?? "" },
+          ], list)}
+          disabled={list.length === 0}
+          className="rounded-md border border-beton-700 px-3 py-1.5 text-xs text-beton-200 hover:border-emniyet-500 disabled:opacity-50">
+          Excel indir
+        </button>
         {canManage && (
           <button onClick={openAdd}
             className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-beton-950 hover:brightness-110">

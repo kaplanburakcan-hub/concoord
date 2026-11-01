@@ -169,6 +169,113 @@ func RunControlAlerts(ctx context.Context, pool *pgxpool.Pool, nt *notify.Servic
 			}
 		}
 		orows.Close()
+		// --- Yanıt tarihine 3 gün kalan açık yazışmalar (E5) ---
+		// Vadesi geçenler yukarıdaki uyarıyla bildirilir; burada yalnız yaklaşanlar.
+		type dueSoon struct {
+			id    uuid.UUID
+			evrak string
+			tarih time.Time
+		}
+		var soon []dueSoon
+		srows, err := pool.Query(ctx, `
+			SELECT id, evrak_no, cevap_tarihi FROM correspondences
+			WHERE project_id=$1 AND deleted_at IS NULL
+			  AND cevap_gerekli AND durum='Açık'
+			  AND cevap_tarihi IS NOT NULL
+			  AND cevap_tarihi >= $2::date AND cevap_tarihi <= $2::date + 3`,
+			p.id, now.Format("2006-01-02"))
+		if err != nil {
+			log.Error("uyarı taraması: yaklaşan yazışmalar okunamadı", "err", err, "project", p.id)
+			continue
+		}
+		for srows.Next() {
+			var x dueSoon
+			if srows.Scan(&x.id, &x.evrak, &x.tarih) == nil {
+				soon = append(soon, x)
+			}
+		}
+		srows.Close()
+		for _, x := range soon {
+			raiseAlert(ctx, pool, nt, log, p.id, "rfi_due_soon:"+x.id.String(), period,
+				notify.TypeRFIDueSoon,
+				fmt.Sprintf("Yanıt tarihi yaklaşan yazışma: %s", x.evrak),
+				fmt.Sprintf("Yanıt tarihi %s — 3 gün içinde.", x.tarih.Format("02.01.2006")))
+		}
+
+		// --- Uzun süredir açık uygunsuzluk ve riskler (E3/E4): 30 gün eşiği ---
+		// Kayıt ay içinde bir kez uyarılır (control_alerts); kayıtlar değişmez.
+		type stale struct {
+			key, kind, label string
+			id               uuid.UUID
+		}
+		var stales []stale
+		nrows, err := pool.Query(ctx, `
+			SELECT id, ncr_no, title FROM ncrs
+			WHERE project_id=$1 AND status='Açık' AND created_at < now() - interval '30 days'`, p.id)
+		if err != nil {
+			log.Error("uyarı taraması: eski uygunsuzluklar okunamadı", "err", err, "project", p.id)
+			continue
+		}
+		for nrows.Next() {
+			var id uuid.UUID
+			var no int
+			var t string
+			if nrows.Scan(&id, &no, &t) == nil {
+				stales = append(stales, stale{"stale_ncr:" + id.String(), "ncr", fmt.Sprintf("U-%03d %s", no, t), id})
+			}
+		}
+		nrows.Close()
+		rrows, err := pool.Query(ctx, `
+			SELECT id, risk_no, title FROM project_risks
+			WHERE project_id=$1 AND deleted_at IS NULL AND status<>'Kapandı'
+			  AND created_at < now() - interval '30 days'`, p.id)
+		if err != nil {
+			log.Error("uyarı taraması: eski riskler okunamadı", "err", err, "project", p.id)
+			continue
+		}
+		for rrows.Next() {
+			var id uuid.UUID
+			var no int
+			var t string
+			if rrows.Scan(&id, &no, &t) == nil {
+				stales = append(stales, stale{"stale_risk:" + id.String(), "risk", fmt.Sprintf("R-%03d %s", no, t), id})
+			}
+		}
+		rrows.Close()
+		for _, x := range stales {
+			label := x.label
+			if len([]rune(label)) > 80 {
+				label = string([]rune(label)[:79]) + "…"
+			}
+			raiseAlert(ctx, pool, nt, log, p.id, x.key, period,
+				notify.TypeStaleOpenAlert,
+				fmt.Sprintf("30 günden uzun açık %s: %s", map[string]string{"ncr": "uygunsuzluk", "risk": "risk"}[x.kind], p.code),
+				label)
+		}
+
+		// --- Haftalık proje özeti (E11): yalnız sayılar, hafta başına bir kez ---
+		var digest struct{ risks, lateTedarik, rfiOver, ncrOpen, tasksOver int }
+		if err := pool.QueryRow(ctx, `
+			SELECT
+			  (SELECT count(*) FROM project_risks WHERE project_id=$1 AND deleted_at IS NULL AND status<>'Kapandı'),
+			  (SELECT count(*) FROM procurement_plan_items WHERE project_id=$1 AND deleted_at IS NULL
+			     AND planned_delivery_date < CURRENT_DATE AND status<>'TeslimAlindi'),
+			  (SELECT count(*) FROM correspondences WHERE project_id=$1 AND deleted_at IS NULL
+			     AND cevap_gerekli AND durum='Açık' AND cevap_tarihi < CURRENT_DATE),
+			  (SELECT count(*) FROM ncrs WHERE project_id=$1 AND status='Açık'),
+			  (SELECT count(*) FROM tasks WHERE project_id=$1 AND deleted_at IS NULL
+			     AND status<>'Done' AND due_date < CURRENT_DATE)`, p.id).
+			Scan(&digest.risks, &digest.lateTedarik, &digest.rfiOver, &digest.ncrOpen, &digest.tasksOver); err != nil {
+			log.Error("haftalık özet: sayılar okunamadı", "err", err, "project", p.id)
+		} else {
+			year, week := now.ISOWeek()
+			raiseAlert(ctx, pool, nt, log, p.id, "weekly_digest", fmt.Sprintf("%04d-W%02d", year, week),
+				notify.TypeWeeklyDigest,
+				fmt.Sprintf("Haftalık proje özeti: %s", p.code),
+				fmt.Sprintf("Açık risk %d · geciken tedarik %d · yanıtı geciken yazışma %d · açık uygunsuzluk %d · vadesi geçen görev %d.",
+					digest.risks, digest.lateTedarik, digest.rfiOver, digest.ncrOpen, digest.tasksOver))
+		}
+
 		// --- Yüksek skorlu açık riskler (E3): olasılık × etki >= 15 ---
 		type hr struct {
 			id    uuid.UUID

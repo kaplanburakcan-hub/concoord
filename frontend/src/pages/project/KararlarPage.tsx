@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
+import { apiWithOfflineFallback } from "../../offline/queue";
 import { useProjects } from "../../projects/ProjectContext";
 
 // Karar günlüğü (E3). Kararlar değiştirilmez; bir karar yalnız yeni bir kayıtla
@@ -47,15 +48,17 @@ export default function KararlarPage() {
     if (!pid || !text.trim()) return;
     setSaving(true);
     try {
-      await api(`/projects/${pid}/decisions`, {
-        method: "POST", projectId: pid,
+      const res = await apiWithOfflineFallback({
+        method: "POST", path: `/projects/${pid}/decisions`, projectId: pid,
         body: {
           text: text.trim(), decided_on: decidedOn,
           decided_by: decidedBy || undefined,
           supersedes_id: supersedes || undefined,
         },
+        label: `Karar: ${text.trim().slice(0, 40)}`,
       });
       setText(""); setDecidedBy(""); setSupersedes(""); setShowForm(false);
+      if (res.queued) { alert("Çevrimdışısınız. Karar kuyruğa alındı; bağlantı gelince gönderilir."); return; }
       await load();
     } catch (e) {
       setErr(describeLoadError(e, "Karar kaydı"));

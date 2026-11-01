@@ -59,6 +59,13 @@ var registry = []Step{
 	// Plan adımları PR'ı (#1) yeni izinler getirdi (calendar.subscribe, risks.*, changes.*
 	// vb.) ama senkron adımı eklememişti: canlıda rollere ve admin'e bağlanmıyorlardı.
 	{Name: "0015_plan_adimlari_izin_sync", Run: stepFaz2PermSync},
+	// Plan adımları (risk, değişiklik, karar, NCR, EOT, takvim, bütçe izinleri) ve
+	// Müşavir rolü: mevcut kurulumlara da yansıtılır (idempotent senkron).
+	{Name: "0015_plan_adimlari_izin_ve_musavir_sync", Run: stepPlanVeMusavirSync},
+	// Taşeron temsilcisi: uygunsuzluk ve bulgu görünümü (E14) izinlerinin senkronu.
+	{Name: "0016_taseron_gorunumu_izin_sync", Run: stepFaz2PermSync},
+	// İşveren (Client) salt okunur görünüm izinleri (E14, sahip görünümü).
+	{Name: "0017_sahip_gorunumu_izin_sync", Run: stepFaz2PermSync},
 }
 
 // stepFaz2PermSync — izin sözlüğünü ve rol varsayılanlarını yeniden senkronlar.
@@ -241,4 +248,13 @@ func Apply(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, opts Optio
 		log.Info("seed uygulandı", "step", s.Name)
 	}
 	return nil
+}
+
+// stepPlanVeMusavirSync — yeni rol (Müşavir) ve plan adımlarının izinlerini mevcut
+// kurulumlara yansıtır: önce roller, sonra izinler ve rol-izin bağları.
+func stepPlanVeMusavirSync(ctx context.Context, tx pgx.Tx, opts Options, log *slog.Logger) error {
+	if err := stepRoles(ctx, tx, opts, log); err != nil {
+		return err
+	}
+	return stepFaz2PermSync(ctx, tx, opts, log)
 }

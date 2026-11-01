@@ -18,6 +18,7 @@ type Tedarikci = {
   id: string; company_name: string; trade?: string; contact_person?: string;
   phone?: string; email?: string; tax_no?: string; default_payment_method?: string | null;
   row_version: number;
+  on_time_rate?: number; closed_orders?: number;
 };
 
 const PAYMENT_METHOD_LABEL: Record<string, string> = { nakit: "Nakit", havale: "Havale", cek: "Çek" };
@@ -115,6 +116,13 @@ export default function SubcontractorsPage() {
             {selTedarikci.phone && <p className="text-beton-400 text-sm">Tel: {selTedarikci.phone}</p>}
             {selTedarikci.email && <p className="text-beton-400 text-sm">E-posta: {selTedarikci.email}</p>}
             {selTedarikci.tax_no && <p className="text-beton-400 text-sm">Vergi No: {selTedarikci.tax_no}</p>}
+            <p className="text-beton-300 text-sm">
+              Teslim performansı:{" "}
+              {selTedarikci.on_time_rate != null
+                ? <span className="font-mono text-beton-100">%{(selTedarikci.on_time_rate * 100).toFixed(0)}</span>
+                : <span className="text-beton-500">—</span>}
+              <span className="text-beton-500"> ({selTedarikci.closed_orders ?? 0} kapanmış sipariş, yalnız tedarikçi kimliği girili PO'lar)</span>
+            </p>
             {selTedarikci.default_payment_method && (
               <p className="text-beton-400 text-sm">
                 Varsayılan ödeme şekli: {PAYMENT_METHOD_LABEL[selTedarikci.default_payment_method]}

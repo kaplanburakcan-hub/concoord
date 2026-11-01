@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
+import { exportXlsx } from "../../lib/exportXlsx";
 import { useProjects } from "../ProjectContext";
 import RetentionPanel from "./RetentionPanel";
 import PaymentPreview from "./PaymentPreview";
@@ -86,6 +87,18 @@ export default function ProgressPaymentsPage() {
     <div>
       <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Hakedişler</h1>
       <p className="mt-1 text-sm text-beton-400">{current.name} — kümülatif hakediş iş akışı ve kesinti yönetimi.</p>
+      <button onClick={() => exportXlsx("hakedisler", "Hakedişler", [
+          { header: "Dönem", value: (p: Payment) => p.period_no },
+          { header: "Durum", value: (p: Payment) => STATUS_LABEL[p.status] ?? p.status },
+          { header: "Dönem başı", value: (p: Payment) => p.period_start ?? "" },
+          { header: "Dönem sonu", value: (p: Payment) => p.period_end ?? "" },
+          { header: "Brüt", value: (p: Payment) => p.gross_this ?? "" },
+          { header: "Net ödenecek", value: (p: Payment) => p.net_payable ?? "" },
+        ], payments)}
+        disabled={payments.length === 0}
+        className="mt-2 rounded-md border border-beton-700 px-3 py-1.5 text-xs text-beton-200 hover:border-emniyet-500 disabled:opacity-50">
+        Excel indir
+      </button>
       {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
 
       <div className="mt-4 rounded-lg border border-beton-800 bg-beton-900 p-3 flex flex-wrap items-center gap-3">
