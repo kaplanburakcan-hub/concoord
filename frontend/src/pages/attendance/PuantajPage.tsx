@@ -73,7 +73,7 @@ export default function PuantajPage() {
   return (
     <div>
       <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="font-display text-2xl font-extrabold text-white">PDKS Puantaj</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">PDKS Puantaj</h1>
         <input
           type="month" value={ym} onChange={(e) => setYm(e.target.value)}
           className="rounded-md bg-beton-900 border border-beton-700 px-3 py-1.5 text-sm text-beton-200"

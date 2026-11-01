@@ -598,7 +598,7 @@ export default function MachinePage({
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-xl font-bold text-beton-100">{tipLabel}</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">{tipLabel}</h1>
         <button
           onClick={() => openAdd()}
           className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium"

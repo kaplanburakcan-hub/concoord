@@ -357,8 +357,8 @@ export default function AnaSozlesmePage() {
       {/* Başlık */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-beton-100">Ana Sözleşme</h1>
-          <p className="text-sm text-beton-400 mt-0.5">{current.name}</p>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Ana Sözleşme</h1>
+          <p className="mt-1 text-sm text-beton-400">{current.name}</p>
         </div>
         {canEdit && mode === "edit" && (
           <button

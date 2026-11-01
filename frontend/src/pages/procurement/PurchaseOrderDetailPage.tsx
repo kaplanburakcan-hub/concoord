@@ -221,7 +221,7 @@ export default function PurchaseOrderDetailPage() {
     <div className="space-y-4 max-w-3xl">
       <div className="flex items-center gap-3">
         <Link to="/satinalma/siparisler" className="text-xs text-beton-400 hover:text-beton-200">← Siparişler</Link>
-        <h1 className="text-lg font-display font-bold text-white">{po.po_no}</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">{po.po_no}</h1>
         <span className={`rounded border px-1.5 py-0.5 text-xs ${PO_STATUS_STYLE[po.status] ?? ""}`}>
           {PO_STATUS_LABEL[po.status] ?? po.status}
         </span>

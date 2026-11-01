@@ -75,8 +75,8 @@ export default function OdemePlanlariPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-4">
       <div>
-        <h1 className="font-display font-extrabold text-xl text-white">Ödeme Planları</h1>
-        <p className="text-xs text-beton-400 mt-0.5">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Ödeme Planları</h1>
+        <p className="mt-1 text-sm text-beton-400">
           Hakediş, tedarikçi ekstresi, sipariş ve idari hakediş ödeme planlarının toplu görünümü —
           her satır kendi detay sayfasında girilmeye devam eder, burada yalnızca birlikte görüntülenir.
         </p>

@@ -323,7 +323,7 @@ export default function PersonelPuantajPage() {
       {/* Başlık + Tabs */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-semibold text-beton-100">Personel & Puantaj</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Personel & Puantaj</h1>
           {currentProject && <p className="text-beton-400 text-sm mt-0.5">{currentProject.name}</p>}
         </div>
         <div className="flex gap-1 bg-beton-900 rounded-lg p-1">

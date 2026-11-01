@@ -15,8 +15,8 @@ export default function ComingSoon({ title, description, icon }: {
           {icon}
         </div>
       )}
-      <h1 className="font-display text-2xl font-medium text-beton-100">{title}</h1>
-      <p className="mt-2 text-beton-400 max-w-md">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">{title}</h1>
+      <p className="mt-1 text-sm text-beton-400 max-w-md">
         {description ?? "Bu modül yakında kullanıma açılacak. Mevcut çalışmalar devam ediyor."}
       </p>
       <span className="mt-4 inline-flex items-center gap-2 rounded-full border border-emniyet-500/30

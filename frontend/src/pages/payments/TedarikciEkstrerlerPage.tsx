@@ -373,7 +373,7 @@ export default function TedarikciEkstrerlerPage() {
       {/* Başlık */}
       <div className="flex items-start justify-between mb-5">
         <div>
-          <h1 className="text-xl font-semibold text-beton-100">Tedarikçi Ekstreler</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Tedarikçi Ekstreler</h1>
           {currentProject && <p className="text-beton-400 text-sm mt-0.5">{currentProject.name}</p>}
         </div>
         <button

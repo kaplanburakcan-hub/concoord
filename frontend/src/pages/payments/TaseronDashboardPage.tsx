@@ -156,8 +156,8 @@ export default function TaseronDashboardPage() {
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Başlık */}
       <div>
-        <h1 className="font-display font-extrabold text-xl text-white">Taşeron & Tedarikçi Dashboard</h1>
-        <p className="text-sm text-beton-400 mt-1">{current.name}</p>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Taşeron & Tedarikçi Dashboard</h1>
+        <p className="mt-1 text-sm text-beton-400">{current.name}</p>
       </div>
 
       {/* KPI Kartları */}

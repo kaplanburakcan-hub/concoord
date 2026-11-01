@@ -34,8 +34,8 @@ export default function TedarikciPerformansPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-display font-bold text-white">Tedarikçi Performansı</h1>
-        <p className="text-xs text-beton-500 mt-0.5">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Tedarikçi Performansı</h1>
+        <p className="mt-1 text-sm text-beton-400">
           Yalnızca beklenen teslim tarihi girilmiş siparişler. Oran = zamanında / (zamanında + geç), kapanmış siparişlerle.
         </p>
       </div>

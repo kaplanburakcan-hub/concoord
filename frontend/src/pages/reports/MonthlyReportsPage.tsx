@@ -80,7 +80,7 @@ export default function MonthlyReportsPage() {
       <p className="font-mono text-xs tracking-[0.3em] text-emniyet-500 uppercase">
         Faz 9 · Aylık Yönetim Raporu
       </p>
-      <h1 className="font-display text-3xl font-extrabold text-white mt-2">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100 mt-2">
         Aylık Raporlar — {current.code}
       </h1>
       <p className="mt-1 text-sm text-beton-400">

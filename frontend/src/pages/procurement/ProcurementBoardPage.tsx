@@ -158,7 +158,7 @@ export default function ProcurementBoardPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="text-lg font-display font-bold text-white">Satınalma</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Satınalma</h1>
         <span className="text-xs text-beton-500">{total} kayıt</span>
         <div className="ml-auto flex gap-2">
           <Link to="/satinalma/tedarik-plani"

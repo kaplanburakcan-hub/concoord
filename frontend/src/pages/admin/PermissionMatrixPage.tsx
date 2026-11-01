@@ -69,8 +69,8 @@ export default function PermissionMatrixPage() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-extrabold text-white">Kullanıcı × İzin Matrisi</h1>
-      <p className="mt-1 text-beton-400 text-sm">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Kullanıcı × İzin Matrisi</h1>
+      <p className="mt-1 text-sm text-beton-400">
         Karar önceliği: <span className="font-mono text-beton-200">DENY &gt; GRANT &gt; rol varsayılanı</span>
       </p>
 

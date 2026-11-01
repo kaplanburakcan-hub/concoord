@@ -179,8 +179,8 @@ export default function ProcurementPlanPage() {
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
         <div>
-          <h1 className="text-lg font-display font-medium text-beton-100">Tedarik Planı</h1>
-          <p className="text-xs text-beton-500 mt-0.5">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Tedarik Planı</h1>
+          <p className="mt-1 text-sm text-beton-400">
             Satın alma sürecinden bağımsız, zorunlu olmayan planlama/takip referansı.
           </p>
         </div>

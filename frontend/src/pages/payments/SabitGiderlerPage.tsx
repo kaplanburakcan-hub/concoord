@@ -125,8 +125,8 @@ export default function SabitGiderlerPage() {
     <div className="max-w-4xl mx-auto space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="font-display font-extrabold text-xl text-white">Sabit Giderler</h1>
-          <p className="text-xs text-beton-400 mt-0.5">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Sabit Giderler</h1>
+          <p className="mt-1 text-sm text-beton-400">
             Araç kiraları, endirekt personel, mobilizasyon sarf vb. tekrarlayan aylık giderler —
             her ayın belirlenen gününde nakit akışına çıkış olarak yansır.
           </p>

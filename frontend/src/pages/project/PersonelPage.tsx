@@ -94,8 +94,8 @@ export default function PersonelPage() {
     <div className="p-6 space-y-5 max-w-5xl mx-auto">
       {/* Başlık */}
       <div>
-        <h1 className="text-xl font-bold text-beton-100">Personel Yönetimi</h1>
-        <p className="text-sm text-beton-400 mt-0.5">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Personel Yönetimi</h1>
+        <p className="mt-1 text-sm text-beton-400">
           {proj.name} — Kayıtlı personel: {personeller.length} kişi
         </p>
       </div>

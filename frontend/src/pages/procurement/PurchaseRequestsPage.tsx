@@ -135,7 +135,7 @@ export default function PurchaseRequestsPage() {
         {/* Modül içi geçiş artık kenar çubuğundaki alt başlıklarda
             (Satınalma → Talepler / Siparişler); başlık yanına iliştirilmiş
             zayıf bağlantı kaldırıldı. */}
-        <h1 className="text-lg font-display font-medium text-beton-100">Satınalma Talepleri</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Satınalma Talepleri</h1>
         {can("procurement.create_pr") && (
           <button
             onClick={() => setShowForm((v) => !v)}

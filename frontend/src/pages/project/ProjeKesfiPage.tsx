@@ -283,8 +283,8 @@ export default function ProjeKesfiPage() {
       {/* Başlık + genel toplam */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold text-beton-100">Proje Keşfi</h1>
-          <p className="text-sm text-beton-400 mt-0.5">{current.name}</p>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Proje Keşfi</h1>
+          <p className="mt-1 text-sm text-beton-400">{current.name}</p>
           {canEdit && (
             <div className="mt-2 flex items-center gap-3 flex-wrap">
               <button onClick={downloadTemplate}

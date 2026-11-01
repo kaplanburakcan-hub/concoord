@@ -353,7 +353,7 @@ export default function SahaTutanaklariPage() {
     <div className="max-w-5xl mx-auto space-y-4">
       {/* Başlık */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="font-display font-extrabold text-xl text-white">Saha Tutanakları</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Saha Tutanakları</h1>
         <button
           onClick={() => setFormAcik(true)}
           className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-beton-950 hover:brightness-110"

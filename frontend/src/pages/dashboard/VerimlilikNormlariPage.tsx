@@ -69,8 +69,8 @@ export default function VerimlilikNormlariPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-4">
       <div>
-        <h1 className="font-display font-extrabold text-xl text-white">Verimlilik Normları</h1>
-        <p className="text-xs text-beton-500 mt-0.5">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Verimlilik Normları</h1>
+        <p className="mt-1 text-sm text-beton-400">
           5 geçmiş projeden (Adana, Yozgat, Elazığ, İkitelli, Bursa) derlenmiş birim adam-saat referans veritabanı — firma çapında, salt okunur.
         </p>
       </div>

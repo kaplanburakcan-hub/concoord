@@ -409,8 +409,8 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
     <div className="max-w-5xl mx-auto space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="font-display font-extrabold text-xl text-white">{title}</h1>
-          <p className="text-xs text-beton-500 mt-0.5">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">{title}</h1>
+          <p className="mt-1 text-sm text-beton-400">
             Projeye ait {direction === "gelen" ? "gelen" : "giden"} yazışma ve evrak kayıtları.
           </p>
         </div>

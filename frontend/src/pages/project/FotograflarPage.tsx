@@ -125,8 +125,8 @@ export default function FotograflarPage() {
     <div className="max-w-6xl mx-auto space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="font-display font-extrabold text-xl text-white">Fotoğraflar</h1>
-          <p className="text-sm text-beton-400 mt-1">{current.name} — proje sahası, imalat ve denetim fotoğrafları.</p>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Fotoğraflar</h1>
+          <p className="mt-1 text-sm text-beton-400">{current.name} — proje sahası, imalat ve denetim fotoğrafları.</p>
         </div>
         {canUpload && (
           <button

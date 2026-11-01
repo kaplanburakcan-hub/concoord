@@ -74,8 +74,8 @@ export default function ProgressPaymentsPage() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-medium text-beton-100 tracking-tight">Hakedişler</h1>
-      <p className="text-sm text-beton-400 mt-1">{current.name} — kümülatif hakediş iş akışı ve kesinti yönetimi.</p>
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Hakedişler</h1>
+      <p className="mt-1 text-sm text-beton-400">{current.name} — kümülatif hakediş iş akışı ve kesinti yönetimi.</p>
       {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
 
       <div className="mt-4 rounded-lg border border-beton-800 bg-beton-900 p-3 flex flex-wrap items-center gap-3">

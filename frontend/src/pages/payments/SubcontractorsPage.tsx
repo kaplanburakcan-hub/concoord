@@ -68,8 +68,8 @@ export default function SubcontractorsPage() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-extrabold text-white">Taşeronlar & Tedarikçiler</h1>
-      <p className="text-sm text-beton-400 mt-1">{current.name} — firma kartları ve sözleşme bilgileri.</p>
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Taşeronlar & Tedarikçiler</h1>
+      <p className="mt-1 text-sm text-beton-400">{current.name} — firma kartları ve sözleşme bilgileri.</p>
       {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
 
       <div className="mt-4 grid gap-4 md:grid-cols-[300px_1fr]">

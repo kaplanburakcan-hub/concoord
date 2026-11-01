@@ -435,7 +435,7 @@ export default function ProgressPaymentDetailPage() {
       <div className="flex items-center gap-3">
         <Link to="/hakedis" className="text-beton-400 hover:text-white text-sm">← Hakedişler</Link>
       </div>
-      <h1 className="font-display text-2xl font-extrabold text-white mt-1">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100 mt-1">
         Hakediş #{pmt.period_no}
         <span className="ml-3 rounded bg-beton-800 px-2 py-0.5 text-sm text-beton-200 align-middle">
           {STATUS_LABEL[pmt.status] || pmt.status}

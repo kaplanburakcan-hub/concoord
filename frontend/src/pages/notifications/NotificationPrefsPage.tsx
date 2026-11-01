@@ -45,8 +45,8 @@ export default function NotificationPrefsPage() {
 
   return (
     <div className="max-w-lg">
-      <h1 className="font-display text-2xl font-extrabold text-white">Bildirim Ayarları</h1>
-      <p className="text-sm text-beton-400 mt-1">Bildirimleri hangi kanallardan almak istediğinizi seçin.</p>
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Bildirim Ayarları</h1>
+      <p className="mt-1 text-sm text-beton-400">Bildirimleri hangi kanallardan almak istediğinizi seçin.</p>
       {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
 
       <div className="mt-5 space-y-3">

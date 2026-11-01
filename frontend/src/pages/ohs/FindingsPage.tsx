@@ -241,7 +241,7 @@ export default function FindingsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="text-lg font-display font-medium text-beton-100">İSG Bulguları</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">İSG Bulguları</h1>
         {overdue > 0 && (
           <span className="rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-xs text-red-300">
             {overdue} bulgunun termini geçti

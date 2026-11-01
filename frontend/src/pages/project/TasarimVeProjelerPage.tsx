@@ -412,7 +412,7 @@ export default function TasarimVeProjelerPage() {
       {/* Başlık */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-beton-100">Tasarım ve Projeler</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Tasarım ve Projeler</h1>
           {currentProject && (
             <p className="text-beton-400 text-sm mt-0.5">{currentProject.name}</p>
           )}

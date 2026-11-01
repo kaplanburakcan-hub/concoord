@@ -75,8 +75,8 @@ export default function UygunsuzluklarPage() {
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
         <div>
-          <h1 className="text-lg font-display font-bold text-white">Uygunsuzluklar</h1>
-          <p className="text-xs text-beton-500 mt-0.5">Açık uygunsuzluklar listelenir. Kapatılan kayıtlar silinmez.</p>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Uygunsuzluklar</h1>
+          <p className="mt-1 text-sm text-beton-400">Açık uygunsuzluklar listelenir. Kapatılan kayıtlar silinmez.</p>
         </div>
         {canManage && (
           <button onClick={() => setShowForm((v) => !v)}

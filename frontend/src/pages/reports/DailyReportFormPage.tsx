@@ -450,7 +450,7 @@ export default function DailyReportFormPage() {
         <div className="flex gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <h1 className="font-display font-extrabold text-xl text-white">
+              <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">
                 {isNew ? "Yeni Günlük Rapor" : `Günlük Rapor — ${formatDateTR(reportDate)}`}
                 {detail && detail.revision_no > 1 && (
                   <span className="ml-2 text-sm text-emniyet-500">rev {detail.revision_no}</span>

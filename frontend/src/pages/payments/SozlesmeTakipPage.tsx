@@ -83,8 +83,8 @@ export default function SozlesmeTakipPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-4">
       <div>
-        <h1 className="font-display font-extrabold text-xl text-white">Sözleşme Takip</h1>
-        <p className="text-xs text-beton-400 mt-0.5">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Sözleşme Takip</h1>
+        <p className="mt-1 text-sm text-beton-400">
           Proje Keşfi kalemleri × taşeron ataması / poz no eşleşmesiyle bulunan sözleşme bilgileri — {current.name}
         </p>
       </div>

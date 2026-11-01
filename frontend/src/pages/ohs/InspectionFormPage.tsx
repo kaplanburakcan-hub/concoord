@@ -82,7 +82,7 @@ export default function InspectionFormPage() {
     <div className="space-y-4 max-w-xl">
       <div className="flex items-center gap-3">
         <Link to="/isg/denetimler" className="text-xs text-beton-400 hover:text-beton-200">← Denetimler</Link>
-        <h1 className="text-lg font-display font-bold text-white">Yeni İSG Denetimi</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Yeni İSG Denetimi</h1>
       </div>
       {err && <p className="text-sm text-red-400">{err}</p>}
 

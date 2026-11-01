@@ -135,7 +135,7 @@ export default function PurchaseOrdersPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-display font-medium text-beton-100">Satınalma Siparişleri</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Satınalma Siparişleri</h1>
         {can("procurement.manage_po") && (
           <button onClick={() => setShowForm((v) => !v)}
             className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">

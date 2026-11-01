@@ -157,7 +157,7 @@ export default function IsProgramiPage() {
   return (
     <div>
       <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="font-display text-2xl font-extrabold text-white">İş Programı</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">İş Programı</h1>
         <div className="ml-auto flex items-center gap-2 flex-wrap">
           <select
             value={selectedBaselineId}

@@ -112,10 +112,10 @@ export default function ProjeIzlemeRaporlariPage() {
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-emniyet-500" />
           Proje izleme
         </p>
-        <h1 className="font-display text-2xl font-medium text-beton-100 mt-1 tracking-tight">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100 mt-1">
           Proje İzleme Raporları
         </h1>
-        <p className="text-sm text-beton-400 mt-1">
+        <p className="mt-1 text-sm text-beton-400">
           Finansal ve operasyonel izleme raporları. Varsayılan raporlara ek olarak
           projeye özel rapor türleri tanımlayabilirsiniz.
         </p>
