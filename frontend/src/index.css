@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hakediş raporlarındaki yazı tipi (Liberation Sans, SIL OFL 1.1 — bkz.
+   public/fonts/LICENSE-Liberation.txt). Yalnızca normal ve kalın ağırlık. */
+@font-face {
+  font-family: "Liberation Sans";
+  src: url("/fonts/LiberationSans-Regular.ttf") format("truetype");
+  font-weight: 100 599; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Liberation Sans";
+  src: url("/fonts/LiberationSans-Bold.ttf") format("truetype");
+  font-weight: 600 900; font-style: normal; font-display: swap;
+}
+
 /* ============================================================
    İPKS tema sistemi — "Profesyonel Proje Kontrol Arayüzü"
    Renkler CSS değişkenlerine bağlıdır: beton/emniyet token'ları
@@ -36,7 +49,7 @@
   /* çeşitli (hex — SVG/inline için) */
   --accent: #2f6fed; --accent-sky: #38bdf8;
   --grid: #e6eef8; --muted: #8496ad; --dot: rgba(24,58,120,.07);
-  --shadow: 0 1px 2px rgba(16,40,80,.05), 0 4px 14px rgba(16,40,80,.05);
+  --shadow: 0 1px 2px rgba(16,40,80,.06);
 }
 [data-theme="dark"] {
   /* beton ölçeği — nötr Grafit ailesi (eski lacivert tondan bilinçli
@@ -81,10 +94,10 @@ body {
   transition: background-color .25s, color .25s;
 }
 
-/* Roboto varsayılan (bkz. tailwind.config.js); sayısal hizalama için mono sınıfı tabular kalsın */
+/* Liberation Sans varsayılan (bkz. tailwind.config.js); sayısal hizalama için mono sınıfı tabular kalsın */
 .font-mono { font-variant-numeric: tabular-nums; }
 
-/* İşlev alanı nokta deseni (AppShell <main> bu sınıfı kullanır).
+/* İşlev alanı zemini (AppShell <main> bu sınıfı kullanır; yalın: desen yok).
    Aktif projenin vurgu rengi varsa (--project-accent-rgb, bkz.
    ProjectContext.tsx) zemin o rengin hafif bir tonuna kayar — proje
    değişince "hangi projedeyim" hissi zemin renginden gelsin, metinler
@@ -93,8 +106,6 @@ body {
 .app-canvas {
   background-color: rgb(var(--beton-950));
   background-color: color-mix(in srgb, rgb(var(--beton-950)) 93%, rgb(var(--project-accent-rgb, var(--beton-950))));
-  background-image: radial-gradient(var(--dot) 1.1px, transparent 1.1px);
-  background-size: 22px 22px;
 }
 
 /* --- Güvenlik geçişleri (35 sayfayı elle değiştirmeden) ---
