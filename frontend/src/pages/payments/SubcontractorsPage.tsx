@@ -109,7 +109,7 @@ export default function SubcontractorsPage() {
           </div>
         ) : activeType === "tedarikci" && selTedarikci ? (
           <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 space-y-3">
-            <h2 className="font-display font-bold text-white text-lg">{selTedarikci.company_name}</h2>
+            <h2 className="font-display text-lg font-bold text-beton-100">{selTedarikci.company_name}</h2>
             {selTedarikci.trade && <p className="text-beton-400 text-sm">Branş: {selTedarikci.trade}</p>}
             {selTedarikci.contact_person && <p className="text-beton-400 text-sm">İletişim: {selTedarikci.contact_person}</p>}
             {selTedarikci.phone && <p className="text-beton-400 text-sm">Tel: {selTedarikci.phone}</p>}
@@ -160,7 +160,7 @@ function SubPanel({ projectId, subs, selected, onSelect, canManage, onChanged }:
 
   return (
     <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
-      <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide mb-2">🏗️ Taşeronlar</h2>
+      <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100 mb-2">🏗️ Taşeronlar</h2>
       <ul className="space-y-1">
         {subs.map((s) => (
           <li key={s.id}>
@@ -231,7 +231,7 @@ function TedarikciPanel({ projectId, tedarikciler, selected, onSelect, canManage
 
   return (
     <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
-      <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide mb-2">📦 Tedarikçiler</h2>
+      <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100 mb-2">📦 Tedarikçiler</h2>
       <ul className="space-y-1">
         {tedarikciler.map((t) => (
           <li key={t.id} className="flex items-center gap-1">
@@ -337,7 +337,7 @@ function WorkItemPanel({ projectId, subId, canManage, canDelete, canFin }: {
   return (
     <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide">Birim Fiyat Cetveli</h2>
+        <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Birim Fiyat Cetveli</h2>
         {canManage && (
           <div className="flex gap-2">
             <input

@@ -215,7 +215,7 @@ function ThresholdEditor({ projectId }: { projectId: string }) {
   if (!s) return null;
   return (
     <div className="mt-6 rounded-lg border border-beton-800 bg-beton-900 p-4">
-      <h2 className="text-sm font-semibold text-white">Otomatik uyarı eşikleri</h2>
+      <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Otomatik uyarı eşikleri</h2>
       <p className="mt-1 text-xs text-beton-400">
         İhlalde proje yöneticilerine bildirim gider (aynı uyarı ay içinde bir kez).
       </p>

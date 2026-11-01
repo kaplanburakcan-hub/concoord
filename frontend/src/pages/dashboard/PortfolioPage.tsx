@@ -93,7 +93,7 @@ export default function PortfolioPage() {
               <span className="font-mono text-xs text-emniyet-500">{c.code}</span>
               <span className="font-mono text-[11px] text-beton-500">{c.status}</span>
             </div>
-            <h2 className="mt-1 text-sm font-semibold text-white">{c.name}</h2>
+            <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100 mt-1">{c.name}</h2>
 
             {/* Zamansal İlerleme */}
             <div className="mt-4">

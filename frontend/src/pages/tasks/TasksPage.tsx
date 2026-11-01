@@ -542,7 +542,7 @@ function Overlay({ title, children, onClose }: {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold text-white">{title}</h2>
+          <h2 className="font-display text-lg font-bold text-beton-100">{title}</h2>
           <button onClick={onClose} className="text-beton-400 hover:text-white">✕</button>
         </div>
         <div className="mt-3">{children}</div>

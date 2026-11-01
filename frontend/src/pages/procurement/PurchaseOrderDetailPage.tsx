@@ -253,7 +253,7 @@ export default function PurchaseOrderDetailPage() {
         {po.note && <p>Not: <span className="text-beton-100">{po.note}</span></p>}
       </div>
 
-      <h2 className="text-sm font-semibold text-white">Teslimatlar</h2>
+      <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Teslimatlar</h2>
       <div className="rounded-lg border border-beton-800 divide-y divide-beton-800">
         {(po.deliveries ?? []).map((d) => (
           <div key={d.id} className="flex items-center gap-3 px-3 py-2 text-sm">
@@ -309,7 +309,7 @@ export default function PurchaseOrderDetailPage() {
         )}
       </div>
 
-      <h2 className="text-sm font-semibold text-white">Ödeme Planı</h2>
+      <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Ödeme Planı</h2>
       <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 space-y-3">
         <p className="text-xs text-beton-500">
           Bu siparişe yapılan kısmi ödemeler. Çekte nakit çıkışı keşide tarihinde,

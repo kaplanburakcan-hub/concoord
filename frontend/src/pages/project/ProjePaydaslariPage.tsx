@@ -681,7 +681,7 @@ export default function ProjePaydaslariPage() {
             className="bg-beton-900 border border-beton-700 rounded-xl w-full max-w-lg mx-4 p-6 space-y-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="font-display font-bold text-white text-lg">
+            <h2 className="font-display text-lg font-bold text-beton-100">
               {duzenleId ? "Paydaş Düzenle" : "Paydaş Ekle"}
             </h2>
 

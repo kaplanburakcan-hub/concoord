@@ -78,52 +78,36 @@ export default function ApprovalChain({
 
   return (
     <div>
-      <ol className="space-y-1.5">
-        {data.chain.map((s) => {
+      <p className="text-[11px] text-beton-400">
+        {data.history.filter((h) => h.decision === "Approved").length} / {data.chain.length} adım tamamlandı
+      </p>
+      {/* Zaman çizelgesi: tamamlanan adım yeşil, sıradaki amber (halkalı), bekleyen gri. */}
+      <ol className="mt-2">
+        {data.chain.map((s, i) => {
           const rec = decidedBy.get(s.step_no);
           const isNext = data.next_step?.step_no === s.step_no;
           const done = rec?.decision === "Approved";
           const rejected = rec?.decision === "Rejected";
+          const last = i === data.chain.length - 1;
+          const dot = done ? "bg-green-600" : rejected ? "bg-red-500" : isNext ? "bg-emniyet-500" : "bg-beton-500";
           return (
-            <li
-              key={s.step_no}
-              className={
-                "flex items-start gap-3 rounded-md border px-3 py-2 text-sm " +
-                (isNext
-                  ? "border-emniyet-500 bg-emniyet-500/10"
-                  : "border-beton-800 bg-beton-950")
-              }
-            >
+            <li key={s.step_no} className="relative pl-6 pb-3 text-sm">
+              {!last && (
+                <span className={"absolute left-[4px] top-3 -bottom-0.5 w-0.5 " + (done ? "bg-green-600" : "bg-beton-800")} />
+              )}
               <span
-                className={
-                  "mt-0.5 flex-none w-5 h-5 rounded-full grid place-items-center text-[11px] font-medium " +
-                  (done
-                    ? "bg-green-500/20 text-green-300"
-                    : rejected
-                    ? "bg-red-500/20 text-red-300"
-                    : isNext
-                    ? "bg-emniyet-500 text-beton-950"
-                    : "bg-beton-800 text-beton-400")
-                }
-              >
-                {done ? "✓" : rejected ? "✕" : s.step_no}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="text-beton-200">{s.label}</span>
-                {rec && (
-                  <span className="block text-xs text-beton-500 mt-0.5">
-                    {rec.actor_name} ·{" "}
-                    {new Date(rec.created_at).toLocaleString("tr-TR", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    })}
-                    {rec.note ? ` · ${rec.note}` : ""}
-                  </span>
-                )}
-                {isNext && !rec && (
-                  <span className="block text-xs text-emniyet-500 mt-0.5">Onayınız bekleniyor</span>
-                )}
-              </span>
+                className={"absolute left-0 top-1 w-2.5 h-2.5 rounded-full " + dot}
+                style={isNext && !rec ? { boxShadow: "0 0 0 4px rgb(var(--emniyet-500) / .25)" } : undefined}
+              />
+              <span className="block font-semibold text-beton-100">{s.label}</span>
+              {rec && (
+                <span className="block text-[11px] text-beton-400">
+                  {rec.actor_name} ·{" "}
+                  {new Date(rec.created_at).toLocaleDateString("tr-TR")}
+                  {rec.note ? ` · ${rec.note}` : ""}
+                </span>
+              )}
+              {isNext && !rec && <span className="block text-[11px] text-beton-400">bekliyor</span>}
             </li>
           );
         })}

@@ -102,7 +102,7 @@ export default function ProjectDetailPage() {
       <Kunye project={project} canEdit={canEdit} onSaved={async (p) => { setProject(p); await reloadProjects(); }} />
 
       <div className="mt-8 flex items-center gap-3">
-        <h2 className="font-display text-lg font-bold text-white">Milestone'lar</h2>
+        <h2 className="font-display text-lg font-bold text-beton-100">Milestone'lar</h2>
       </div>
       <MilestoneList
         projectId={id}

@@ -48,7 +48,7 @@ export default function PdfPreviewModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl w-full max-w-3xl h-[85vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-beton-800 shrink-0">
-          <h2 className="text-sm font-bold text-beton-100 truncate">{title}</h2>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100 truncate">{title}</h2>
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={download}

@@ -114,7 +114,7 @@ export default function RetentionPanel({
 
   return (
     <div className="rounded-xl border border-beton-800 bg-beton-900 p-4" style={{ boxShadow: "var(--shadow)" }}>
-      <h2 className="font-display font-medium text-beton-100 text-sm uppercase tracking-wide">
+      <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">
         Teminat bakiyesi ve iadeler
       </h2>
       <p className="text-xs text-beton-500 mt-1">

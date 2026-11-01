@@ -174,7 +174,7 @@ function AdjustModal({ day, onClose, onSaved }: { day: Day; onClose: () => void;
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="w-full max-w-sm rounded-xl border border-beton-700 bg-beton-900 p-5" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-bold text-beton-100">{day.person_name}</h2>
+        <h2 className="font-display text-lg font-bold text-beton-100">{day.person_name}</h2>
         <p className="text-xs text-beton-400 font-mono">{day.work_date}</p>
         {day.has_flag && (
           <p className="mt-2 text-xs text-red-400">⚠ Bu güne ait en az bir giriş/çıkış kaydı şantiye sınırı dışından yapılmış.</p>

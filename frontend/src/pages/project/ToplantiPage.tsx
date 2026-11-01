@@ -111,7 +111,7 @@ function MeetingDetail({ m, onClose }: { m: Meeting; onClose: () => void }) {
               <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${turuMeta.cls}`}>{turuMeta.label}</span>
               <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${durumMeta.cls}`}>{durumMeta.label}</span>
             </div>
-            <h2 className="text-lg font-bold text-beton-100">{m.baslik}</h2>
+            <h2 className="font-display text-lg font-bold text-beton-100">{m.baslik}</h2>
             <p className="text-sm text-beton-400 mt-0.5">
               {fmtDate(m.tarih)}
               {m.baslangic_saati && ` · ${m.baslangic_saati}`}

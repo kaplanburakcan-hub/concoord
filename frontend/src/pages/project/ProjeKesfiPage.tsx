@@ -429,7 +429,7 @@ export default function ProjeKesfiPage() {
       {/* Özet tablo */}
       <div className="rounded-lg border border-beton-800 bg-beton-900 overflow-hidden">
         <div className="px-5 py-3 border-b border-beton-800 bg-beton-900">
-          <h2 className="text-sm font-semibold text-beton-100">Keşif Özeti</h2>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Keşif Özeti</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -534,7 +534,7 @@ function AssignModal({ item, projectId, onClose, onAssigned }: {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="w-full max-w-sm rounded-xl border border-beton-700 bg-beton-900 p-5" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-bold text-beton-100">Taşeron Ata</h2>
+        <h2 className="font-display text-lg font-bold text-beton-100">Taşeron Ata</h2>
         <p className="text-xs text-beton-400 mt-1">{item.poz_no} — {item.tanim}</p>
         <p className="mt-2 text-xs text-beton-500">
           Atama, bu kalemi seçilen taşeron altında gerçek bir hakediş poz kaydına dönüştürür — sonrasında

@@ -192,7 +192,7 @@ export default function SabitGiderlerPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setFormAcik(false)}>
           <div className="bg-beton-900 border border-beton-700 rounded-xl w-full max-w-md mx-4 p-6 space-y-4"
             onClick={(e) => e.stopPropagation()}>
-            <h2 className="font-display font-bold text-white text-lg">Yeni Sabit Gider</h2>
+            <h2 className="font-display text-lg font-bold text-beton-100">Yeni Sabit Gider</h2>
 
             <div>
               <label className="block text-xs text-beton-400 mb-1">Gider Adı *</label>

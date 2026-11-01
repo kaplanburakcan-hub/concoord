@@ -300,7 +300,7 @@ function SurveyGenModal({ categories, busy, onClose, onConfirm }: {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="w-full max-w-lg rounded-xl border border-beton-700 bg-beton-900 p-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-bold text-beton-100">Keşiften Otomatik WBS Önizleme</h2>
+        <h2 className="font-display text-lg font-bold text-beton-100">Keşiften Otomatik WBS Önizleme</h2>
         <p className="mt-1 text-xs text-beton-400">
           {categories.length} kategori, {itemCount} kalem oluşturulacak — {derivedCount} tanesi taşerona atanmış
           olduğu için doğrudan hakedişten türetilen ilerlemeyle, kalanı elle girilecek şekilde başlar.
@@ -686,7 +686,7 @@ function ItemModal({
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-xl border border-beton-700 bg-beton-900 p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-bold text-beton-100">{item ? "Kalemi Düzenle" : "Yeni WBS Kalemi"}</h2>
+        <h2 className="font-display text-lg font-bold text-beton-100">{item ? "Kalemi Düzenle" : "Yeni WBS Kalemi"}</h2>
         {parentName && <p className="text-xs text-beton-400 mt-1">Üst kalem: {parentName}</p>}
 
         <label className="block mt-4 text-xs text-beton-400 mb-1">WBS Kodu *</label>
@@ -792,7 +792,7 @@ function PozLinkModal({ item, projectId, onClose, onChanged }: { item: ScheduleI
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-xl border border-beton-700 bg-beton-900 p-5" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-bold text-beton-100">Poz Bağla — {item.name}</h2>
+        <h2 className="font-display text-lg font-bold text-beton-100">Poz Bağla — {item.name}</h2>
         <p className="text-xs text-beton-400 mt-1">
           Bu WBS kalemini bir sözleşme pozuna bağlayın; ilerlemesi onaylı hakedişten türetilecekse "İlerleme Kaynağı: Hakedişten
           türetilir" seçili olmalı.
