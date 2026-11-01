@@ -463,14 +463,14 @@ export default function ProgressPaymentDetailPage() {
             );
             return (
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-beton-400">
+                <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">
                   Hakediş oranları
-                  <span className="ml-2 normal-case font-normal text-beton-500">
+                  <span className="ml-2 normal-case font-normal text-beton-400">
                     · {IS_TURU_LABEL[rates.is_turu] ?? rates.is_turu} sözleşmesi
                     {!rates.contract_found && " (sözleşme girilmemiş — varsayılan oranlar)"}
                   </span>
-                </p>
-                <div className="mt-2 grid grid-cols-2 gap-2">
+                </h2>
+                <div className="mt-3 grid grid-cols-2 gap-2">
                   {field("KDV oranı %", "vat_pct", rates.contract.vat_pct)}
                   <label className="text-[11px] text-beton-400">
                     KDV tevkifat oranı
