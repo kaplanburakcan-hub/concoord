@@ -252,7 +252,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           className="flex items-center border-b shrink-0 px-5"
           style={{ height: "76px", borderColor: "var(--chrome-border)", color: "var(--chrome-text)" }}
         >
-          <Wordmark size={21} subtitle />
+          <Wordmark size={24} subtitle />
         </Link>
 
         <nav className="flex-1 overflow-y-auto px-3 pb-3">
