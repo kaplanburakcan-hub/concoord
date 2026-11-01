@@ -129,7 +129,7 @@ body {
      butonlarda text-white yerine bunu kullan. */
   .text-white-solid { color: #fff; }
 
-  /* Panel her zaman koyu olduğundan, içindeki beton-*/emniyet-* sınıflarını
+  /* Panel her zaman koyu olduğundan, içindeki beton ve emniyet renk sınıflarını
      kullanan bileşenler (dikkat sayaçları, takvim bağlantısı) açık temada
      açık gri zeminde silik kalıyordu. .panel-scope koyu paleti yerel olarak
      geri getirir; böylece o bileşenler iki temada da aynı okunur. */
