@@ -129,6 +129,20 @@ body {
      butonlarda text-white yerine bunu kullan. */
   .text-white-solid { color: #fff; }
 
+  /* Panel her zaman koyu olduğundan, içindeki beton-*/emniyet-* sınıflarını
+     kullanan bileşenler (dikkat sayaçları, takvim bağlantısı) açık temada
+     açık gri zeminde silik kalıyordu. .panel-scope koyu paleti yerel olarak
+     geri getirir; böylece o bileşenler iki temada da aynı okunur. */
+  .panel-scope {
+    --beton-950: 22 24 28; --beton-900: 32 36 44; --beton-800: 46 50 58; --beton-700: 62 67 77;
+    --beton-600: 130 136 146; --beton-500: 130 136 146; --beton-400: 172 178 187;
+    --beton-300: 200 205 212; --beton-200: 228 231 235; --beton-100: 245 246 248;
+    --emniyet-500: 245 168 0; --emniyet-600: 214 145 0;
+  }
+  [data-theme="light"] body .panel-scope .text-beton-950 { color: rgb(22 24 28) !important; }
+  [data-theme="light"] body .panel-scope .text-red-300,
+  [data-theme="light"] body .panel-scope .text-red-400 { color: #fca5a5 !important; }
+
   /* --- Durum renkleri: light modda kontrast düzeltmesi ---
      Sayfalarda kullanılan semantik tonlar (red-400/300, green-300, blue-300…)
      koyu zemin için seçilmişti; beyaz/pastel yüzeyde okunmuyorlardı. Açık temada

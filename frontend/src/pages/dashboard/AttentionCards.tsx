@@ -37,7 +37,7 @@ export default function AttentionCards({ projectId, canRfi, canPlan, canTasks }:
   if (cards.length === 0) return null;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 p-4">
+    <div className="panel-scope grid gap-3 sm:grid-cols-2 p-4">
       {cards.map((c) => (
         <Link key={c.label} to={c.to}
           className="rounded-lg border border-beton-800 bg-beton-900/60 p-3 hover:border-emniyet-500 transition">

@@ -60,7 +60,7 @@ export default function CalendarFeedCard({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="space-y-3 text-sm">
+    <div className="panel-scope space-y-3 text-sm">
       <p className="text-xs text-beton-500">
         Takvim uygulamanıza salt okunur abone olun: hakediş ve ödeme tarihleri, çek keside tarihleri
         ve milestone'lar görünür. Bağlantı 90 gün geçerlidir.
