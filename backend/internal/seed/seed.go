@@ -56,6 +56,9 @@ var registry = []Step{
 	{Name: "0013_ana_sozlesme_izin_sync", Run: stepFaz2PermSync},
 	// Hakedişe esas oranlar: progress_payments.edit_rates eklendi (ProjectManager + Admin).
 	{Name: "0014_hakedis_oran_izin_sync", Run: stepFaz2PermSync},
+	// Plan adımları PR'ı (#1) yeni izinler getirdi (calendar.subscribe, risks.*, changes.*
+	// vb.) ama senkron adımı eklememişti: canlıda rollere ve admin'e bağlanmıyorlardı.
+	{Name: "0015_plan_adimlari_izin_sync", Run: stepFaz2PermSync},
 }
 
 // stepFaz2PermSync — izin sözlüğünü ve rol varsayılanlarını yeniden senkronlar.
