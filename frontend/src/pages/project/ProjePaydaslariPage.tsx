@@ -427,7 +427,7 @@ export default function ProjePaydaslariPage() {
     <div className="max-w-5xl mx-auto space-y-4">
       {/* Başlık */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="font-display font-extrabold text-xl text-white">Proje Paydaşları</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Proje Paydaşları</h1>
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={downloadTemplate}
@@ -681,7 +681,7 @@ export default function ProjePaydaslariPage() {
             className="bg-beton-900 border border-beton-700 rounded-xl w-full max-w-lg mx-4 p-6 space-y-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="font-display font-bold text-white text-lg">
+            <h2 className="font-display text-lg font-bold text-beton-100">
               {duzenleId ? "Paydaş Düzenle" : "Paydaş Ekle"}
             </h2>
 

@@ -127,7 +127,7 @@ function RentalUploadPanel({
     <div className={compact ? "rounded-md border border-beton-800 bg-beton-950 p-3 space-y-2" : "space-y-3"}>
       {!compact ? (
         <div>
-          <h2 className="text-lg font-bold text-beton-100">Kiralama Sözleşmesi</h2>
+          <h2 className="font-display text-lg font-bold text-beton-100">Kiralama Sözleşmesi</h2>
           <p className="text-sm text-beton-400 mt-0.5">
             "{ad}" kiralık olarak kaydedildi. Sözleşmeyi şimdi yükleyebilir ya da sonraya bırakabilirsiniz.
           </p>
@@ -598,7 +598,7 @@ export default function MachinePage({
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-xl font-bold text-beton-100">{tipLabel}</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">{tipLabel}</h1>
         <button
           onClick={() => openAdd()}
           className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium"
@@ -983,7 +983,7 @@ export default function MachinePage({
               />
             ) : (
             <>
-            <h2 className="text-lg font-bold text-beton-100">
+            <h2 className="font-display text-lg font-bold text-beton-100">
               {editId ? "Makineyi Düzenle" : `${tipLabel === "Ekipmanlar" ? "Ekipman" : tipLabel === "İş Makineleri" ? "Makine" : "Araç"} Ekle`}
             </h2>
 
@@ -1261,7 +1261,7 @@ export default function MachinePage({
       {conflict && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
           <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 space-y-4">
-            <h2 className="text-lg font-bold text-beton-100">Ekipman Başka Projede Kullanılıyor</h2>
+            <h2 className="font-display text-lg font-bold text-beton-100">Ekipman Başka Projede Kullanılıyor</h2>
             <p className="text-sm text-beton-300">
               "<span className="font-medium text-beton-100">{conflict.machineName}</span>" ilgili iş makinesi/araç/ekipman
               hâlihazırda <span className="font-medium text-amber-400">{conflict.currentProjectName}</span> projesinde
@@ -1290,7 +1290,7 @@ export default function MachinePage({
       {transferRequestedMsg && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
           <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 space-y-4">
-            <h2 className="text-lg font-bold text-beton-100">Transfer Talebi Oluşturuldu</h2>
+            <h2 className="font-display text-lg font-bold text-beton-100">Transfer Talebi Oluşturuldu</h2>
             <p className="text-sm text-green-400 bg-green-950/30 border border-green-900 rounded-md px-3 py-2">
               {transferRequestedMsg}
             </p>
@@ -1314,7 +1314,7 @@ export default function MachinePage({
         return (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
             <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 space-y-4 max-h-[90vh] overflow-y-auto">
-              <h2 className="text-lg font-bold text-beton-100">İş Başı Detayları — {m.ad}</h2>
+              <h2 className="font-display text-lg font-bold text-beton-100">İş Başı Detayları — {m.ad}</h2>
 
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-beton-400">{mevcutLabel}</label>

@@ -89,7 +89,7 @@ export default function MaterialApprovalDetailPage() {
     <div className="space-y-4 max-w-3xl">
       <div className="flex items-center gap-3 flex-wrap">
         <Link to="/malzeme-onaylari" className="text-beton-400 hover:text-beton-200 text-sm">← Pano</Link>
-        <h1 className="text-lg font-display font-bold text-white">{mar.mar_no}</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">{mar.mar_no}</h1>
         <span className={"text-xs px-2 py-0.5 rounded border " + (MAR_STATUS_STYLE[mar.status] || "")}>
           {MAR_STATUS_LABEL[mar.status] || mar.status}
         </span>

@@ -86,7 +86,7 @@ export default function MaterialApprovalsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="text-lg font-display font-bold text-white">Malzeme Onayları (MAR)</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Malzeme Onayları (MAR)</h1>
         <span className="text-xs text-beton-500">{mars.length} kayıt</span>
         <div className="ml-auto flex gap-2">
           <button

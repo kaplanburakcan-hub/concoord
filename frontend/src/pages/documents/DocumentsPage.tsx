@@ -66,8 +66,8 @@ export default function DocumentsPage() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-extrabold text-white">Dokümanlar</h1>
-      <p className="text-sm text-beton-400 mt-1">{current.name} — sözleşme, zeyilname ve tüm proje belgeleri (versiyonlu).</p>
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Dokümanlar</h1>
+      <p className="mt-1 text-sm text-beton-400">{current.name} — sözleşme, zeyilname ve tüm proje belgeleri (versiyonlu).</p>
       {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
 
       <div className="mt-4 grid gap-4 md:grid-cols-[240px_1fr]">

@@ -47,7 +47,7 @@ export default function PortfolioPage() {
         <span className="inline-block w-1.5 h-1.5 rounded-full bg-emniyet-500" />
         Portföy
       </p>
-      <h1 className="font-display text-3xl font-medium text-beton-100 mt-2 tracking-tight">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100 mt-2">
         Portföy Görünümü
       </h1>
       <p className="mt-1 text-sm text-beton-400">
@@ -93,7 +93,7 @@ export default function PortfolioPage() {
               <span className="font-mono text-xs text-emniyet-500">{c.code}</span>
               <span className="font-mono text-[11px] text-beton-500">{c.status}</span>
             </div>
-            <h2 className="mt-1 text-sm font-semibold text-white">{c.name}</h2>
+            <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100 mt-1">{c.name}</h2>
 
             {/* Zamansal İlerleme */}
             <div className="mt-4">

@@ -313,8 +313,8 @@ export default function DepoPage() {
       {/* Başlık */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-beton-100">Depo Raporları</h1>
-          <p className="text-sm text-beton-400 mt-0.5">{proj.name} — Stok takibi ve hareket kayıtları</p>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Depo Raporları</h1>
+          <p className="mt-1 text-sm text-beton-400">{proj.name} — Stok takibi ve hareket kayıtları</p>
         </div>
         <div className="flex gap-2">
           <Link

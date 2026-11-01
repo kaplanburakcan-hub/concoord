@@ -51,7 +51,7 @@ export default function ProjectsPage() {
   return (
     <div>
       <div className="flex items-center gap-3">
-        <h1 className="font-display text-2xl font-extrabold text-white">Projeler</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Projeler</h1>
         {can("projects.create") && (
           <button
             onClick={() => setShowNew((v) => !v)}

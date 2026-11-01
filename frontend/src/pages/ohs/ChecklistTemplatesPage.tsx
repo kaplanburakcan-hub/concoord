@@ -86,7 +86,7 @@ export default function ChecklistTemplatesPage() {
   return (
     <div className="space-y-4 max-w-3xl">
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-display font-bold text-white">İSG Checklist Şablonları</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">İSG Checklist Şablonları</h1>
         {canManage && !editing && (
           <button onClick={startNew}
             className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">

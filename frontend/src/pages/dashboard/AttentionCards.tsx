@@ -40,7 +40,7 @@ export default function AttentionCards({ projectId, canRfi, canPlan, canTasks }:
   if (cards.length === 0 && !week) return null;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 p-4">
+    <div className="panel-scope grid gap-3 sm:grid-cols-2 p-4">
       {week && (
         <div className="rounded-lg border border-beton-800 bg-beton-900/60 p-3 sm:col-span-2">
           <div className="text-[11px] uppercase tracking-wider text-beton-500">Bu hafta (7 gün)</div>

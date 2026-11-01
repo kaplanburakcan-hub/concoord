@@ -42,8 +42,8 @@ export default function AuditLogPage() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-extrabold text-white">Denetim İzi</h1>
-      <p className="mt-1 text-beton-400 text-sm">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Denetim İzi</h1>
+      <p className="mt-1 text-sm text-beton-400">
         Her yazma işlemi kim, ne zaman, ne değiştirdi bilgisiyle kaydedilir.
       </p>
 

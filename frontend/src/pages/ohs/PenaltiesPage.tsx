@@ -125,7 +125,7 @@ export default function PenaltiesPage() {
   return (
     <div className="space-y-4 max-w-3xl">
       <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="text-lg font-display font-bold text-white">İSG Ceza Tutanakları</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">İSG Ceza Tutanakları</h1>
         <Link to="/isg" className="text-xs text-beton-400 hover:text-beton-200">Bulgular</Link>
         <Link to="/isg/denetimler" className="text-xs text-beton-400 hover:text-beton-200">Denetimler</Link>
         {canIssue && (

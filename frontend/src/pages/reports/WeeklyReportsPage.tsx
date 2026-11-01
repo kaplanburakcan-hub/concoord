@@ -879,8 +879,8 @@ export default function WeeklyReportsPage() {
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="font-display font-extrabold text-xl text-white">Haftalık İlerleme Raporları</h1>
-          <p className="text-xs text-beton-500 mt-0.5">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Haftalık İlerleme Raporları</h1>
+          <p className="mt-1 text-sm text-beton-400">
             Günlük raporlar, teslimatlar ve depo verilerinden otomatik derlenen haftalık özetler.
           </p>
         </div>

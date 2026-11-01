@@ -410,8 +410,8 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
     <div className="max-w-5xl mx-auto space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="font-display font-extrabold text-xl text-white">{title}</h1>
-          <p className="text-xs text-beton-500 mt-0.5">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">{title}</h1>
+          <p className="mt-1 text-sm text-beton-400">
             Projeye ait {direction === "gelen" ? "gelen" : "giden"} yazışma ve evrak kayıtları.
           </p>
         </div>
@@ -637,7 +637,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
       {formOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="bg-beton-900 border border-beton-700 rounded-xl shadow-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-4">
-            <h2 className="text-lg font-bold text-beton-100">
+            <h2 className="font-display text-lg font-bold text-beton-100">
               {form.id ? "Yazışmayı Düzenle" : `Yeni ${direction === "gelen" ? "Gelen" : "Giden"} Evrak`}
             </h2>
             {saveError && <p className="text-red-400 text-sm">{saveError}</p>}

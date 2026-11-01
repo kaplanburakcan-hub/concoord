@@ -156,8 +156,8 @@ export default function TaseronDashboardPage() {
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Başlık */}
       <div>
-        <h1 className="font-display font-extrabold text-xl text-white">Taşeron & Tedarikçi Dashboard</h1>
-        <p className="text-sm text-beton-400 mt-1">{current.name}</p>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Taşeron & Tedarikçi Dashboard</h1>
+        <p className="mt-1 text-sm text-beton-400">{current.name}</p>
       </div>
 
       {/* KPI Kartları */}
@@ -179,7 +179,7 @@ export default function TaseronDashboardPage() {
       <div className="rounded-xl border border-beton-800 bg-beton-900 overflow-hidden">
         <div className="px-4 py-3 border-b border-beton-800 flex items-center gap-2">
           <span>🏗️</span>
-          <h2 className="text-sm font-semibold text-white">Taşeronlar</h2>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Taşeronlar</h2>
           <span className="text-xs text-beton-500 ml-1">({subs.length} firma)</span>
           <div className="ml-auto flex items-center gap-3 text-xs text-beton-400">
             <span className="flex items-center gap-1">
@@ -295,7 +295,7 @@ export default function TaseronDashboardPage() {
       <div className="rounded-xl border border-beton-800 bg-beton-900 overflow-hidden">
         <div className="px-4 py-3 border-b border-beton-800 flex items-center gap-2 flex-wrap">
           <span>📦</span>
-          <h2 className="text-sm font-semibold text-white">Tedarikçiler</h2>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Tedarikçiler</h2>
           <span className="text-xs text-beton-500 ml-1">({tedarikciler.length} firma)</span>
           <label className="ml-auto flex items-center gap-1.5 text-xs text-beton-400 cursor-pointer select-none">
             <input

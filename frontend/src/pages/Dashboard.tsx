@@ -37,7 +37,7 @@ const MALZEME_STOPS: ColorStop[] = [{ t: 0, hex: "#fbbf24" }, { t: 1, hex: "#f59
 const DIGER_STOPS: ColorStop[] = [{ t: 0, hex: "#9ca3af" }, { t: 1, hex: "#6b7280" }];
 const ONAYLI_STOPS: ColorStop[] = [{ t: 0, hex: "#60a5fa" }, { t: 1, hex: "#3b82f6" }];
 const TAMAMLANAN_STOPS: ColorStop[] = [{ t: 0, hex: "#4ade80" }, { t: 1, hex: "#22c55e" }];
-const DEVAM_STOPS: ColorStop[] = [{ t: 0, hex: "#fbbf24" }, { t: 1, hex: "#f5a800" }];
+const DEVAM_STOPS: ColorStop[] = [{ t: 0, hex: "#f2d04a" }, { t: 1, hex: "#e0b400" }];
 
 type Milestone = {
   id: string;
@@ -347,7 +347,7 @@ export default function Dashboard() {
                     centerLabel="AÇIK PO"
                     segments={[
                       { label: "Tamamlanan", value: dash.pending.delivered_pos, colorStops: TAMAMLANAN_STOPS, swatch: "#22c55e" },
-                      { label: "Devam Eden", value: dash.pending.open_pos, colorStops: DEVAM_STOPS, swatch: "#f5a800" },
+                      { label: "Devam Eden", value: dash.pending.open_pos, colorStops: DEVAM_STOPS, swatch: "#e0b400" },
                     ]}
                   />
                   <div className="space-y-2 text-[12.5px] flex-1">

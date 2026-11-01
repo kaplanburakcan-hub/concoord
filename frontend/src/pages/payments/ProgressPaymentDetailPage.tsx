@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, apiDownload, apiFetchBlob, apiUpload, describeLoadError, RequestError } from "../../api/client";
 import ApprovalChain from "./ApprovalChain";
+import PaymentHero from "./PaymentHero";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 import { useUndoable, useUndoShortcuts } from "../../hooks/useUndoable";
@@ -70,7 +71,11 @@ const IS_TURU_LABEL: Record<string, string> = { yapim: "Yapım", hizmet: "Hizmet
 const TEVKIFAT_SECENEKLERI: [number, string][] = [
   [0, "Tevkifat yok"], [0.2, "2/10"], [0.3, "3/10"], [0.4, "4/10"], [0.5, "5/10"], [0.7, "7/10"], [0.9, "9/10"], [1, "Tam tevkifat"],
 ];
-const rateTxt = (v: number) => String(v).replace(".", ",");
+const fmtDate = (d: string) => {
+  const t = new Date(d);
+  return isNaN(t.getTime()) ? d : t.toLocaleDateString("tr-TR");
+};
+const rateTxt =(v: number) => String(v).replace(".", ",");
 const rateNum = (s: string) => Number(String(s).replace(",", ".")) || 0;
 
 type PdfLayout = "resmi" | "panel" | "akis";
@@ -168,6 +173,9 @@ export default function ProgressPaymentDetailPage() {
   // sözleşmelerinin toplam bedeli (finansal görüntüleme yetkisi olmayanlara
   // sunucu zaten null döner).
   const [contractAmount, setContractAmount] = useState<number | null>(null);
+  // Özet bandı başlığı için taşeron adı ve sözleşme numarası.
+  const [subName, setSubName] = useState("");
+  const [contractNo, setContractNo] = useState("");
   const [suggestions, setSuggestions] = useState<PenaltySuggestion[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -225,6 +233,11 @@ export default function ProgressPaymentDetailPage() {
       const wi = await api<{ work_items: WorkItem[] }>(
         `/projects/${pid}/subcontractors/${r.payment.subcontractor_id}/work-items`, { projectId: pid });
       setWorkItems(wi.work_items);
+      try {
+        const sl = await api<{ subcontractors: { id: string; company_name: string }[] }>(
+          `/projects/${pid}/subcontractors`, { projectId: pid });
+        setSubName(sl.subcontractors.find((x) => x.id === r.payment.subcontractor_id)?.company_name ?? "");
+      } catch { setSubName(""); }
       // "Tutanaklı imalat": aynı taşerona ait, onaylanmış tutanaklar —
       // metraj satırlarına dayanak olarak seçilebilir.
       try {
@@ -237,8 +250,9 @@ export default function ProgressPaymentDetailPage() {
       // projedeki toplam sözleşme bedelini de sağlar (birden fazla
       // sözleşmesi varsa toplamı alınır).
       try {
-        const cs = await api<{ contracts: { default_payment_method?: string | null; amount?: number | null }[] }>(
+        const cs = await api<{ contracts: { default_payment_method?: string | null; amount?: number | null; contract_no?: string }[] }>(
           `/projects/${pid}/contracts?subcontractor_id=${r.payment.subcontractor_id}`, { projectId: pid });
+        setContractNo(cs.contracts.find((c) => c.contract_no)?.contract_no ?? "");
         const m = cs.contracts.find((c) => c.default_payment_method)?.default_payment_method ?? null;
         setDefaultMethod(m);
         setDForm((f) => ({ ...f, payment_method: f.payment_method || m || "" }));
@@ -300,6 +314,7 @@ export default function ProgressPaymentDetailPage() {
 
   async function save() {
     if (!pmt) return;
+
     setMsg(null); setErr(null);
     // Açık (onaylanmamış) kesinti satırı sessizce atlanmasın ya da yarım
     // kaydedilmesin: önce "Ekle" / "Değişikliği onayla" ya da satır silinmeli.
@@ -427,15 +442,71 @@ export default function ProgressPaymentDetailPage() {
   const isValidExtra = (x: Extra) => !!x.catalog_code && x.description.trim() !== "" && trToNumber(x.amount) > 0;
   const hasOpenExtra = extras.some((x) => !x.done);
 
+
   if (!current) return <p className="text-beton-400">Önce bir proje seçin.</p>;
   if (!pmt) return <p className="text-beton-400">{err || "Yükleniyor…"}</p>;
+
+  // Hakedişe esas oranlar: sözleşmeden gelir; farklı girmek yetki ister.
+  const ratesBlock = rates ? (() => {
+            const lock = !(editable && rates.can_edit);
+            const diff = (cur: number, con: number) => Math.abs(cur - con) > 1e-9;
+            const field = (label: string, key: "vat_pct" | "retention_pct" | "withholding_pct", con: number) => (
+              <label className="text-[11px] text-beton-400">
+                {label}
+                <input disabled={lock} inputMode="decimal" value={rateForm[key]}
+                  onChange={(e) => setRateForm({ ...rateForm, [key]: e.target.value })}
+                  className="mt-0.5 w-full rounded bg-beton-900 border border-beton-800 px-2 py-1 text-sm text-beton-100 text-right disabled:opacity-60" />
+                {diff(rateNum(rateForm[key]), con) && (
+                  <span className="block text-[10px] text-amber-400 mt-0.5">sözleşmede %{rateTxt(con)}</span>
+                )}
+              </label>
+            );
+            return (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-beton-400">
+                  Hakediş oranları
+                  <span className="ml-2 normal-case font-normal text-beton-500">
+                    · {IS_TURU_LABEL[rates.is_turu] ?? rates.is_turu} sözleşmesi
+                    {!rates.contract_found && " (sözleşme girilmemiş — varsayılan oranlar)"}
+                  </span>
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {field("KDV oranı %", "vat_pct", rates.contract.vat_pct)}
+                  <label className="text-[11px] text-beton-400">
+                    KDV tevkifat oranı
+                    <select disabled={lock} value={String(pmt.vat_withholding_ratio ?? 0)}
+                      onChange={(e) => setPmt({ ...pmt, vat_withholding_ratio: Number(e.target.value) })}
+                      className="mt-0.5 w-full rounded bg-beton-900 border border-beton-800 px-1 py-1 text-sm text-beton-100 disabled:opacity-60">
+                      {TEVKIFAT_SECENEKLERI.map(([v, l]) => <option key={v} value={String(v)}>{l}</option>)}
+                    </select>
+                    {diff(pmt.vat_withholding_ratio ?? 0, rates.contract.vat_withholding_ratio) && (
+                      <span className="block text-[10px] text-amber-400 mt-0.5">
+                        sözleşmede {TEVKIFAT_SECENEKLERI.find(([v]) => v === rates.contract.vat_withholding_ratio)?.[1] ?? rates.contract.vat_withholding_ratio}
+                      </span>
+                    )}
+                  </label>
+                  {field("Teminat kesintisi %", "retention_pct", rates.contract.retention_pct)}
+                  {field("Stopaj oranı %", "withholding_pct", rates.contract.withholding_pct)}
+                </div>
+                <p className="mt-1.5 text-[10px] text-beton-500">
+                  {pmt.status !== "Draft"
+                    ? "🔒 Hakediş taslak durumunda değil; oranlar değiştirilemez."
+                    : !canEdit
+                      ? "🔒 Taslağı düzenleme yetkiniz olmadığı için oranlar değiştirilemez."
+                      : rates.can_edit
+                        ? "Sözleşmedeki oranlardan farklı değer girebilirsiniz (yetkiniz var)."
+                        : "🔒 Oranlar sözleşmeden gelir; değiştirmek için \"Hakediş oranlarını değiştir\" yetkisi gerekir."}
+                </p>
+              </div>
+            );
+  })() : null;
 
   return (
     <div>
       <div className="flex items-center gap-3">
         <Link to="/hakedis" className="text-beton-400 hover:text-white text-sm">← Hakedişler</Link>
       </div>
-      <h1 className="font-display text-2xl font-extrabold text-white mt-1">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100 mt-1">
         Hakediş #{pmt.period_no}
         <span className="ml-3 rounded bg-beton-800 px-2 py-0.5 text-sm text-beton-200 align-middle">
           {STATUS_LABEL[pmt.status] || pmt.status}
@@ -444,9 +515,79 @@ export default function ProgressPaymentDetailPage() {
       {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
       {msg && <p className="mt-3 text-sm text-emniyet-500">{msg}</p>}
 
+      <div className="mt-4">
+        <PaymentHero
+          title={`Hakediş #${pmt.period_no} · ${subName || "Taşeron"}`}
+          subtitle={[contractNo, pmt.period_start && pmt.period_end ? `${fmtDate(pmt.period_start)} – ${fmtDate(pmt.period_end)}` : ""].filter(Boolean).join(" · ")}
+          status={<span className="rounded px-2.5 py-0.5 text-xs font-bold" style={{ background: "#e0b400", color: "#0b2545" }}>{STATUS_LABEL[pmt.status] || pmt.status}</span>}
+          contract={contractAmount} cum={pmt.gross_cum} prev={pmt.gross_prev} thisGross={pmt.gross_this} payable={pmt.net_payable}
+          canFin={canFin}
+        />
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-[1.1fr_1fr]">
+        <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
+          {!ratesBlock && <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Hakediş işlemleri</h2>}
+          {ratesBlock}
+          <div className="mt-3">
+      <div className="flex flex-wrap gap-2">
+        {editable && (
+          <button onClick={save}
+            className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-sm px-4 py-2">
+            Kaydet & Hesapla
+          </button>
+        )}
+        {pmt.status === "Draft" && can("progress_payments.submit") && (
+          <ActionBtn onClick={() => doTransition("submit", "Gönderim")}>Saha Onayına Gönder</ActionBtn>
+        )}
+        {pmt.status === "Submitted" && can("progress_payments.approve") && (
+          <>
+            <ActionBtn onClick={() => doTransition("approve", "Saha onayı")}>Saha Onayı Ver</ActionBtn>
+            <ActionBtn danger onClick={() => doTransition("reject", "Reddetme")}>Reddet</ActionBtn>
+          </>
+        )}
+        {pmt.status === "SiteApproved" && can("progress_payments.finalize") && (
+          <ActionBtn onClick={() => doTransition("finalize", "Kesinleştirme")}>Kesinleştir (Kilitle)</ActionBtn>
+        )}
+        {canFin && (
+          <>
+            <div role="group" aria-label="Özet PDF düzeni"
+              className="flex rounded border border-beton-700 overflow-hidden text-sm">
+              {PDF_LAYOUTS.map((l) => (
+                <button key={l.id} onClick={() => setPdfLayout(l.id)} aria-pressed={pdfLayout === l.id}
+                  title={l.hint}
+                  className={`px-3 py-2 ${pdfLayout === l.id
+                    ? "bg-emniyet-500 text-beton-950 font-semibold"
+                    : "text-beton-200 hover:bg-beton-800"}`}>
+                  {l.label}
+                </button>
+              ))}
+            </div>
+            <button onClick={viewPdf}
+              className="rounded border border-beton-700 text-beton-200 hover:bg-beton-800 text-sm px-4 py-2">
+              Özet PDF — Görüntüle
+            </button>
+            <button onClick={downloadPdf}
+              className="rounded border border-beton-700 text-beton-200 hover:bg-beton-800 text-sm px-4 py-2">
+              PDF İndir
+            </button>
+          </>
+        )}
+      </div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
+          {/* Faz 11 — çok adımlı onay zinciri (teknik ofis → ... → finansal kontrol) */}
+          <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Onay Zinciri</h2>
+          <div className="mt-2">
+            {id && <ApprovalChain paymentId={id} onChanged={load} />}
+          </div>
+        </div>
+      </div>
+
       {/* Metraj tablosu */}
       <div className="mt-4 rounded-lg border border-beton-800 bg-beton-900 p-3">
-        <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide">İmalat Kalemleri (Kümülatif Metraj)</h2>
+        <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">İmalat Kalemleri (Kümülatif Metraj)</h2>
         <table className="mt-2 w-full text-sm">
           <thead>
             <tr className="text-beton-400 text-left border-b border-beton-800">
@@ -524,63 +665,9 @@ export default function ProgressPaymentDetailPage() {
       {/* Kesintiler + özet */}
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
-          <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide">Kesintiler</h2>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Kesintiler</h2>
           <p className="text-xs text-beton-400 mt-1">Avans ve teminat otomatik hesaplanır. Aşağıya vergi/İSG/diğer ekleyin.</p>
 
-          {/* Hakedişe esas oranlar: sözleşmeden gelir; farklı girmek yetki ister. */}
-          {rates && (() => {
-            const lock = !(editable && rates.can_edit);
-            const diff = (cur: number, con: number) => Math.abs(cur - con) > 1e-9;
-            const field = (label: string, key: "vat_pct" | "retention_pct" | "withholding_pct", con: number) => (
-              <label className="text-[11px] text-beton-400">
-                {label}
-                <input disabled={lock} inputMode="decimal" value={rateForm[key]}
-                  onChange={(e) => setRateForm({ ...rateForm, [key]: e.target.value })}
-                  className="mt-0.5 w-full rounded bg-beton-900 border border-beton-800 px-2 py-1 text-sm text-beton-100 text-right disabled:opacity-60" />
-                {diff(rateNum(rateForm[key]), con) && (
-                  <span className="block text-[10px] text-amber-400 mt-0.5">sözleşmede %{rateTxt(con)}</span>
-                )}
-              </label>
-            );
-            return (
-              <div className="mt-3 rounded-md border border-beton-800 bg-beton-950 p-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-beton-400">
-                  Hakediş oranları
-                  <span className="ml-2 normal-case font-normal text-beton-500">
-                    · {IS_TURU_LABEL[rates.is_turu] ?? rates.is_turu} sözleşmesi
-                    {!rates.contract_found && " (sözleşme girilmemiş — varsayılan oranlar)"}
-                  </span>
-                </p>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  {field("KDV oranı %", "vat_pct", rates.contract.vat_pct)}
-                  <label className="text-[11px] text-beton-400">
-                    KDV tevkifat oranı
-                    <select disabled={lock} value={String(pmt.vat_withholding_ratio ?? 0)}
-                      onChange={(e) => setPmt({ ...pmt, vat_withholding_ratio: Number(e.target.value) })}
-                      className="mt-0.5 w-full rounded bg-beton-900 border border-beton-800 px-1 py-1 text-sm text-beton-100 disabled:opacity-60">
-                      {TEVKIFAT_SECENEKLERI.map(([v, l]) => <option key={v} value={String(v)}>{l}</option>)}
-                    </select>
-                    {diff(pmt.vat_withholding_ratio ?? 0, rates.contract.vat_withholding_ratio) && (
-                      <span className="block text-[10px] text-amber-400 mt-0.5">
-                        sözleşmede {TEVKIFAT_SECENEKLERI.find(([v]) => v === rates.contract.vat_withholding_ratio)?.[1] ?? rates.contract.vat_withholding_ratio}
-                      </span>
-                    )}
-                  </label>
-                  {field("Teminat kesintisi %", "retention_pct", rates.contract.retention_pct)}
-                  {field("Stopaj oranı %", "withholding_pct", rates.contract.withholding_pct)}
-                </div>
-                <p className="mt-1.5 text-[10px] text-beton-500">
-                  {pmt.status !== "Draft"
-                    ? "🔒 Hakediş taslak durumunda değil; oranlar değiştirilemez."
-                    : !canEdit
-                      ? "🔒 Taslağı düzenleme yetkiniz olmadığı için oranlar değiştirilemez."
-                      : rates.can_edit
-                        ? "Sözleşmedeki oranlardan farklı değer girebilirsiniz (yetkiniz var)."
-                        : "🔒 Oranlar sözleşmeden gelir; değiştirmek için \"Hakediş oranlarını değiştir\" yetkisi gerekir."}
-                </p>
-              </div>
-            );
-          })()}
 
           {editable && (
             <div className="mt-2 flex items-center justify-end gap-2">
@@ -924,16 +1011,9 @@ export default function ProgressPaymentDetailPage() {
           )}
         </div>
 
-        <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
-          {/* Faz 11 — çok adımlı onay zinciri (teknik ofis → ... → finansal kontrol) */}
-          <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide">Onay Zinciri</h2>
-          <div className="mt-2">
-            {id && <ApprovalChain paymentId={id} onChanged={load} />}
-          </div>
-        </div>
 
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-3">
-          <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide">Özet</h2>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Özet</h2>
           {canFin ? (
             <dl className="mt-2 space-y-1 text-sm">
               <Row label="A) Kümülatif imalat" v={pmt.gross_cum} />
@@ -965,7 +1045,7 @@ export default function ProgressPaymentDetailPage() {
 
       {/* Faz B (Nakit Akış) — Ödeme Planı */}
       <div className="mt-4 rounded-lg border border-beton-800 bg-beton-900 p-3">
-        <h2 className="font-display font-bold text-white text-sm uppercase tracking-wide">Ödeme Planı</h2>
+        <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Ödeme Planı</h2>
         <p className="text-xs text-beton-400 mt-1">
           Bu hakedişe yapılan kısmi ödemeler. Çekte nakit çıkışı keşide tarihinde,
           diğerlerinde ödeme tarihinde nakit akışına yansır.
@@ -1047,51 +1127,6 @@ export default function ProgressPaymentDetailPage() {
         )}
       </div>
 
-      {/* Aksiyonlar */}
-      <div className="mt-4 flex flex-wrap gap-2">
-        {editable && (
-          <button onClick={save}
-            className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-sm px-4 py-2">
-            Kaydet & Hesapla
-          </button>
-        )}
-        {pmt.status === "Draft" && can("progress_payments.submit") && (
-          <ActionBtn onClick={() => doTransition("submit", "Gönderim")}>Saha Onayına Gönder</ActionBtn>
-        )}
-        {pmt.status === "Submitted" && can("progress_payments.approve") && (
-          <>
-            <ActionBtn onClick={() => doTransition("approve", "Saha onayı")}>Saha Onayı Ver</ActionBtn>
-            <ActionBtn danger onClick={() => doTransition("reject", "Reddetme")}>Reddet</ActionBtn>
-          </>
-        )}
-        {pmt.status === "SiteApproved" && can("progress_payments.finalize") && (
-          <ActionBtn onClick={() => doTransition("finalize", "Kesinleştirme")}>Kesinleştir (Kilitle)</ActionBtn>
-        )}
-        {canFin && (
-          <>
-            <div role="group" aria-label="Özet PDF düzeni"
-              className="flex rounded border border-beton-700 overflow-hidden text-sm">
-              {PDF_LAYOUTS.map((l) => (
-                <button key={l.id} onClick={() => setPdfLayout(l.id)} aria-pressed={pdfLayout === l.id}
-                  title={l.hint}
-                  className={`px-3 py-2 ${pdfLayout === l.id
-                    ? "bg-emniyet-500 text-beton-950 font-semibold"
-                    : "text-beton-200 hover:bg-beton-800"}`}>
-                  {l.label}
-                </button>
-              ))}
-            </div>
-            <button onClick={viewPdf}
-              className="rounded border border-beton-700 text-beton-200 hover:bg-beton-800 text-sm px-4 py-2">
-              Özet PDF — Görüntüle
-            </button>
-            <button onClick={downloadPdf}
-              className="rounded border border-beton-700 text-beton-200 hover:bg-beton-800 text-sm px-4 py-2">
-              PDF İndir
-            </button>
-          </>
-        )}
-      </div>
     </div>
   );
 }

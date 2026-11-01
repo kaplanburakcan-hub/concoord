@@ -73,7 +73,7 @@ export default function PuantajPage() {
   return (
     <div>
       <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="font-display text-2xl font-extrabold text-white">PDKS Puantaj</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">PDKS Puantaj</h1>
         <input
           type="month" value={ym} onChange={(e) => setYm(e.target.value)}
           className="rounded-md bg-beton-900 border border-beton-700 px-3 py-1.5 text-sm text-beton-200"
@@ -174,7 +174,7 @@ function AdjustModal({ day, onClose, onSaved }: { day: Day; onClose: () => void;
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="w-full max-w-sm rounded-xl border border-beton-700 bg-beton-900 p-5" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-bold text-beton-100">{day.person_name}</h2>
+        <h2 className="font-display text-lg font-bold text-beton-100">{day.person_name}</h2>
         <p className="text-xs text-beton-400 font-mono">{day.work_date}</p>
         {day.has_flag && (
           <p className="mt-2 text-xs text-red-400">⚠ Bu güne ait en az bir giriş/çıkış kaydı şantiye sınırı dışından yapılmış.</p>

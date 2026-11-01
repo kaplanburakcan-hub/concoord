@@ -1,5 +1,6 @@
 import { type ReactNode, useState, useEffect } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import Wordmark from "./Wordmark";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../api/client";
 import { Can } from "../auth/guards";
@@ -248,14 +249,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
       >
         <Link
           to="/"
-          className="flex items-center justify-center border-b shrink-0 overflow-hidden"
-          style={{
-            height: "100px",
-            borderColor: "#F5A800",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
-          }}
+          className="flex items-center border-b shrink-0 px-5"
+          style={{ height: "76px", borderColor: "var(--chrome-border)", color: "var(--chrome-text)" }}
         >
-          <img src="/logo.png" alt="ConCoord" className="w-full h-full object-cover" />
+          <Wordmark size={21} subtitle />
         </Link>
 
         <nav className="flex-1 overflow-y-auto px-3 pb-3">
@@ -265,14 +262,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
               <div key={g.title}>
                 <button
                   onClick={() => toggleGroup(g.title)}
-                  className="w-full flex items-center justify-between mt-4 mb-1.5 px-3 py-2 rounded-[9px] transition-colors hover:brightness-110"
-                  style={{
-                    color: "var(--group-accent)",
-                    background: "var(--group-fill)",
-                    border: "1px solid var(--group-border)",
-                  }}
+                  className="w-full flex items-center justify-between mt-5 mb-1 px-3 py-1.5 transition-colors hover:opacity-80"
+                  style={{ color: "var(--chrome-text-3)" }}
                 >
-                  <span className="flex-1 min-w-0 text-left text-[14px] font-bold leading-snug">{g.title}</span>
+                  <span className="flex-1 min-w-0 text-left text-[11px] font-bold uppercase tracking-[.1em] leading-snug">{g.title}</span>
                   <svg
                     width="13" height="13" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" strokeWidth="2.5"
@@ -315,9 +308,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <div className="flex flex-col min-w-0 app-canvas">
         <header
           className="no-print h-16 flex items-center gap-3 px-5 sticky top-0 z-10 border-b"
-          style={{ background: "var(--chrome)", color: "var(--chrome-text)", borderColor: "var(--chrome-border)" }}
+          style={{ background: "var(--chrome-top)", color: "var(--chrome-text)", borderColor: "var(--chrome-border)" }}
         >
-          <span className="md:hidden text-white font-medium tracking-wide">ConCoord</span>
+          <span className="md:hidden text-white"><Wordmark size={17} /></span>
 
           {projects.length > 0 && (
             <label

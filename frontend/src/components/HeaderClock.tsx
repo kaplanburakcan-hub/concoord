@@ -221,7 +221,6 @@ export default function HeaderClock() {
           className="text-[21px] font-bold tabular-nums"
           style={{
             color: "var(--group-accent)",
-            fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
             letterSpacing: "-0.02em",
           }}
         >

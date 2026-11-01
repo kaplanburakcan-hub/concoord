@@ -87,8 +87,8 @@ export default function RisklerPage() {
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
         <div>
-          <h1 className="text-lg font-display font-bold text-white">Risk Kaydı</h1>
-          <p className="text-xs text-beton-500 mt-0.5">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Risk Kaydı</h1>
+          <p className="mt-1 text-sm text-beton-400">
             Skor = olasılık × etki (1–25). Kayıtlar silinmez; durum değişir.
           </p>
         </div>

@@ -64,7 +64,7 @@ export default function InspectionsPage() {
   return (
     <div className="space-y-4 max-w-3xl">
       <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="text-lg font-display font-bold text-white">İSG Denetimleri</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">İSG Denetimleri</h1>
         <Link to="/isg" className="text-xs text-beton-400 hover:text-beton-200">Bulgular</Link>
         <Link to="/isg/cezalar" className="text-xs text-beton-400 hover:text-beton-200">Cezalar</Link>
         {can("ohs.perform_inspection") && (
@@ -110,7 +110,7 @@ export default function InspectionsPage() {
       {detail && (
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 space-y-2">
           <div className="flex items-center gap-3">
-            <h2 className="text-sm font-semibold text-white">{detail.template_name}</h2>
+            <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">{detail.template_name}</h2>
             {detail.gps_lat != null && detail.gps_lng != null && (
               <span className="text-xs text-beton-400">
                 GPS: {detail.gps_lat.toFixed(5)}, {detail.gps_lng.toFixed(5)}

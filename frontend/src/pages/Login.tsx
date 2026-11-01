@@ -33,23 +33,15 @@ export default function Login() {
     <main className="min-h-screen app-canvas flex items-center justify-center p-6">
       <form
         onSubmit={submit}
-        className="w-full max-w-sm rounded-2xl border border-beton-800 bg-beton-900 p-8"
+        className="w-full max-w-md rounded-xl border border-beton-800 bg-beton-900 p-8"
         style={{ boxShadow: "var(--shadow)" }}
       >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-11 h-11 rounded-xl grid place-items-center text-white font-medium"
-            style={{ background: "linear-gradient(135deg,var(--accent),var(--accent-sky))" }}
-          >
-            İP
-          </div>
-          <div className="leading-tight">
-            <div className="font-display text-lg font-medium text-beton-100">İPKS</div>
-            <div className="text-[11px] text-beton-500">Proje kontrol platformu</div>
-          </div>
-        </div>
+        {/* Baretli görsel logo yalnızca açılış (giriş) ekranında görünür; uygulama
+            içinde rapordaki yazı logosu kullanılır (bkz. components/Wordmark.tsx). */}
+        <img src="/logo.png" alt="ConCoord — İnşaat proje yönetim platformu"
+          className="w-full rounded-xl" style={{ aspectRatio: "1698 / 926", objectFit: "cover", background: "#00142e" }} />
 
-        <h1 className="font-display text-2xl font-medium text-beton-100 mt-7 tracking-tight">Giriş</h1>
+        <h1 className="font-display text-2xl font-bold text-beton-100 mt-7 tracking-tight">Giriş</h1>
         <p className="mt-1 text-beton-400 text-sm">Hesabınızla oturum açın.</p>
 
         <label className="block mt-6 text-sm text-beton-300">E-posta veya kullanıcı adı</label>

@@ -5,6 +5,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { exportXlsx } from "../../lib/exportXlsx";
 import { useProjects } from "../ProjectContext";
 import RetentionPanel from "./RetentionPanel";
+import PaymentPreview from "./PaymentPreview";
 
 type Sub = { id: string; company_name: string };
 type Payment = {
@@ -33,6 +34,8 @@ export default function ProgressPaymentsPage() {
   const [newSub, setNewSub] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Listede seçili hakediş: altında özet bandı, oranlar ve onay zinciri görünür.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const pid = current?.id;
   const canFin = can("progress_payments.view_financials");
 
@@ -51,6 +54,13 @@ export default function ProgressPaymentsPage() {
   }, [pid, subFilter]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Seçim listede yoksa (ilk yükleme, filtre değişimi) ilk satıra döner.
+  useEffect(() => {
+    if (!payments.length) { setSelectedId(null); return; }
+    if (!selectedId || !payments.some((p) => p.id === selectedId)) setSelectedId(payments[0].id);
+  }, [payments, selectedId]);
+  const selected = payments.find((p) => p.id === selectedId);
 
   async function createDraft() {
     if (!newSub) return;
@@ -75,8 +85,8 @@ export default function ProgressPaymentsPage() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-medium text-beton-100 tracking-tight">Hakedişler</h1>
-      <p className="text-sm text-beton-400 mt-1">{current.name} — kümülatif hakediş iş akışı ve kesinti yönetimi.</p>
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Hakedişler</h1>
+      <p className="mt-1 text-sm text-beton-400">{current.name} — kümülatif hakediş iş akışı ve kesinti yönetimi.</p>
       <button onClick={() => exportXlsx("hakedisler", "Hakedişler", [
           { header: "Dönem", value: (p: Payment) => p.period_no },
           { header: "Durum", value: (p: Payment) => STATUS_LABEL[p.status] ?? p.status },
@@ -119,39 +129,54 @@ export default function ProgressPaymentsPage() {
         )}
       </div>
 
-      <table className="mt-4 w-full text-sm">
-        <thead>
-          <tr className="text-beton-400 text-left border-b border-beton-800">
-            <th className="py-2 pr-2">Taşeron</th>
-            <th className="py-2 pr-2">Dönem</th>
-            <th className="py-2 pr-2">Durum</th>
-            {canFin && <th className="py-2 pr-2 text-right">Bu Dönem Brüt</th>}
-            {canFin && <th className="py-2 pr-2 text-right">Net Ödenecek</th>}
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {payments.map((p) => (
-            <tr key={p.id} className="border-b border-beton-800/50 text-beton-200">
-              <td className="py-2 pr-2">{subName(p.subcontractor_id)}</td>
-              <td className="py-2 pr-2">#{p.period_no}</td>
-              <td className="py-2 pr-2">
-                <span className={`rounded px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[p.status] || ""}`}>
-                  {STATUS_LABEL[p.status] || p.status}
-                </span>
-              </td>
-              {canFin && <td className="py-2 pr-2 text-right tabular-nums">{p.gross_this?.toLocaleString("tr-TR")}</td>}
-              {canFin && <td className="py-2 pr-2 text-right tabular-nums">{p.net_payable?.toLocaleString("tr-TR")}</td>}
-              <td className="py-2 text-right">
-                <Link to={`/hakedis/${p.id}`} className="text-emniyet-500 hover:underline text-xs font-semibold">Aç →</Link>
-              </td>
+      <div className="mt-4 rounded-lg border border-beton-800 bg-beton-900 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-beton-400 text-left border-b border-beton-800 text-[11px] uppercase tracking-wider">
+              <th className="py-2 px-3">Taşeron</th>
+              <th className="py-2 px-3">Dönem</th>
+              <th className="py-2 px-3">Durum</th>
+              {canFin && <th className="py-2 px-3 text-right">Bu Dönem Brüt</th>}
+              {canFin && <th className="py-2 px-3 text-right">Net Ödenecek</th>}
+              <th></th>
             </tr>
-          ))}
-          {!payments.length && (
-            <tr><td colSpan={6} className="py-4 text-beton-400 text-center">Hakediş yok.</td></tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {payments.map((p) => (
+              <tr key={p.id} onClick={() => setSelectedId(p.id)}
+                aria-selected={p.id === selectedId}
+                className={"border-b border-beton-800/50 text-beton-200 cursor-pointer " +
+                  (p.id === selectedId ? "bg-emniyet-500/10" : "hover:bg-beton-800/40")}>
+                <td className="py-2 px-3">{subName(p.subcontractor_id)}</td>
+                <td className="py-2 px-3">#{p.period_no}</td>
+                <td className="py-2 px-3">
+                  <span className={`rounded px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[p.status] || ""}`}>
+                    {STATUS_LABEL[p.status] || p.status}
+                  </span>
+                </td>
+                {canFin && <td className="py-2 px-3 text-right tabular-nums">{p.gross_this?.toLocaleString("tr-TR")}</td>}
+                {canFin && <td className="py-2 px-3 text-right tabular-nums">{p.net_payable?.toLocaleString("tr-TR")}</td>}
+                <td className="py-2 px-3 text-right">
+                  <Link to={`/hakedis/${p.id}`} onClick={(e) => e.stopPropagation()}
+                    className="text-emniyet-500 hover:underline text-xs font-semibold">Aç →</Link>
+                </td>
+              </tr>
+            ))}
+            {!payments.length && (
+              <tr><td colSpan={6} className="py-4 text-beton-400 text-center">Hakediş yok.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {selected && (
+        <PaymentPreview
+          key={selected.id}
+          projectId={pid!} paymentId={selected.id}
+          subName={subName(selected.subcontractor_id)}
+          canFin={canFin} onChanged={load}
+        />
+      )}
 
       {/* Faz 11 — teminat (geçici kesinti) bakiyesi ve iade akışı.
           Hakediş listesinin altında: iade kararı, hakediş geçmişiyle

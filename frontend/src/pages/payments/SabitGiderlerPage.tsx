@@ -125,8 +125,8 @@ export default function SabitGiderlerPage() {
     <div className="max-w-4xl mx-auto space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="font-display font-extrabold text-xl text-white">Sabit Giderler</h1>
-          <p className="text-xs text-beton-400 mt-0.5">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Sabit Giderler</h1>
+          <p className="mt-1 text-sm text-beton-400">
             Araç kiraları, endirekt personel, mobilizasyon sarf vb. tekrarlayan aylık giderler —
             her ayın belirlenen gününde nakit akışına çıkış olarak yansır.
           </p>
@@ -192,7 +192,7 @@ export default function SabitGiderlerPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setFormAcik(false)}>
           <div className="bg-beton-900 border border-beton-700 rounded-xl w-full max-w-md mx-4 p-6 space-y-4"
             onClick={(e) => e.stopPropagation()}>
-            <h2 className="font-display font-bold text-white text-lg">Yeni Sabit Gider</h2>
+            <h2 className="font-display text-lg font-bold text-beton-100">Yeni Sabit Gider</h2>
 
             <div>
               <label className="block text-xs text-beton-400 mb-1">Gider Adı *</label>

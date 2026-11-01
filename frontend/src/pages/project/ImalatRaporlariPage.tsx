@@ -69,10 +69,10 @@ export default function ImalatRaporlariPage() {
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-emniyet-500" />
           İmalat raporları
         </p>
-        <h1 className="font-display text-2xl font-medium text-beton-100 mt-1 tracking-tight">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100 mt-1">
           {current.name}
         </h1>
-        <p className="text-sm text-beton-400 mt-1">
+        <p className="mt-1 text-sm text-beton-400">
           Günlük rapor girişi, haftalık özet ve aylık yönetim raporlarına buradan ulaşın.
           Çeyrek yıl ve özel dönem raporları isteğe bağlı oluşturulabilir.
         </p>

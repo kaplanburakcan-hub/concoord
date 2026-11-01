@@ -52,7 +52,7 @@ export function PanelLine({ label, value, bad }: { label: string; value: number;
 export function PanelBadge({ label, tone }: { label: string; tone: "red" | "amber" | "blue" | "muted" }) {
   const style =
     tone === "red" ? { background: "rgba(248,113,113,.15)", color: "#f87171" }
-    : tone === "amber" ? { background: "rgba(245,168,0,.15)", color: "var(--group-accent)" }
+    : tone === "amber" ? { background: "rgba(224,180,0,.15)", color: "var(--group-accent)" }
     : tone === "blue" ? { background: "rgba(96,165,250,.15)", color: "#60a5fa" }
     : { background: "rgb(var(--panel-hairline) / .6)", color: "rgb(var(--panel-ink2))" };
   return <span className="font-mono text-xs px-2 py-1 rounded" style={style}>{label}</span>;

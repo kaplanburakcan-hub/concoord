@@ -48,7 +48,7 @@ export default function GeofencePage() {
   return (
     <div>
       <div className="flex items-center gap-3">
-        <h1 className="font-display text-2xl font-extrabold text-white">Şantiye Sınırları</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Şantiye Sınırları</h1>
         <button
           onClick={() => setShowForm((v) => !v)}
           className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold px-3 py-1.5 text-sm transition"

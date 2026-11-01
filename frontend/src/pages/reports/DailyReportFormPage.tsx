@@ -450,7 +450,7 @@ export default function DailyReportFormPage() {
         <div className="flex gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <h1 className="font-display font-extrabold text-xl text-white">
+              <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">
                 {isNew ? "Yeni Günlük Rapor" : `Günlük Rapor — ${formatDateTR(reportDate)}`}
                 {detail && detail.revision_no > 1 && (
                   <span className="ml-2 text-sm text-emniyet-500">rev {detail.revision_no}</span>
@@ -526,7 +526,7 @@ export default function DailyReportFormPage() {
 
       {/* Yüklenici / Müşavir kadrosu — Proje Paydaşları'ndan otomatik gelir */}
       <div className={section}>
-        <h2 className="font-medium text-white text-sm">Yüklenici ve Müşavir Kadrosu</h2>
+        <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Yüklenici ve Müşavir Kadrosu</h2>
         {staff.length === 0 && (
           <p className="text-xs text-beton-500">
             {readOnly
@@ -575,7 +575,7 @@ export default function DailyReportFormPage() {
       {/* Personel */}
       <div className={section}>
         <div className="flex items-center justify-between gap-2">
-          <h2 className="font-medium text-white text-sm">Personel (işçi / taşeron vb.)</h2>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Personel (işçi / taşeron vb.)</h2>
           {!readOnly && canEdit && (
             <button type="button" onClick={fromPuantaj} disabled={puantajBusy}
               className="rounded border border-beton-700 px-2.5 py-1 text-xs text-emniyet-500 hover:border-emniyet-500 disabled:opacity-50">
@@ -619,7 +619,7 @@ export default function DailyReportFormPage() {
 
       {/* Ekipman */}
       <div className={section}>
-        <h2 className="font-medium text-white text-sm">Ekipman</h2>
+        <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Ekipman</h2>
         {equipment.map((e, i) => (
           <div key={i} className="flex gap-2 items-end">
             <div className="flex-1 grid grid-cols-2 gap-2">
@@ -682,7 +682,7 @@ export default function DailyReportFormPage() {
 
       {/* İmalat girdileri */}
       <div className={section}>
-        <h2 className="font-medium text-white text-sm">İmalat Girdileri</h2>
+        <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">İmalat Girdileri</h2>
         {entries.map((w, i) => (
           <div key={i} className="flex gap-2 items-end">
             <div className="flex-1 grid grid-cols-2 gap-2">
@@ -741,7 +741,7 @@ export default function DailyReportFormPage() {
 
       {/* Şantiye Kasa Harcaması */}
       <div className={section}>
-        <h2 className="font-medium text-white text-sm">Şantiye Kasa Harcaması</h2>
+        <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Şantiye Kasa Harcaması</h2>
         {cashExpenses.map((c, i) => (
           <div key={i} className="flex gap-2 items-end">
             <div className="flex-1 grid grid-cols-2 gap-2">
@@ -797,7 +797,7 @@ export default function DailyReportFormPage() {
 
       {/* Gecikme nedenleri (E16) */}
       <div className={section}>
-        <h2 className="font-medium text-white text-sm">Gecikme nedenleri</h2>
+        <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Gecikme nedenleri</h2>
         <p className="text-xs text-beton-500">Kaybedilen süreyi nedenine göre girin. Gecikme yoksa bu bölüm boş kalır.</p>
         {!readOnly && canEdit && !weatherHintDismissed && !delays.some((d) => d.reason_code === "Hava") &&
           ((precipMM ?? 0) >= RAIN_SUGGEST_MM || (windKph ?? 0) >= WIND_SUGGEST_KPH) && (
@@ -845,7 +845,7 @@ export default function DailyReportFormPage() {
       {/* Depo-Stok Özeti */}
       {ctx && (
         <div className={section}>
-          <h2 className="font-medium text-white text-sm">Depo-Stok Özeti</h2>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Depo-Stok Özeti</h2>
           <p className="text-xs text-beton-500">{formatDateTR(reportDate)} tarihli depo hareketleri</p>
           {ctx.warehouse_delta.length === 0 ? (
             <p className="text-xs text-beton-500 italic">Bu tarih için depo hareketi yok.</p>
@@ -870,7 +870,7 @@ export default function DailyReportFormPage() {
       {/* Bekleyen Aktiviteler */}
       {ctx && (ctx.pending_mars > 0 || ctx.pending_pos > 0 || ctx.open_tasks > 0) && (
         <div className={section}>
-          <h2 className="font-medium text-white text-sm">Bekleyen Aktiviteler</h2>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Bekleyen Aktiviteler</h2>
           <div className="flex flex-wrap gap-3">
             {ctx.pending_mars > 0 && (
               <div className="rounded-md border border-beton-700 bg-beton-950 px-3 py-2 text-center min-w-[90px]">

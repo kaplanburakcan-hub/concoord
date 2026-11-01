@@ -194,8 +194,8 @@ export default function ProcurementPlanPage() {
           Excel indir
         </button>
         <div>
-          <h1 className="text-lg font-display font-medium text-beton-100">Tedarik Planı</h1>
-          <p className="text-xs text-beton-500 mt-0.5">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Tedarik Planı</h1>
+          <p className="mt-1 text-sm text-beton-400">
             Satın alma sürecinden bağımsız, zorunlu olmayan planlama/takip referansı.
           </p>
         </div>
@@ -360,7 +360,7 @@ export default function ProcurementPlanPage() {
       {confirmDeleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setConfirmDeleteId(null)}>
           <div className="bg-beton-900 border border-beton-700 rounded-xl w-full max-w-sm mx-4 p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h2 className="font-display font-bold text-white text-lg">Kalemi Sil</h2>
+            <h2 className="font-display text-lg font-bold text-beton-100">Kalemi Sil</h2>
             <p className="text-sm text-beton-300">Bu tedarik planı kalemini silmek istediğinize emin misiniz?</p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDeleteId(null)} className="flex-1 rounded-md border border-beton-700 px-4 py-2 text-sm text-beton-300 hover:bg-beton-800">Vazgeç</button>

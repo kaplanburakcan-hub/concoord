@@ -111,7 +111,7 @@ function MeetingDetail({ m, onClose }: { m: Meeting; onClose: () => void }) {
               <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${turuMeta.cls}`}>{turuMeta.label}</span>
               <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${durumMeta.cls}`}>{durumMeta.label}</span>
             </div>
-            <h2 className="text-lg font-bold text-beton-100">{m.baslik}</h2>
+            <h2 className="font-display text-lg font-bold text-beton-100">{m.baslik}</h2>
             <p className="text-sm text-beton-400 mt-0.5">
               {fmtDate(m.tarih)}
               {m.baslangic_saati && ` · ${m.baslangic_saati}`}
@@ -382,8 +382,8 @@ export default function ToplantiPage() {
       {/* Başlık */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-beton-100">Toplantı Tutanakları</h1>
-          <p className="text-sm text-beton-400 mt-0.5">{proj.name} — PMP İletişim Yönetimi</p>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Toplantı Tutanakları</h1>
+          <p className="mt-1 text-sm text-beton-400">{proj.name} — PMP İletişim Yönetimi</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}

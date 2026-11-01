@@ -80,7 +80,7 @@ export default function MonthlyReportsPage() {
       <p className="font-mono text-xs tracking-[0.3em] text-emniyet-500 uppercase">
         Faz 9 · Aylık Yönetim Raporu
       </p>
-      <h1 className="font-display text-3xl font-extrabold text-white mt-2">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100 mt-2">
         Aylık Raporlar — {current.code}
       </h1>
       <p className="mt-1 text-sm text-beton-400">
@@ -215,7 +215,7 @@ function ThresholdEditor({ projectId }: { projectId: string }) {
   if (!s) return null;
   return (
     <div className="mt-6 rounded-lg border border-beton-800 bg-beton-900 p-4">
-      <h2 className="text-sm font-semibold text-white">Otomatik uyarı eşikleri</h2>
+      <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100">Otomatik uyarı eşikleri</h2>
       <p className="mt-1 text-xs text-beton-400">
         İhlalde proje yöneticilerine bildirim gider (aynı uyarı ay içinde bir kez).
       </p>

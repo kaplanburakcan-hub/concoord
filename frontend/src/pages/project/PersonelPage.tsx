@@ -94,8 +94,8 @@ export default function PersonelPage() {
     <div className="p-6 space-y-5 max-w-5xl mx-auto">
       {/* Başlık */}
       <div>
-        <h1 className="text-xl font-bold text-beton-100">Personel Yönetimi</h1>
-        <p className="text-sm text-beton-400 mt-0.5">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Personel Yönetimi</h1>
+        <p className="mt-1 text-sm text-beton-400">
           {proj.name} — Kayıtlı personel: {personeller.length} kişi
         </p>
       </div>
@@ -123,7 +123,7 @@ export default function PersonelPage() {
       {/* Görev dağılımı */}
       {Object.keys(gorevDagilim).length > 0 && (
         <div className="rounded-xl border border-beton-800 bg-beton-900 p-4">
-          <h2 className="text-sm font-semibold text-beton-100 mb-3">Aktif Personel — Görev Dağılımı</h2>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wide text-beton-100 mb-3">Aktif Personel — Görev Dağılımı</h2>
           <div className="flex flex-wrap gap-2">
             {Object.entries(gorevDagilim)
               .sort((a, b) => b[1] - a[1])

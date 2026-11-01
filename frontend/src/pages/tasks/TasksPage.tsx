@@ -109,8 +109,8 @@ export default function TasksPage() {
     <div>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-extrabold text-white">Görevler</h1>
-          <p className="text-sm text-beton-400 mt-1">{current.name} — Kanban panosu. Kartları sürükleyerek taşıyın.</p>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Görevler</h1>
+          <p className="mt-1 text-sm text-beton-400">{current.name} — Kanban panosu. Kartları sürükleyerek taşıyın.</p>
         </div>
         {can("tasks.create") && (
           <button
@@ -542,7 +542,7 @@ function Overlay({ title, children, onClose }: {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold text-white">{title}</h2>
+          <h2 className="font-display text-lg font-bold text-beton-100">{title}</h2>
           <button onClick={onClose} className="text-beton-400 hover:text-white">✕</button>
         </div>
         <div className="mt-3">{children}</div>

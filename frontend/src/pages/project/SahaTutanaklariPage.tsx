@@ -353,7 +353,7 @@ export default function SahaTutanaklariPage() {
     <div className="max-w-5xl mx-auto space-y-4">
       {/* Başlık */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="font-display font-extrabold text-xl text-white">Saha Tutanakları</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Saha Tutanakları</h1>
         <button
           onClick={() => setFormAcik(true)}
           className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-beton-950 hover:brightness-110"
@@ -427,7 +427,7 @@ export default function SahaTutanaklariPage() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="text-lg">{TIP_ICON[secili.tip]}</div>
-                <h2 className="font-bold text-white mt-1">{secili.baslik}</h2>
+                <h2 className="font-display text-lg font-bold text-beton-100 mt-1">{secili.baslik}</h2>
                 <p className="text-xs text-beton-400">{TIP_LABEL[secili.tip]} · {secili.tarih}</p>
               </div>
               <span className={`rounded-full border px-2 py-0.5 text-xs ${DURUM_STYLE[secili.durum]}`}>
@@ -545,7 +545,7 @@ export default function SahaTutanaklariPage() {
           <div className="bg-beton-900 border border-beton-700 rounded-xl w-full max-w-lg mx-4 p-6 space-y-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="font-display font-bold text-white text-lg">Yeni Tutanak</h2>
+            <h2 className="font-display text-lg font-bold text-beton-100">Yeni Tutanak</h2>
 
             {/* Tip */}
             <div>
@@ -763,7 +763,7 @@ export default function SahaTutanaklariPage() {
       {onayModal && secili && bekleyenOnay !== -1 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="bg-beton-900 border border-beton-700 rounded-xl w-full max-w-md mx-4 p-6 space-y-4">
-            <h2 className="font-bold text-white">Onay: {secili.onay_zinciri[bekleyenOnay].rol}</h2>
+            <h2 className="font-display text-lg font-bold text-beton-100">Onay:{secili.onay_zinciri[bekleyenOnay].rol}</h2>
             <p className="text-sm text-beton-300">Tutanak: <span className="text-white">{secili.baslik}</span></p>
             <div>
               <label className="block text-xs text-beton-400 mb-1">Not (opsiyonel)</label>

@@ -307,8 +307,8 @@ export default function SigortaPolicelerPage() {
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-start justify-between mb-5">
         <div>
-          <h1 className="text-xl font-semibold text-beton-100">Sigorta ve Poliçeler</h1>
-          <p className="text-beton-400 text-sm mt-0.5">{current.name}</p>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Sigorta ve Poliçeler</h1>
+          <p className="mt-1 text-sm text-beton-400">{current.name}</p>
         </div>
         {canEdit && (
           <button

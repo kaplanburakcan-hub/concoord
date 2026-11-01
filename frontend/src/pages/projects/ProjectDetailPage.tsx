@@ -94,7 +94,7 @@ export default function ProjectDetailPage() {
       <div className="flex items-center gap-3">
         <Link to="/projects" className="text-beton-400 hover:text-beton-200 text-sm">← Projeler</Link>
       </div>
-      <h1 className="mt-1 font-display text-2xl font-extrabold text-white">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100 mt-1">
         <span className="font-mono text-emniyet-500 text-lg mr-2">{project.code}</span>
         {project.name}
       </h1>
@@ -102,7 +102,7 @@ export default function ProjectDetailPage() {
       <Kunye project={project} canEdit={canEdit} onSaved={async (p) => { setProject(p); await reloadProjects(); }} />
 
       <div className="mt-8 flex items-center gap-3">
-        <h2 className="font-display text-lg font-bold text-white">Milestone'lar</h2>
+        <h2 className="font-display text-lg font-bold text-beton-100">Milestone'lar</h2>
       </div>
       <MilestoneList
         projectId={id}

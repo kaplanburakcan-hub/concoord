@@ -29,10 +29,11 @@ export default {
         },
       },
       fontFamily: {
-        // Tüm roller Roboto (Google Fonts, index.html'de yüklenir).
-        display: ["'Roboto'", "system-ui", "sans-serif"],
-        body: ["'Roboto'", "system-ui", "sans-serif"],
-        mono: ["'Roboto'", "system-ui", "sans-serif"],
+        // Tüm roller hakediş raporuyla aynı yazı tipi: Liberation Sans
+        // (index.css'te @font-face). Arial/Helvetica ile ölçü uyumludur.
+        display: ["'Liberation Sans'", "Arial", "Helvetica", "sans-serif"],
+        body: ["'Liberation Sans'", "Arial", "Helvetica", "sans-serif"],
+        mono: ["'Liberation Sans'", "Arial", "Helvetica", "sans-serif"],
       },
     },
   },
