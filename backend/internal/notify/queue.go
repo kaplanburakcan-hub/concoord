@@ -30,17 +30,24 @@ func Enqueue(ctx context.Context, pool *pgxpool.Pool, kind string, payload json.
 
 // Dequeue — hazır tek işi atomik olarak 'running'e çeker. İş yoksa (nil, nil).
 func Dequeue(ctx context.Context, pool *pgxpool.Pool) (*Job, error) {
+	return DequeueKinds(ctx, pool, nil)
+}
+
+// DequeueKinds — Dequeue gibi, ama yalnızca verilen türleri çeker (boş = hepsi).
+// API sürecinde çalışan PDF döngüsü e-posta/SMS işlerine dokunmaz.
+func DequeueKinds(ctx context.Context, pool *pgxpool.Pool, kinds []string) (*Job, error) {
 	var j Job
 	err := pool.QueryRow(ctx, `
 		UPDATE job_queue SET status='running', attempts=attempts+1, updated_at=now()
 		WHERE id = (
 			SELECT id FROM job_queue
 			WHERE status='pending' AND run_at <= now()
+			  AND (cardinality($1::text[]) = 0 OR kind = ANY($1::text[]))
 			ORDER BY run_at
 			FOR UPDATE SKIP LOCKED
 			LIMIT 1
 		)
-		RETURNING id, kind, payload, attempts, max_attempts`).
+		RETURNING id, kind, payload, attempts, max_attempts`, kinds).
 		Scan(&j.ID, &j.Kind, &j.Payload, &j.Attempts, &j.MaxAtt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

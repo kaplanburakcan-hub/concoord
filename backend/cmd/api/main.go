@@ -17,8 +17,10 @@ import (
 	"github.com/ipks/ipks/backend/internal/config"
 	"github.com/ipks/ipks/backend/internal/db"
 	"github.com/ipks/ipks/backend/internal/logger"
+	"github.com/ipks/ipks/backend/internal/pdfjobs"
 	"github.com/ipks/ipks/backend/internal/seed"
 	"github.com/ipks/ipks/backend/internal/server"
+	"github.com/ipks/ipks/backend/internal/storage"
 )
 
 func main() {
@@ -53,6 +55,17 @@ func main() {
 		log.Info("seed tamamlandı")
 		return
 	}
+
+	// Render'da ayrı worker yok: rapor PDF'leri API içinde üretilir.
+	go pdfjobs.Run(ctx, pool, storage.New(storage.Config{
+		Endpoint:       cfg.S3Endpoint,
+		PublicEndpoint: cfg.S3PublicEndpoint,
+		AccessKey:      cfg.S3AccessKey,
+		SecretKey:      cfg.S3SecretKey,
+		Bucket:         cfg.S3Bucket,
+		Region:         cfg.S3Region,
+		UseSSL:         cfg.S3UseSSL,
+	}), log)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
