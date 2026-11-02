@@ -236,5 +236,6 @@ export async function apiDownload(path: string, fallbackName: string, retry = fa
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+  // Hemen iptal etmek bazı tarayıcılarda indirmeyi başlamadan keser.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

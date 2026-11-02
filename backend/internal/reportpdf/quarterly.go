@@ -231,8 +231,13 @@ func buildQuarterly(in PeriodData) []byte {
 			}
 		}
 		n := 0
-		card(n, "Fiziki hedef", fmt.Sprintf("%%%s → %%%s", Num(in.Next.ProgressFrom, 0), Num(in.Next.ProgressTo, 0)),
-			fmt.Sprintf("çeyrekte +%s puan (plana göre)", Num(in.Next.ProgressTo-in.Next.ProgressFrom, 0)))
+		if in.Next.ProgressTo > in.Next.ProgressFrom {
+			card(n, "Fiziki hedef", fmt.Sprintf("%%%s → %%%s", Num(in.Next.ProgressFrom, 0), Num(in.Next.ProgressTo, 0)),
+				fmt.Sprintf("çeyrekte +%s puan (plana göre)", Num(in.Next.ProgressTo-in.Next.ProgressFrom, 0)))
+		} else {
+			// Plan bu çeyrekten önce bitmiş: gerileyen bir hedef göstermek yanıltıcı olur.
+			card(n, "Fiziki hedef", "%"+Num(in.Next.ProgressFrom, 0)+" (mevcut)", "bu çeyrek için planlı ilerleme yok")
+		}
 		n++
 		if len(in.Next.Milestones) > 0 {
 			ms := in.Next.Milestones[0]

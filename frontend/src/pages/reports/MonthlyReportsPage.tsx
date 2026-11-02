@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { api, apiDownload } from "../../api/client";
 import { Can } from "../../auth/guards";
 import { useProjects } from "../../projects/ProjectContext";
+import PdfPreviewModal from "../../components/PdfPreviewModal";
 
 // Faz 9 — Aylık Yönetim Raporu (EVM + finansal + İSG + tedarik).
 // Haftalık raporla aynı akış: snapshot API'de dondurulur, PDF worker'da
@@ -41,8 +42,14 @@ function periodText(m: Monthly): string {
   return `${m.year}-${String(m.month).padStart(2, "0")}`;
 }
 
+function pdfName(m: Monthly): string {
+  const p = m.kind === "Quarterly" ? "ceyrek" : m.kind === "Custom" ? "donem" : "aylik";
+  return `${p}-rapor-${m.period_start}_${m.period_end}.pdf`;
+}
+
 export default function MonthlyReportsPage() {
   const { current } = useProjects();
+  const [preview, setPreview] = useState<Monthly | null>(null);
   const [items, setItems] = useState<Monthly[] | null>(null);
   const [params] = useSearchParams();
   const initialKind = params.get("tur");
@@ -250,17 +257,25 @@ export default function MonthlyReportsPage() {
                 </td>
                 <td className="px-4 py-2 text-right">
                   {m.status === "Ready" && m.has_pdf ? (
-                    <button
-                      onClick={() =>
-                        apiDownload(
-                          `/projects/${current.id}/monthly-reports/${m.id}/download`,
-                          `${m.kind === "Quarterly" ? "ceyrek" : m.kind === "Custom" ? "donem" : "aylik"}-rapor-${m.period_start}_${m.period_end}.pdf`
-                        )
-                      }
-                      className="text-emniyet-500 hover:underline text-sm"
-                    >
-                      İndir
-                    </button>
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => setPreview(m)}
+                        className="text-emniyet-500 hover:underline text-sm"
+                      >
+                        Görüntüle
+                      </button>
+                      <button
+                        onClick={() =>
+                          apiDownload(
+                            `/projects/${current.id}/monthly-reports/${m.id}/download`,
+                            pdfName(m)
+                          ).catch(() => setErr("İndirme başarısız."))
+                        }
+                        className="text-emniyet-500 hover:underline text-sm"
+                      >
+                        İndir
+                      </button>
+                    </div>
                   ) : (
                     <span className="text-beton-600 text-xs">—</span>
                   )}
@@ -270,6 +285,14 @@ export default function MonthlyReportsPage() {
           </tbody>
         </table>
       </div>
+
+      <PdfPreviewModal
+        open={!!preview}
+        onClose={() => setPreview(null)}
+        title={preview ? `${KIND_LABEL[preview.kind] ?? "Aylık"} rapor — ${current.code} (${periodText(preview)})` : ""}
+        fetchPath={preview ? `/projects/${current.id}/monthly-reports/${preview.id}/download` : ""}
+        downloadName={preview ? pdfName(preview) : "rapor.pdf"}
+      />
 
       <Can perm="projects.edit">
         <ThresholdEditor projectId={current.id} />
