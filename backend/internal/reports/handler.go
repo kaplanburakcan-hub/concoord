@@ -35,6 +35,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/audit"
 	"github.com/ipks/ipks/backend/internal/auth"
 	"github.com/ipks/ipks/backend/internal/httpx"
+	"github.com/ipks/ipks/backend/internal/reportpdf"
 	"github.com/ipks/ipks/backend/internal/notify"
 	"github.com/ipks/ipks/backend/internal/rbac"
 	"github.com/ipks/ipks/backend/internal/storage"
@@ -502,7 +503,7 @@ func (h *Handler) DailyPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pdf := BuildDailyPDF(projectName, projectCode, d)
+	pdf := reportpdf.BuildDaily(h.buildDailyData(r.Context(), pid, projectName, projectCode, d))
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="gunluk-rapor-%s.pdf"`, d.ReportDate))
 	w.WriteHeader(http.StatusOK)

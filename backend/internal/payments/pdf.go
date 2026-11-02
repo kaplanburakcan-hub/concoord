@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/ipks/ipks/backend/internal/pdfkit"
 )
 
 // PDFData — özet PDF'i için düzleştirilmiş görünüm modeli.
@@ -496,15 +498,15 @@ func (p *pdfDoc) contHeader(footer string, d PDFData) float64 {
 type pdfDoc struct {
 	pages        []*bytes.Buffer
 	cur          *bytes.Buffer
-	reg, boldFnt *ttfFont
+	reg, boldFnt *pdfkit.Font
 }
 
 func newPdfDoc() *pdfDoc {
-	r, b := newFontPair()
+	r, b := pdfkit.NewFontPair()
 	return &pdfDoc{reg: r, boldFnt: b}
 }
 
-func (p *pdfDoc) font(bold bool) *ttfFont {
+func (p *pdfDoc) font(bold bool) *pdfkit.Font {
 	if bold {
 		return p.boldFnt
 	}
@@ -539,7 +541,7 @@ func (p *pdfDoc) text(x, y float64, s string, bold bool, size float64, c rgb) {
 		font = "F2"
 	}
 	fmt.Fprintf(p.cur, "BT /%s %.2f Tf %.3f %.3f %.3f rg %.2f %.2f Td %s Tj ET\n",
-		font, size, c.r, c.g, c.b, x, pgH-y, p.font(bold).hex(s))
+		font, size, c.r, c.g, c.b, x, pgH-y, p.font(bold).Hex(s))
 }
 
 func (p *pdfDoc) textR(xRight, y float64, s string, bold bool, size float64, c rgb) {
@@ -547,7 +549,7 @@ func (p *pdfDoc) textR(xRight, y float64, s string, bold bool, size float64, c r
 }
 
 func (p *pdfDoc) width(s string, bold bool, size float64) float64 {
-	return p.font(bold).width(s, size)
+	return p.font(bold).Width(s, size)
 }
 
 // fit — metni verilen genişliğe sığacak şekilde sonuna "…" ekleyerek kısaltır.
@@ -580,8 +582,8 @@ func (p *pdfDoc) finish(footer string) []byte {
 	objs = append(objs, "") // 0 kullanılmaz
 	objs = append(objs, "<< /Type /Catalog /Pages 2 0 R >>")
 	objs = append(objs, "") // 2: Pages, sonra doldurulur
-	objs = append(objs, p.reg.objects(3, "LiberationSans")...)
-	objs = append(objs, p.boldFnt.objects(8, "LiberationSans-Bold")...)
+	objs = append(objs, p.reg.Objects(3, "LiberationSans")...)
+	objs = append(objs, p.boldFnt.Objects(8, "LiberationSans-Bold")...)
 	var kids []string
 	for _, pg := range p.pages {
 		content := pg.String()

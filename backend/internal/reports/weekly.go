@@ -35,6 +35,7 @@ import (
 	"github.com/ipks/ipks/backend/internal/audit"
 	"github.com/ipks/ipks/backend/internal/httpx"
 	"github.com/ipks/ipks/backend/internal/notify"
+	"github.com/ipks/ipks/backend/internal/reportphotos"
 	"github.com/ipks/ipks/backend/internal/storage"
 )
 
@@ -61,6 +62,38 @@ type SnapDay struct {
 	Manpower      []manpowerDTO  `json:"manpower,omitempty"`
 	Equipment     []equipmentDTO `json:"equipment,omitempty"`
 	WorkEntries   []workEntryDTO `json:"work_entries,omitempty"`
+	DelayHours    float64        `json:"delay_hours,omitempty"`
+}
+
+// SnapPPC — planlanan tamamlanma yüzdesi (PPC) ham sayıları: haftada bitmesi
+// planlanan iş programı kalemleri ve bunlardan tamamlananlar.
+type SnapPPC struct {
+	Planned   int `json:"planned"`
+	Completed int `json:"completed"`
+}
+
+// SnapLook — ileri bakış (önümüzdeki 3 hafta) için iş programı kalemi.
+type SnapLook struct {
+	Name   string `json:"name"`
+	Start  string `json:"start"`
+	Finish string `json:"finish"`
+}
+
+// SnapTask — açık görev (kritik konular tablosu).
+type SnapTask struct {
+	Title    string `json:"title"`
+	Assignee string `json:"assignee,omitempty"`
+	Due      string `json:"due,omitempty"`
+	Status   string `json:"status"`
+	Priority string `json:"priority"`
+}
+
+// SnapPhoto — haftaya ait proje fotoğrafı (baytlar PDF anında depodan okunur).
+type SnapPhoto struct {
+	Key      string `json:"key"`
+	Title    string `json:"title"`
+	TakenAt  string `json:"taken_at"` // RFC 3339
+	Category string `json:"category,omitempty"`
 }
 
 type SnapPayment struct {
@@ -184,6 +217,14 @@ type Snapshot struct {
 
 	// İSG özeti Faz 8'de eklenir:
 	OHSNote string `json:"ohs_note,omitempty"`
+
+	// Hafta panosu (v2 düzen): gecikme saati, PPC, ileri bakış, kritik görevler,
+	// fotoğraflar. Eski snapshot'larda yoktur; PDF yoklukta bölümü boş durumla çizer.
+	DelayHours    float64     `json:"delay_hours,omitempty"`
+	PPC           *SnapPPC    `json:"ppc,omitempty"`
+	LookAhead     []SnapLook  `json:"look_ahead,omitempty"`
+	CriticalTasks []SnapTask  `json:"critical_tasks,omitempty"`
+	Photos        []SnapPhoto `json:"photos,omitempty"`
 }
 
 // buildSnapshot — haftanın tüm verisini derler. Günler için TARİH BAŞINA EN
@@ -258,6 +299,10 @@ func (h *Handler) buildSnapshot(ctx context.Context, pid uuid.UUID, start, end t
 		for _, m := range d.Manpower {
 			sd.ManpowerTotal += m.Headcount
 		}
+		for _, c := range d.DelayCauses {
+			sd.DelayHours += c.Hours
+		}
+		sn.DelayHours += sd.DelayHours
 		sn.Days = append(sn.Days, sd)
 
 		sn.Totals.DaysReported++
@@ -541,7 +586,79 @@ func (h *Handler) buildSnapshot(ctx context.Context, pid uuid.UUID, start, end t
 	ceRows.Close()
 
 	sn.OHSNote = "İSG özeti Faz 8 ile eklenecektir."
+	h.addBoardData(ctx, pid, sn)
 	return sn, nil
+}
+
+// addBoardData — hafta panosunun iş programı, görev ve fotoğraf verisi. Bu
+// bölümler isteğe bağlıdır; bir sorgu hata verirse ilgili alan boş kalır ve rapor
+// yine üretilir.
+func (h *Handler) addBoardData(ctx context.Context, pid uuid.UUID, sn *Snapshot) {
+	start, _ := time.Parse("2006-01-02", sn.PeriodStart)
+	end, _ := time.Parse("2006-01-02", sn.PeriodEnd)
+
+	// PPC: haftada bitmesi planlanan (baseline) iş programı kalemleri.
+	var ppc SnapPPC
+	if err := h.pool.QueryRow(ctx, `
+		SELECT count(*), count(*) FILTER (WHERE actual_finish IS NOT NULL AND actual_finish <= $3::date)
+		FROM schedule_items
+		WHERE project_id=$1 AND deleted_at IS NULL AND is_milestone = false
+		  AND baseline_finish BETWEEN $2::date AND $3::date`,
+		pid, sn.PeriodStart, sn.PeriodEnd).Scan(&ppc.Planned, &ppc.Completed); err == nil && ppc.Planned > 0 {
+		sn.PPC = &ppc
+	}
+
+	// İleri bakış: bitmemiş, önümüzdeki 21 gün içinde süren kalemler.
+	next := end.AddDate(0, 0, 1)
+	horizon := end.AddDate(0, 0, 21)
+	if rows, err := h.pool.Query(ctx, `
+		SELECT name, to_char(COALESCE(baseline_start, baseline_finish),'YYYY-MM-DD'),
+		       to_char(baseline_finish,'YYYY-MM-DD')
+		FROM schedule_items
+		WHERE project_id=$1 AND deleted_at IS NULL AND is_milestone = false
+		  AND baseline_finish IS NOT NULL AND actual_finish IS NULL
+		  AND COALESCE(baseline_start, baseline_finish) <= $3::date
+		  AND baseline_finish >= $2::date
+		ORDER BY COALESCE(baseline_start, baseline_finish), baseline_finish
+		LIMIT 6`, pid, next, horizon); err == nil {
+		for rows.Next() {
+			var l SnapLook
+			if err := rows.Scan(&l.Name, &l.Start, &l.Finish); err == nil {
+				sn.LookAhead = append(sn.LookAhead, l)
+			}
+		}
+		rows.Close()
+	}
+
+	// Kritik konular: açık görevler (öncelik, termin sırasıyla).
+	if rows, err := h.pool.Query(ctx, `
+		SELECT t.title,
+		       COALESCE((SELECT string_agg(u.full_name, ', ' ORDER BY u.full_name)
+		                 FROM task_assignees ta JOIN users u ON u.id = ta.user_id
+		                 WHERE ta.task_id = t.id), ''),
+		       COALESCE(to_char(t.due_date,'YYYY-MM-DD'),''), t.status, t.priority
+		FROM tasks t
+		WHERE t.project_id=$1 AND t.deleted_at IS NULL AND t.status <> 'Done'
+		ORDER BY CASE t.priority WHEN 'Urgent' THEN 0 WHEN 'High' THEN 1 WHEN 'Normal' THEN 2 ELSE 3 END,
+		         t.due_date NULLS LAST, t.created_at
+		LIMIT 5`, pid); err == nil {
+		for rows.Next() {
+			var t SnapTask
+			if err := rows.Scan(&t.Title, &t.Assignee, &t.Due, &t.Status, &t.Priority); err == nil {
+				sn.CriticalTasks = append(sn.CriticalTasks, t)
+			}
+		}
+		rows.Close()
+	}
+
+	// Fotoğraflar: haftada Fotoğraflar sayfasına yüklenenler.
+	if refs, err := reportphotos.List(ctx, h.pool, pid, start, end, 10); err == nil {
+		for _, r := range refs {
+			sn.Photos = append(sn.Photos, SnapPhoto{
+				Key: r.Key, Title: r.Title, TakenAt: r.TakenAt.Format(time.RFC3339), Category: r.Category,
+			})
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -734,7 +851,7 @@ func (h *Handler) DownloadWeekly(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pdf := BuildWeeklyPDF(sn)
+	pdf := buildWeeklyPDF(r.Context(), h.store, sn)
 	fname := fmt.Sprintf("haftalik-rapor-%s-H%02d.pdf", sn.ProjectCode, sn.WeekNo)
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename=%q`, fname))
@@ -793,7 +910,7 @@ func ProcessWeeklyPDF(ctx context.Context, pool *pgxpool.Pool, store *storage.Cl
 		return nil
 	}
 
-	pdf := BuildWeeklyPDF(sn)
+	pdf := buildWeeklyPDF(ctx, store, sn)
 	key := fmt.Sprintf("project/%s/reports/weekly/%s.pdf", pid, id)
 	sha := sha256Hex(pdf)
 	if err := store.PutObject(ctx, key, "application/pdf",

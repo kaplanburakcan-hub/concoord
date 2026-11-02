@@ -107,6 +107,15 @@ type MonthlySnapshot struct {
 		POsOverdue   int `json:"pos_overdue"`
 		PRsPending   int `json:"prs_pending"`
 	} `json:"procurement"`
+
+	// v2 düzen bölümleri (period_extra.go) — eski snapshot'larda yoktur.
+	Thresholds *Thresholds     `json:"thresholds,omitempty"`
+	Attention  []AttentionItem `json:"attention,omitempty"`
+	Months     []MonthBrief    `json:"months,omitempty"`    // yalnızca çeyrek
+	Risks      []RiskBrief     `json:"risks,omitempty"`     // yalnızca çeyrek
+	Decisions  []DecisionBrief `json:"decisions,omitempty"` // yalnızca çeyrek
+	Next       *NextBrief      `json:"next,omitempty"`      // yalnızca çeyrek
+	Photos     []PhotoRef      `json:"photos,omitempty"`
 }
 
 // MonthlyDelayCause — bir gecikme nedeninin ay içindeki toplamı.
@@ -313,6 +322,7 @@ func (h *Handler) buildMonthlySnapshot(ctx context.Context, pid uuid.UUID, kind 
 	if err := drows.Err(); err != nil {
 		return nil, err
 	}
+	h.addExtras(ctx, pid, sn, start, end)
 	return sn, nil
 }
 
@@ -627,7 +637,7 @@ func ProcessMonthlyPDF(ctx context.Context, pool *pgxpool.Pool, store *storage.C
 		return nil
 	}
 
-	pdf := BuildMonthlyPDF(sn)
+	pdf := buildPeriodPDF(ctx, store, sn)
 	key := fmt.Sprintf("project/%s/reports/monthly/%s.pdf", pid, id)
 	sha := sha256Hex(pdf)
 	if err := store.PutObject(ctx, key, "application/pdf",

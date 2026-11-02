@@ -2,7 +2,7 @@ package reports
 
 import (
 	"bytes"
-	"strings"
+	"context"
 	"testing"
 	"time"
 )
@@ -51,8 +51,8 @@ func TestValidateDaily(t *testing.T) {
 }
 
 // TestWeeklyPDFFromSnapshot — kabul kriteri: PDF rakamları snapshot'tan
-// doğrulanabilir. PDF'e giren toplamların snapshot değerleriyle birebir aynı
-// metin olarak yer aldığını doğrular; ayrıca çıktı geçerli bir PDF iskeletidir.
+// doğrulanabilir. PDF girdisi (weeklyPDFData) snapshot değerlerini birebir taşır;
+// çıktı geçerli bir PDF iskeletidir.
 func TestWeeklyPDFFromSnapshot(t *testing.T) {
 	sub := "Yılmaz İnşaat"
 	sn := Snapshot{
@@ -60,7 +60,7 @@ func TestWeeklyPDFFromSnapshot(t *testing.T) {
 		ProjectName: "Kule Ofis", ProjectCode: "PRJ-01",
 		WeekNo: 27, PeriodStart: "2026-06-29", PeriodEnd: "2026-07-05",
 		Days: []SnapDay{
-			{Date: "2026-06-29", RevisionNo: 1, Status: "Submitted", ManpowerTotal: 14,
+			{Date: "2026-06-29", RevisionNo: 1, Status: "Submitted", ManpowerTotal: 14, WeatherCond: "Açık",
 				Manpower:  []manpowerDTO{{Trade: "Demirci", Headcount: 14, SubcontractorName: &sub}},
 				Equipment: []equipmentDTO{{EquipmentName: "Beton pompası", Count: 2, WorkingHours: f(7.5)}},
 				WorkEntries: []workEntryDTO{{Description: "A blok temel demir bağlama", Qty: f(1250)}},
@@ -68,29 +68,26 @@ func TestWeeklyPDFFromSnapshot(t *testing.T) {
 			{Date: "2026-06-30", RevisionNo: 2, Status: "Submitted", ManpowerTotal: 9},
 		},
 		Totals: SnapTotals{DaysReported: 2, ManpowerDays: 23, EquipmentHours: 7.5, WorkEntryCount: 1},
+		DelayHours: 3.5, PPC: &SnapPPC{Planned: 10, Completed: 7},
 		PendingPayments: []SnapPayment{{Subcontractor: "Yılmaz İnşaat", PeriodNo: 3, Status: "Submitted"}},
 		OpenTasks: 5, TasksDueWeek: 2, PendingMARs: 1,
 	}
 
-	pdf := BuildWeeklyPDF(sn)
-	if !bytes.HasPrefix(pdf, []byte("%PDF-1.4")) || !bytes.HasSuffix(pdf, []byte("%%EOF")) {
-		t.Fatal("geçerli PDF iskeleti üretilmedi")
+	d := weeklyPDFData(sn)
+	if d.WeekNo != 27 || d.DaysReported != 2 || d.ManpowerDays != 23 || d.EquipHours != 7.5 ||
+		d.DelayHours != 3.5 || d.PPCPlanned != 10 || d.PPCCompleted != 7 {
+		t.Fatalf("snapshot değerleri PDF girdisine taşınmadı: %+v", d)
+	}
+	if len(d.Days) != 7 || !d.Days[0].Reported || d.Days[0].Manpower != 14 || d.Days[6].Reported {
+		t.Fatalf("gün gün dağılım hatalı: %+v", d.Days)
+	}
+	if len(d.PendingPayments) != 1 || d.PendingPayments[0] != "Yılmaz İnşaat #3" {
+		t.Fatalf("bekleyen hakediş hatalı: %v", d.PendingPayments)
 	}
 
-	s := string(pdf)
-	for _, want := range []string{
-		"HAFTALIK ILERLEME RAPORU",
-		"PRJ-01",
-		"Hafta: 27",
-		itoa(sn.Totals.DaysReported),
-		itoa(sn.Totals.ManpowerDays),
-		num(sn.Totals.EquipmentHours, 1), // 7.5
-		"rev 2",                          // revizyonlu gün görünür
-		"Yilmaz Insaat / Donem 3",        // asciiTR uygulanmış bekleyen hakediş
-	} {
-		if !strings.Contains(s, want) {
-			t.Errorf("PDF içinde snapshot değeri bulunamadı: %q", want)
-		}
+	pdf := buildWeeklyPDF(context.Background(), nil, sn)
+	if !bytes.HasPrefix(pdf, []byte("%PDF-1.4")) || !bytes.HasSuffix(pdf, []byte("%%EOF")) {
+		t.Fatal("geçerli PDF iskeleti üretilmedi")
 	}
 }
 

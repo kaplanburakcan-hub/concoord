@@ -1,4 +1,4 @@
-package payments
+package pdfkit
 
 // Minimal TrueType okuyucu + PDF CID yazı tipi gömme (yalnızca stdlib).
 // Amaç: Türkçe karakterlerin (ş ğ İ ı ...) her PDF okuyucuda aynı çizilmesi
@@ -23,7 +23,7 @@ var fontRegularTTF []byte
 //go:embed fonts/LiberationSans-Bold.ttf
 var fontBoldTTF []byte
 
-type ttfFont struct {
+type Font struct {
 	data       []byte
 	unitsPerEm int
 	ascent     int
@@ -42,7 +42,7 @@ type cmapSeg struct {
 
 var (
 	fontsOnce             sync.Once
-	baseRegular, baseBold *ttfFont
+	baseRegular, baseBold *Font
 )
 
 func loadBaseFonts() {
@@ -50,11 +50,11 @@ func loadBaseFonts() {
 	baseBold = mustParseTTF(fontBoldTTF)
 }
 
-// newFontPair — belge başına taze kullanım takibi olan iki yazı tipi döner
+// NewFontPair — belge başına taze kullanım takibi olan iki yazı tipi döner
 // (ayrıştırılmış tablolar paylaşılır, "used" kümesi belgeye özeldir).
-func newFontPair() (reg, bold *ttfFont) {
+func NewFontPair() (reg, bold *Font) {
 	fontsOnce.Do(loadBaseFonts)
-	c := func(f *ttfFont) *ttfFont {
+	c := func(f *Font) *Font {
 		n := *f
 		n.used = map[uint16]rune{}
 		return &n
@@ -62,7 +62,7 @@ func newFontPair() (reg, bold *ttfFont) {
 	return c(baseRegular), c(baseBold)
 }
 
-func mustParseTTF(b []byte) *ttfFont {
+func mustParseTTF(b []byte) *Font {
 	f, err := parseTTF(b)
 	if err != nil {
 		panic("gömülü yazı tipi ayrıştırılamadı: " + err.Error())
@@ -73,7 +73,7 @@ func mustParseTTF(b []byte) *ttfFont {
 func u16(b []byte, o int) int { return int(binary.BigEndian.Uint16(b[o:])) }
 func i16(b []byte, o int) int { return int(int16(binary.BigEndian.Uint16(b[o:]))) }
 
-func parseTTF(b []byte) (*ttfFont, error) {
+func parseTTF(b []byte) (*Font, error) {
 	if len(b) < 12 {
 		return nil, fmt.Errorf("kısa dosya")
 	}
@@ -93,7 +93,7 @@ func parseTTF(b []byte) (*ttfFont, error) {
 		}
 		return v[0], nil
 	}
-	f := &ttfFont{data: b, used: map[uint16]rune{}}
+	f := &Font{data: b, used: map[uint16]rune{}}
 	head, err := need("head")
 	if err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ func parseTTF(b []byte) (*ttfFont, error) {
 	return f, nil
 }
 
-func (f *ttfFont) gid(r rune) uint16 {
+func (f *Font) gid(r rune) uint16 {
 	if r > 0xFFFF {
 		return 0
 	}
@@ -183,8 +183,8 @@ func (f *ttfFont) gid(r rune) uint16 {
 	return 0
 }
 
-// width — metin genişliği (puan).
-func (f *ttfFont) width(s string, size float64) float64 {
+// Width — metin genişliği (puan).
+func (f *Font) Width(s string, size float64) float64 {
 	var w float64
 	for _, r := range s {
 		g := f.gid(r)
@@ -195,8 +195,8 @@ func (f *ttfFont) width(s string, size float64) float64 {
 	return w * size / float64(f.unitsPerEm)
 }
 
-// hex — metni 2 baytlık glif kimlikleri olarak hex dizeye çevirir ve kullanımı kaydeder.
-func (f *ttfFont) hex(s string) string {
+// Hex — metni 2 baytlık glif kimlikleri olarak hex dizeye çevirir ve kullanımı kaydeder.
+func (f *Font) Hex(s string) string {
 	var b strings.Builder
 	b.WriteByte('<')
 	for _, r := range s {
@@ -213,10 +213,10 @@ func (f *ttfFont) hex(s string) string {
 	return b.String()
 }
 
-// objects — bu yazı tipi için PDF nesne gövdelerini sırayla üretir:
+// Objects — bu yazı tipi için PDF nesne gövdelerini sırayla üretir:
 // [Type0, CIDFontType2, FontDescriptor, FontFile2, ToUnicode]; ilk nesnenin
 // numarası base'dir (diğerleri base+1..base+4).
-func (f *ttfFont) objects(base int, psName string) []string {
+func (f *Font) Objects(base int, psName string) []string {
 	scale := func(v int) int { return v * 1000 / f.unitsPerEm }
 
 	gids := make([]int, 0, len(f.used))
