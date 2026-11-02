@@ -42,15 +42,15 @@ const REPORT_TYPES: ReportType[] = [
   {
     id: "quarterly",
     label: "Çeyrek Yıl Raporu",
-    desc: "3 aylık dönem özeti. İsteğe bağlı oluşturulur.",
-    path: "/aylik-raporlar",
+    desc: "3 aylık dönem özeti (EVM, hakediş, İSG, tedarik). Yıl ve çeyrek seçilerek PDF olarak üretilir.",
+    path: "/aylik-raporlar?tur=quarterly",
     color: "border-amber-500/40 bg-amber-500/5",
   },
   {
     id: "custom",
     label: "Özel Dönem Raporu",
-    desc: "Başlangıç ve bitiş tarihi seçilerek oluşturulan dönem raporu.",
-    path: "/aylik-raporlar",
+    desc: "Başlangıç ve bitiş tarihi seçilerek oluşturulan dönem raporu (en fazla 5 yıl).",
+    path: "/aylik-raporlar?tur=custom",
     color: "border-violet-500/40 bg-violet-500/5",
   },
 ];
@@ -100,17 +100,14 @@ export default function ImalatRaporlariPage() {
         <p className="text-xs uppercase tracking-wider text-beton-500 mb-3">İsteğe bağlı raporlar</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {REPORT_TYPES.filter((r) => !r.default).map((r) => (
-            <div
+            <Link
               key={r.id}
-              className={"rounded-xl border p-4 opacity-50 cursor-not-allowed select-none " + r.color}
-              title="Yakında kullanılabilir olacak"
+              to={r.path}
+              className={"rounded-xl border p-4 transition hover:brightness-110 " + r.color}
             >
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-medium text-beton-100 text-sm">{r.label}</p>
-                <span className="rounded-full border border-beton-700 px-2 py-0.5 text-[10px] text-beton-500 bg-beton-900 shrink-0">Yakında</span>
-              </div>
+              <p className="font-medium text-beton-100 text-sm">{r.label}</p>
               <p className="mt-1 text-xs text-beton-400 leading-relaxed">{r.desc}</p>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

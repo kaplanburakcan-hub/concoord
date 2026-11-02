@@ -13,7 +13,7 @@ func TestBuildMonthlyPDF(t *testing.T) {
 	sn := MonthlySnapshot{
 		GeneratedAt: time.Date(2026, 3, 1, 10, 0, 0, 0, time.UTC),
 		ProjectName: "Örnek Konut Projesi", ProjectCode: "PRJ-01", Currency: "TRY",
-		Year: 2026, Month: 2, PeriodStart: "2026-02-01", PeriodEnd: "2026-02-28",
+		Kind: KindMonthly, Label: "2026-02", Year: 2026, Month: 2, PeriodStart: "2026-02-01", PeriodEnd: "2026-02-28",
 	}
 	pts := BuildSCurve(in)
 	sn.EVM = EVMResult{
@@ -42,5 +42,28 @@ func TestBuildMonthlyPDF(t *testing.T) {
 		if !bytes.Contains(pdf, []byte(want)) {
 			t.Fatalf("PDF içeriğinde %q bekleniyordu", want)
 		}
+	}
+}
+
+func TestBuildPeriodPDFTitles(t *testing.T) {
+	for kind, want := range map[string]string{
+		KindQuarterly: "CEYREK YIL YONETIM RAPORU",
+		KindCustom:    "OZEL DONEM YONETIM RAPORU",
+	} {
+		pdf := BuildMonthlyPDF(MonthlySnapshot{Kind: kind, Label: "2026 Q2", ProjectCode: "PRJ-01",
+			PeriodStart: "2026-04-01", PeriodEnd: "2026-06-30"})
+		if !bytes.Contains(pdf, []byte(want)) || !bytes.Contains(pdf, []byte("2026 Q2")) {
+			t.Fatalf("%s: başlık/dönem etiketi PDF'te yok", kind)
+		}
+	}
+}
+
+func TestPeriodLabel(t *testing.T) {
+	d := func(y, m, dd int) time.Time { return time.Date(y, time.Month(m), dd, 0, 0, 0, 0, time.UTC) }
+	if got := periodLabel(KindQuarterly, d(2026, 4, 1), d(2026, 6, 30)); got != "2026 Q2" {
+		t.Fatalf("çeyrek etiketi: %q", got)
+	}
+	if got := periodLabel(KindCustom, d(2026, 3, 1), d(2026, 5, 15)); got != "01.03.2026 - 15.05.2026" {
+		t.Fatalf("özel dönem etiketi: %q", got)
 	}
 }

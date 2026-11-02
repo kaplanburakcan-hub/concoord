@@ -65,6 +65,8 @@ type MonthlySnapshot struct {
 	ProjectName string    `json:"project_name"`
 	ProjectCode string    `json:"project_code"`
 	Currency    string    `json:"currency"`
+	Kind        string    `json:"kind"`  // Monthly | Quarterly | Custom
+	Label       string    `json:"label"` // "2026-03", "2026 Q2", "01.03.2026 - 15.05.2026"
 	Year        int       `json:"year"`
 	Month       int       `json:"month"`
 	PeriodStart string    `json:"period_start"`
@@ -123,14 +125,36 @@ var delayReasonTR = map[string]string{
 	"Idari": "İdari / resmi işlem", "Diger": "Diğer",
 }
 
-// buildMonthlySnapshot — ayın tüm verisini derler (Plan Faz 9: EVM + finansal
-// + İSG + tedarik tek raporda).
-func (h *Handler) buildMonthlySnapshot(ctx context.Context, pid uuid.UUID, year, month int) (*MonthlySnapshot, error) {
-	start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
-	end := start.AddDate(0, 1, -1)
+// Dönem türleri (monthly_reports.kind).
+const (
+	KindMonthly   = "Monthly"
+	KindQuarterly = "Quarterly"
+	KindCustom    = "Custom"
+)
+
+// maxCustomPeriodDays — özel dönem raporunun en uzun aralığı (5 yıl).
+const maxCustomPeriodDays = 1827
+
+// periodLabel — dönemin kullanıcıya gösterilen kısa adı.
+func periodLabel(kind string, start, end time.Time) string {
+	switch kind {
+	case KindMonthly:
+		return start.Format("2006-01")
+	case KindQuarterly:
+		return fmt.Sprintf("%d Q%d", start.Year(), (int(start.Month())-1)/3+1)
+	}
+	return start.Format("02.01.2006") + " - " + end.Format("02.01.2006")
+}
+
+// buildMonthlySnapshot — dönemin (start..end, ikisi de dahil) tüm verisini
+// derler (Plan Faz 9: EVM + finansal + İSG + tedarik tek raporda).
+func (h *Handler) buildMonthlySnapshot(ctx context.Context, pid uuid.UUID, kind string, start, end time.Time) (*MonthlySnapshot, error) {
+	endEx := end.AddDate(0, 0, 1) // dışlayıcı üst sınır
 	sn := &MonthlySnapshot{
 		GeneratedAt: time.Now().UTC(),
-		Year:        year, Month: month,
+		Kind:        kind,
+		Label:       periodLabel(kind, start, end),
+		Year:        start.Year(), Month: int(start.Month()),
 		PeriodStart: start.Format("2006-01-02"),
 		PeriodEnd:   end.Format("2006-01-02"),
 	}
@@ -157,7 +181,7 @@ func (h *Handler) buildMonthlySnapshot(ctx context.Context, pid uuid.UUID, year,
 		WHERE pp.project_id=$1 AND pp.deleted_at IS NULL AND pp.status='Finalized'
 		  AND pp.finalized_at >= $2 AND pp.finalized_at < $3
 		ORDER BY s.company_name, pp.period_no`,
-		pid, start, start.AddDate(0, 1, 0))
+		pid, start, endEx)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +208,7 @@ func (h *Handler) buildMonthlySnapshot(ctx context.Context, pid uuid.UUID, year,
 		JOIN progress_payments pp ON pp.id = pd.progress_payment_id
 		WHERE pp.project_id=$1 AND pp.deleted_at IS NULL AND pp.status='Finalized'
 		  AND pp.finalized_at >= $2 AND pp.finalized_at < $3
-		GROUP BY pd.type`, pid, start, start.AddDate(0, 1, 0))
+		GROUP BY pd.type`, pid, start, endEx)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +229,7 @@ func (h *Handler) buildMonthlySnapshot(ctx context.Context, pid uuid.UUID, year,
 		       COALESCE(to_char(actual_date,'YYYY-MM-DD'),''), weight_pct, status,
 		       (planned_date IS NOT NULL AND planned_date < $2::date AND status <> 'Completed')
 		FROM milestones WHERE project_id=$1 AND deleted_at IS NULL
-		ORDER BY sort_order, planned_date NULLS LAST`, pid, end.AddDate(0, 0, 1))
+		ORDER BY sort_order, planned_date NULLS LAST`, pid, endEx)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +260,7 @@ func (h *Handler) buildMonthlySnapshot(ctx context.Context, pid uuid.UUID, year,
 		     AND created_at >= $2 AND created_at < $3),
 		  (SELECT COALESCE(sum(amount),0) FROM ohs_penalties WHERE project_id=$1 AND deleted_at IS NULL
 		     AND created_at >= $2 AND created_at < $3 AND amount IS NOT NULL)`,
-		pid, start, start.AddDate(0, 1, 0)).
+		pid, start, endEx).
 		Scan(&sn.OHS.FindingsOpened, &sn.OHS.FindingsClosed, &sn.OHS.OpenTotal,
 			&sn.OHS.OpenCritical, &sn.OHS.PenaltiesCount, &sn.OHS.PenaltiesTotal); err != nil {
 		return nil, err
@@ -258,7 +282,7 @@ func (h *Handler) buildMonthlySnapshot(ctx context.Context, pid uuid.UUID, year,
 		     AND expected_date IS NOT NULL AND expected_date < CURRENT_DATE),
 		  (SELECT count(*) FROM purchase_requests WHERE project_id=$1 AND deleted_at IS NULL
 		     AND status='Submitted')`,
-		pid, start, start.AddDate(0, 1, 0)).
+		pid, start, endEx).
 		Scan(&sn.Procurement.POsOrdered, &sn.Procurement.POsDelivered,
 			&sn.Procurement.POsOverdue, &sn.Procurement.PRsPending); err != nil {
 		return nil, err
@@ -298,6 +322,7 @@ func (h *Handler) buildMonthlySnapshot(ctx context.Context, pid uuid.UUID, year,
 
 type monthlyDTO struct {
 	ID          uuid.UUID `json:"id"`
+	Kind        string    `json:"kind"`
 	Year        int       `json:"year"`
 	Month       int       `json:"month"`
 	PeriodStart string    `json:"period_start"`
@@ -315,7 +340,7 @@ func (h *Handler) ListMonthly(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, err := h.pool.Query(r.Context(), `
-		SELECT mr.id, mr.year, mr.month, to_char(mr.period_start,'YYYY-MM-DD'),
+		SELECT mr.id, mr.kind, mr.year, mr.month, to_char(mr.period_start,'YYYY-MM-DD'),
 		       to_char(mr.period_end,'YYYY-MM-DD'), mr.status, mr.error,
 		       u.full_name, mr.generated_pdf_file_id IS NOT NULL, mr.created_at
 		FROM monthly_reports mr
@@ -331,7 +356,7 @@ func (h *Handler) ListMonthly(w http.ResponseWriter, r *http.Request) {
 	out := []monthlyDTO{}
 	for rows.Next() {
 		var d monthlyDTO
-		if err := rows.Scan(&d.ID, &d.Year, &d.Month, &d.PeriodStart, &d.PeriodEnd,
+		if err := rows.Scan(&d.ID, &d.Kind, &d.Year, &d.Month, &d.PeriodStart, &d.PeriodEnd,
 			&d.Status, &d.Error, &d.GeneratedBy, &d.HasPDF, &d.CreatedAt); err != nil {
 			httpx.Internal(w, r)
 			return
@@ -354,13 +379,13 @@ func (h *Handler) GetMonthly(w http.ResponseWriter, r *http.Request) {
 	var d monthlyDTO
 	var snapshot json.RawMessage
 	err := h.pool.QueryRow(r.Context(), `
-		SELECT mr.id, mr.year, mr.month, to_char(mr.period_start,'YYYY-MM-DD'),
+		SELECT mr.id, mr.kind, mr.year, mr.month, to_char(mr.period_start,'YYYY-MM-DD'),
 		       to_char(mr.period_end,'YYYY-MM-DD'), mr.status, mr.error,
 		       u.full_name, mr.generated_pdf_file_id IS NOT NULL, mr.created_at, mr.snapshot
 		FROM monthly_reports mr
 		JOIN users u ON u.id = mr.generated_by
 		WHERE mr.id=$1 AND mr.project_id=$2 AND mr.deleted_at IS NULL`, id, pid).
-		Scan(&d.ID, &d.Year, &d.Month, &d.PeriodStart, &d.PeriodEnd, &d.Status,
+		Scan(&d.ID, &d.Kind, &d.Year, &d.Month, &d.PeriodStart, &d.PeriodEnd, &d.Status,
 			&d.Error, &d.GeneratedBy, &d.HasPDF, &d.CreatedAt, &snapshot)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Aylık rapor bulunamadı.", nil)
@@ -388,20 +413,73 @@ func (h *Handler) GenerateMonthly(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Month string `json:"month"`
+		Kind    string `json:"kind"`    // monthly | quarterly | custom (boş = monthly)
+		Month   string `json:"month"`   // monthly: YYYY-MM
+		Year    int    `json:"year"`    // quarterly
+		Quarter int    `json:"quarter"` // quarterly: 1..4
+		Start   string `json:"start"`   // custom: YYYY-MM-DD
+		End     string `json:"end"`     // custom: YYYY-MM-DD
 	}
 	if !httpx.DecodeJSON(w, r, &in) {
 		return
 	}
-	t, err := time.Parse("2006-01", strings.TrimSpace(in.Month))
-	if err != nil {
-		httpx.ValidationFailed(w, r, map[string]string{"month": "geçerli bir ay (YYYY-MM) girin"})
+	var kind string
+	var start, end time.Time
+	switch strings.ToLower(strings.TrimSpace(in.Kind)) {
+	case "", "monthly":
+		kind = KindMonthly
+		t, err := time.Parse("2006-01", strings.TrimSpace(in.Month))
+		if err != nil {
+			httpx.ValidationFailed(w, r, map[string]string{"month": "geçerli bir ay (YYYY-MM) girin"})
+			return
+		}
+		start = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
+		end = start.AddDate(0, 1, -1)
+	case "quarterly":
+		kind = KindQuarterly
+		errs := map[string]string{}
+		if in.Year < 2000 || in.Year > 2100 {
+			errs["year"] = "geçerli bir yıl girin"
+		}
+		if in.Quarter < 1 || in.Quarter > 4 {
+			errs["quarter"] = "çeyrek 1 ile 4 arasında olmalı"
+		}
+		if len(errs) > 0 {
+			httpx.ValidationFailed(w, r, errs)
+			return
+		}
+		start = time.Date(in.Year, time.Month((in.Quarter-1)*3+1), 1, 0, 0, 0, 0, time.UTC)
+		end = start.AddDate(0, 3, -1)
+	case "custom":
+		kind = KindCustom
+		errs := map[string]string{}
+		s, e1 := time.Parse("2006-01-02", strings.TrimSpace(in.Start))
+		e, e2 := time.Parse("2006-01-02", strings.TrimSpace(in.End))
+		if e1 != nil {
+			errs["start"] = "geçerli bir başlangıç tarihi girin"
+		}
+		if e2 != nil {
+			errs["end"] = "geçerli bir bitiş tarihi girin"
+		}
+		if len(errs) == 0 && e.Before(s) {
+			errs["end"] = "bitiş tarihi başlangıçtan önce olamaz"
+		}
+		if len(errs) == 0 && int(e.Sub(s).Hours()/24) >= maxCustomPeriodDays {
+			errs["end"] = "özel dönem en fazla 5 yıl olabilir"
+		}
+		if len(errs) > 0 {
+			httpx.ValidationFailed(w, r, errs)
+			return
+		}
+		start, end = s, e
+	default:
+		httpx.ValidationFailed(w, r, map[string]string{"kind": "rapor türü monthly, quarterly veya custom olmalı"})
 		return
 	}
 
-	sn, err := h.buildMonthlySnapshot(r.Context(), pid, t.Year(), int(t.Month()))
+	sn, err := h.buildMonthlySnapshot(r.Context(), pid, kind, start, end)
 	if err != nil {
-		h.log.Error("aylık snapshot derlenemedi", "err", err, "project", pid)
+		h.log.Error("dönem snapshot'ı derlenemedi", "err", err, "project", pid)
 		httpx.Internal(w, r)
 		return
 	}
@@ -413,11 +491,11 @@ func (h *Handler) GenerateMonthly(w http.ResponseWriter, r *http.Request) {
 
 	var id uuid.UUID
 	err = h.pool.QueryRow(r.Context(), `
-		INSERT INTO monthly_reports (project_id, year, month, period_start, period_end,
+		INSERT INTO monthly_reports (project_id, kind, year, month, period_start, period_end,
 		                             status, snapshot, generated_by)
-		VALUES ($1,$2,$3,$4::date,$5::date,'Pending',$6,$7)
+		VALUES ($1,$2,$3,$4,$5::date,$6::date,'Pending',$7,$8)
 		RETURNING id`,
-		pid, sn.Year, sn.Month, sn.PeriodStart, sn.PeriodEnd, snapJSON, uid).Scan(&id)
+		pid, kind, sn.Year, sn.Month, sn.PeriodStart, sn.PeriodEnd, snapJSON, uid).Scan(&id)
 	if err != nil {
 		httpx.Internal(w, r)
 		return
@@ -431,12 +509,12 @@ func (h *Handler) GenerateMonthly(w http.ResponseWriter, r *http.Request) {
 	m := audit.MetaFrom(r.Context())
 	h.rec.Record(r.Context(), audit.Entry{
 		ActorID: m.ActorID, Entity: "monthly_reports", EntityID: id.String(), Action: audit.ActionInsert,
-		After: map[string]interface{}{"year": sn.Year, "month": sn.Month,
+		After: map[string]interface{}{"kind": kind, "period": sn.Label,
 			"spi": sn.EVM.SPI, "cpi": sn.EVM.CPI},
 		IP: m.IP, ReqID: m.ReqID,
 	})
 	httpx.JSON(w, http.StatusAccepted, map[string]interface{}{
-		"id": id, "status": "Pending", "year": sn.Year, "month": sn.Month,
+		"id": id, "status": "Pending", "kind": kind, "label": sn.Label,
 	})
 }
 
@@ -477,6 +555,29 @@ func (h *Handler) DownloadMonthly(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, name))
 	_, _ = io.Copy(w, obj.Body)
 }
+
+func pdfFilePrefix(kind string) string {
+	switch kind {
+	case KindQuarterly:
+		return "ceyrek-yonetim-raporu"
+	case KindCustom:
+		return "donem-yonetim-raporu"
+	}
+	return "aylik-yonetim-raporu"
+}
+
+// kindTitleTR — bildirim başlıklarında kullanılan Türkçe rapor adı.
+func kindTitleTR(kind string) string {
+	switch kind {
+	case KindQuarterly:
+		return "Çeyrek yıl yönetim raporu"
+	case KindCustom:
+		return "Özel dönem yönetim raporu"
+	}
+	return "Aylık yönetim raporu"
+}
+
+func fileSafe(s string) string { return strings.NewReplacer(" ", "", ":", "-", "/", "-").Replace(s) }
 
 func sha256Hex(b []byte) string {
 	sum := sha256.Sum256(b)
@@ -534,7 +635,7 @@ func ProcessMonthlyPDF(ctx context.Context, pool *pgxpool.Pool, store *storage.C
 		return fmt.Errorf("PDF depoya yüklenemedi: %w", err)
 	}
 
-	fname := fmt.Sprintf("aylik-yonetim-raporu-%s-%04d-%02d.pdf", sn.ProjectCode, sn.Year, sn.Month)
+	fname := fmt.Sprintf("%s-%s-%s.pdf", pdfFilePrefix(sn.Kind), sn.ProjectCode, fileSafe(sn.PeriodStart+"_"+sn.PeriodEnd))
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -561,7 +662,7 @@ func ProcessMonthlyPDF(ctx context.Context, pool *pgxpool.Pool, store *storage.C
 	nt.Send(ctx, notify.Input{
 		UserIDs: []uuid.UUID{genBy},
 		Type:    notify.TypeMonthlyReportReady,
-		Title:   fmt.Sprintf("Aylık yönetim raporu hazır: %s / %04d-%02d", sn.ProjectCode, sn.Year, sn.Month),
+		Title:   fmt.Sprintf("%s hazır: %s / %s", kindTitleTR(sn.Kind), sn.ProjectCode, sn.Label),
 		Body:    fmt.Sprintf("SPI %.3f · CPI %.3f — PDF indirilebilir.", sn.EVM.SPI, sn.EVM.CPI),
 		EntityType: "monthly_reports", EntityID: &id, ProjectID: &pid,
 	})
@@ -579,7 +680,7 @@ func markMonthlyFailed(ctx context.Context, pool *pgxpool.Pool, nt *notify.Servi
 	nt.Send(ctx, notify.Input{
 		UserIDs: []uuid.UUID{genBy},
 		Type:    notify.TypeMonthlyReportFailed,
-		Title:   "Aylık yönetim raporu üretilemedi",
+		Title:   "Yönetim raporu üretilemedi",
 		Body:    reason,
 		EntityType: "monthly_reports", EntityID: &id, ProjectID: &pid,
 	})

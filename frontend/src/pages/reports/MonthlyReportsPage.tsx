@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, apiDownload } from "../../api/client";
 import { Can } from "../../auth/guards";
 import { useProjects } from "../../projects/ProjectContext";
@@ -9,8 +10,10 @@ import { useProjects } from "../../projects/ProjectContext";
 // üretilir (Pending → Ready), indirilir. Eşik ayarları da bu ekranda
 // (projects.edit iznine bağlı) yönetilir.
 
+type Kind = "monthly" | "quarterly" | "custom";
 type Monthly = {
   id: string;
+  kind: "Monthly" | "Quarterly" | "Custom";
   year: number;
   month: number;
   period_start: string;
@@ -23,10 +26,34 @@ type Monthly = {
 };
 type Settings = { cpi_min: number; spi_min: number; finding_aging_days: number; pv_source: "auto" | "baseline" };
 
+const KIND_LABEL: Record<Monthly["kind"], string> = {
+  Monthly: "Aylık",
+  Quarterly: "Çeyrek yıl",
+  Custom: "Özel dönem",
+};
+
+function periodText(m: Monthly): string {
+  if (m.kind === "Quarterly") return `${m.year} Q${Math.floor((m.month - 1) / 3) + 1}`;
+  if (m.kind === "Custom") {
+    const f = (d: string) => d.split("-").reverse().join(".");
+    return `${f(m.period_start)} – ${f(m.period_end)}`;
+  }
+  return `${m.year}-${String(m.month).padStart(2, "0")}`;
+}
+
 export default function MonthlyReportsPage() {
   const { current } = useProjects();
   const [items, setItems] = useState<Monthly[] | null>(null);
+  const [params] = useSearchParams();
+  const initialKind = params.get("tur");
+  const [kind, setKind] = useState<Kind>(
+    initialKind === "quarterly" || initialKind === "custom" ? initialKind : "monthly"
+  );
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [qYear, setQYear] = useState(() => new Date().getFullYear());
+  const [quarter, setQuarter] = useState(() => Math.floor(new Date().getMonth() / 3) + 1);
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -57,16 +84,33 @@ export default function MonthlyReportsPage() {
 
   async function generate() {
     if (!current) return;
-    setBusy(true);
     setErr(null);
+    let body: Record<string, unknown>;
+    if (kind === "monthly") {
+      body = { kind, month };
+    } else if (kind === "quarterly") {
+      body = { kind, year: qYear, quarter };
+    } else {
+      if (!start || !end) {
+        setErr("Başlangıç ve bitiş tarihini seçin.");
+        return;
+      }
+      if (end < start) {
+        setErr("Bitiş tarihi başlangıçtan önce olamaz.");
+        return;
+      }
+      body = { kind, start, end };
+    }
+    setBusy(true);
     try {
-      await api(`/projects/${current.id}/monthly-reports`, {
-        method: "POST",
-        body: { month },
-      });
+      await api(`/projects/${current.id}/monthly-reports`, { method: "POST", body });
       await load();
     } catch {
-      setErr("Rapor üretimi başlatılamadı (ay biçimi YYYY-MM olmalı).");
+      setErr(
+        kind === "monthly"
+          ? "Rapor üretimi başlatılamadı (ay biçimi YYYY-MM olmalı)."
+          : "Rapor üretimi başlatılamadı; dönem bilgisini kontrol edin (özel dönem en fazla 5 yıl)."
+      );
     } finally {
       setBusy(false);
     }
@@ -78,24 +122,79 @@ export default function MonthlyReportsPage() {
   return (
     <div>
       <p className="font-mono text-xs tracking-[0.3em] text-emniyet-500 uppercase">
-        Faz 9 · Aylık Yönetim Raporu
+        Faz 9 · Yönetim Raporu — aylık, çeyrek yıl, özel dönem
       </p>
       <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100 mt-2">
-        Aylık Raporlar — {current.code}
+        Dönem Raporları — {current.code}
       </h1>
       <p className="mt-1 text-sm text-beton-400">
         EVM (PV/EV/AC, SPI/CPI, EAC/ETC) + kesinleşen hakedişler ve kesinti
-        dökümü + İSG performansı + tedarik özeti. Rakamlar üretim anında
-        snapshot olarak dondurulur.
+        dökümü + İSG performansı + tedarik özeti. Ay, çeyrek yıl ya da seçtiğiniz
+        tarih aralığı için üretilir; rakamlar üretim anında snapshot olarak dondurulur.
       </p>
 
-      <div className="mt-6 flex items-center gap-2">
-        <input
-          value={month}
-          onChange={(e) => setMonth(e.target.value)}
-          placeholder="YYYY-MM"
-          className="w-32 rounded-md bg-beton-900 border border-beton-700 px-2 py-1.5 text-sm text-beton-100 font-mono outline-none focus:border-emniyet-500"
-        />
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <select
+          value={kind}
+          onChange={(e) => setKind(e.target.value as Kind)}
+          aria-label="Rapor türü"
+          className="rounded-md bg-beton-900 border border-beton-700 px-2 py-1.5 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+        >
+          <option value="monthly">Aylık rapor</option>
+          <option value="quarterly">Çeyrek yıl raporu</option>
+          <option value="custom">Özel dönem raporu</option>
+        </select>
+        {kind === "monthly" && (
+          <input
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            placeholder="YYYY-MM"
+            aria-label="Ay"
+            className="w-32 rounded-md bg-beton-900 border border-beton-700 px-2 py-1.5 text-sm text-beton-100 font-mono outline-none focus:border-emniyet-500"
+          />
+        )}
+        {kind === "quarterly" && (
+          <>
+            <input
+              type="number"
+              value={qYear}
+              onChange={(e) => setQYear(Number(e.target.value))}
+              aria-label="Yıl"
+              className="w-24 rounded-md bg-beton-900 border border-beton-700 px-2 py-1.5 text-sm text-beton-100 font-mono outline-none focus:border-emniyet-500"
+            />
+            <select
+              value={quarter}
+              onChange={(e) => setQuarter(Number(e.target.value))}
+              aria-label="Çeyrek"
+              className="rounded-md bg-beton-900 border border-beton-700 px-2 py-1.5 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+            >
+              <option value={1}>1. çeyrek (Oca–Mar)</option>
+              <option value={2}>2. çeyrek (Nis–Haz)</option>
+              <option value={3}>3. çeyrek (Tem–Eyl)</option>
+              <option value={4}>4. çeyrek (Eki–Ara)</option>
+            </select>
+          </>
+        )}
+        {kind === "custom" && (
+          <>
+            <input
+              type="date"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+              aria-label="Başlangıç tarihi"
+              className="rounded-md bg-beton-900 border border-beton-700 px-2 py-1.5 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+            />
+            <span className="text-beton-500 text-sm">–</span>
+            <input
+              type="date"
+              value={end}
+              min={start || undefined}
+              onChange={(e) => setEnd(e.target.value)}
+              aria-label="Bitiş tarihi"
+              className="rounded-md bg-beton-900 border border-beton-700 px-2 py-1.5 text-sm text-beton-100 outline-none focus:border-emniyet-500"
+            />
+          </>
+        )}
         <Can perm="reports.generate_weekly">
           <button
             onClick={generate}
@@ -112,6 +211,7 @@ export default function MonthlyReportsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wider text-beton-500 border-b border-beton-800">
+              <th className="px-4 py-2">Tür</th>
               <th className="px-4 py-2">Dönem</th>
               <th className="px-4 py-2">Durum</th>
               <th className="px-4 py-2">Üreten</th>
@@ -122,23 +222,22 @@ export default function MonthlyReportsPage() {
           <tbody>
             {!items && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-beton-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-beton-400">
                   Yükleniyor…
                 </td>
               </tr>
             )}
             {items?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-beton-400">
-                  Henüz aylık rapor üretilmedi.
+                <td colSpan={6} className="px-4 py-6 text-center text-beton-400">
+                  Henüz rapor üretilmedi.
                 </td>
               </tr>
             )}
             {items?.map((m) => (
               <tr key={m.id} className="border-b border-beton-800/60 last:border-0">
-                <td className="px-4 py-2 font-mono text-beton-100">
-                  {m.year}-{String(m.month).padStart(2, "0")}
-                </td>
+                <td className="px-4 py-2 text-beton-300">{KIND_LABEL[m.kind] ?? "Aylık"}</td>
+                <td className="px-4 py-2 font-mono text-beton-100">{periodText(m)}</td>
                 <td className="px-4 py-2">
                   <StatusBadge status={m.status} />
                   {m.status === "Failed" && m.error && (
@@ -155,7 +254,7 @@ export default function MonthlyReportsPage() {
                       onClick={() =>
                         apiDownload(
                           `/projects/${current.id}/monthly-reports/${m.id}/download`,
-                          `aylik-rapor-${m.year}-${m.month}.pdf`
+                          `${m.kind === "Quarterly" ? "ceyrek" : m.kind === "Custom" ? "donem" : "aylik"}-rapor-${m.period_start}_${m.period_end}.pdf`
                         )
                       }
                       className="text-emniyet-500 hover:underline text-sm"

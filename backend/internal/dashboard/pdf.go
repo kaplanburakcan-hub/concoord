@@ -12,6 +12,24 @@ import (
 	"strings"
 )
 
+func pdfTitle(kind string) string {
+	switch kind {
+	case KindQuarterly:
+		return "CEYREK YIL YONETIM RAPORU"
+	case KindCustom:
+		return "OZEL DONEM YONETIM RAPORU"
+	}
+	return "AYLIK YONETIM RAPORU"
+}
+
+// pdfPeriod — eski (Kind/Label'siz) snapshot'lar için YYYY-MM'e düşer.
+func pdfPeriod(sn MonthlySnapshot) string {
+	if sn.Label != "" {
+		return sn.Label
+	}
+	return fmt.Sprintf("%04d-%02d", sn.Year, sn.Month)
+}
+
 // BuildMonthlyPDF — snapshot'tan çok sayfalı PDF baytları üretir.
 func BuildMonthlyPDF(sn MonthlySnapshot) []byte {
 	var lines []textLine
@@ -21,9 +39,9 @@ func BuildMonthlyPDF(sn MonthlySnapshot) []byte {
 	gap := func() { lines = append(lines, textLine{gap: true}) }
 	cur := " " + sn.Currency
 
-	add(true, 15, "AYLIK YONETIM RAPORU")
+	add(true, 15, pdfTitle(sn.Kind))
 	add(false, 9, fmt.Sprintf("Proje: %s (%s)", sn.ProjectName, sn.ProjectCode))
-	add(false, 9, fmt.Sprintf("Donem: %04d-%02d  (%s - %s)", sn.Year, sn.Month, sn.PeriodStart, sn.PeriodEnd))
+	add(false, 9, fmt.Sprintf("Donem: %s  (%s - %s)", pdfPeriod(sn), sn.PeriodStart, sn.PeriodEnd))
 	add(false, 8, fmt.Sprintf("Uretim ani (snapshot): %s UTC", sn.GeneratedAt.Format("02.01.2006 15:04")))
 	gap()
 
@@ -56,7 +74,7 @@ func BuildMonthlyPDF(sn MonthlySnapshot) []byte {
 	// Finansal: ay içinde kesinleşen hakedişler.
 	add(true, 10, "AY ICINDE KESINLESEN HAKEDISLER")
 	if len(sn.FinalizedPayments) == 0 {
-		add(false, 9, "Bu ay kesinlesen hakedis yok.")
+		add(false, 9, "Bu donemde kesinlesen hakedis yok.")
 	} else {
 		add(true, 8, padRight("Taseron", 34)+padLeft("Donem", 6)+
 			padLeft("Brut", 14)+padLeft("Kesinti", 14)+padLeft("Net", 14))
@@ -107,18 +125,18 @@ func BuildMonthlyPDF(sn MonthlySnapshot) []byte {
 
 	// İSG performansı.
 	add(true, 10, "ISG PERFORMANSI")
-	add(false, 9, kv("Ay icinde acilan bulgu", itoa(sn.OHS.FindingsOpened)))
-	add(false, 9, kv("Ay icinde kapatilan bulgu", itoa(sn.OHS.FindingsClosed)))
+	add(false, 9, kv("Donem icinde acilan bulgu", itoa(sn.OHS.FindingsOpened)))
+	add(false, 9, kv("Donem icinde kapatilan bulgu", itoa(sn.OHS.FindingsClosed)))
 	add(false, 9, kv("Acik bulgu (toplam)", itoa(sn.OHS.OpenTotal)))
 	add(false, 9, kv("Acik KRITIK bulgu", itoa(sn.OHS.OpenCritical)))
 	add(false, 9, kv("Kesilen ceza tutanagi", itoa(sn.OHS.PenaltiesCount)))
 	add(false, 9, kv("Ceza toplami", num(sn.OHS.PenaltiesTotal, 2)+cur))
 	gap()
 
-	// Gecikme nedenleri (günlük raporlardan, ay toplamı).
+	// Gecikme nedenleri (günlük raporlardan, dönem toplamı).
 	add(true, 10, "GECIKME NEDENLERI")
 	if len(sn.DelayCauses) == 0 {
-		add(false, 9, "Ay icinde kayitli gecikme yok.")
+		add(false, 9, "Donem icinde kayitli gecikme yok.")
 	} else {
 		for _, c := range sn.DelayCauses {
 			add(false, 9, kv(trunc(c.Label, 34), num(c.Hours, 1)+" saat  ("+itoa(c.Reports)+" rapor)"))
@@ -128,8 +146,8 @@ func BuildMonthlyPDF(sn MonthlySnapshot) []byte {
 
 	// Tedarik.
 	add(true, 10, "TEDARIK OZETI")
-	add(false, 9, kv("Ay icinde acilan siparis (PO)", itoa(sn.Procurement.POsOrdered)))
-	add(false, 9, kv("Ay icinde teslim alinan PO", itoa(sn.Procurement.POsDelivered)))
+	add(false, 9, kv("Donem icinde acilan siparis (PO)", itoa(sn.Procurement.POsOrdered)))
+	add(false, 9, kv("Donem icinde teslim alinan PO", itoa(sn.Procurement.POsDelivered)))
 	add(false, 9, kv("Geciken acik PO", itoa(sn.Procurement.POsOverdue)))
 	add(false, 9, kv("Onay bekleyen PR", itoa(sn.Procurement.PRsPending)))
 
