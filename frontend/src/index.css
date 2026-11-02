@@ -43,9 +43,10 @@
   --emniyet-600: 190 152 0;
   --sky: 56 189 248;
   /* chrome (lacivert) */
-  --chrome: #0b2545; --chrome-top: #0b2545; --chrome-2: #1d3d68; --chrome-active: rgba(224,180,0,.14);
-  --chrome-text: #e8eef6; --chrome-text-2: #b3c3d8; --chrome-text-3: #8ca3c2;
-  --chrome-border: rgba(255,255,255,.10);
+  /* chrome iki temada da aynı (koyu temadaki lacivert): sabit kalır */
+  --chrome: #08162b; --chrome-top: #0a1c36; --chrome-2: #16294a; --chrome-active: rgba(224,180,0,.16);
+  --chrome-text: #e4ebf3; --chrome-text-2: #a9bbd2; --chrome-text-3: #7f93ae;
+  --chrome-border: rgba(255,255,255,.08);
   /* grup başlığı / aktif işaret — amber */
   --group-accent: #e0b400; --group-fill: rgba(224,180,0,.14); --group-border: rgba(224,180,0,.30);
   /* çeşitli (hex — SVG/inline için) */
