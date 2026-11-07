@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { api, describeLoadError } from "../../api/client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, apiUpload, describeLoadError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../../projects/ProjectContext";
 
@@ -7,6 +7,13 @@ import { useProjects } from "../../projects/ProjectContext";
 // ile bağlantı bu aşamada yoktur.
 
 type CostCode = { id: string; code: string; name: string; parent_id?: string; budget?: number; committed: number; variance_pct?: number; created_by_name: string; created_at: string };
+
+type ImportResult = {
+  processed: number;
+  total: number;
+  unknown_codes: { line: number; code: string; reason?: string }[];
+  invalid_rows: { line: number; code?: string; reason?: string }[];
+};
 
 const inp = "rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100 outline-none focus:border-emniyet-500";
 
@@ -25,6 +32,28 @@ export default function MaliyetKodlariPage() {
   const [saving, setSaving] = useState(false);
   // Bütçe tutarı girişi (E6, ilk adım): yalnız giriş; EVM ve sapma hesabı yok.
   const [budgetDraft, setBudgetDraft] = useState<Record<string, string>>({});
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState<ImportResult | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function importBudgets(files: FileList | null) {
+    const file = files?.[0];
+    if (!file || !pid) return;
+    setImporting(true);
+    setImportMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await apiUpload<ImportResult>(`/projects/${pid}/cost-codes/budgets/import`, fd);
+      setImportMsg(r);
+      await load();
+    } catch (e) {
+      setErr(describeLoadError(e, "Bütçe içe aktarma"));
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
 
   async function saveBudget(c: CostCode) {
     if (!pid) return;
@@ -87,14 +116,38 @@ export default function MaliyetKodlariPage() {
           </p>
         </div>
         {canEdit && (
-          <button onClick={() => setShowForm((v) => !v)}
-            className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-xs font-semibold px-3 py-1.5">
-            {showForm ? "Vazgeç" : "+ Kod ekle"}
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <input ref={fileRef} type="file" accept=".xlsx,.csv" className="hidden"
+              onChange={(e) => importBudgets(e.target.files)} />
+            <button onClick={() => fileRef.current?.click()} disabled={importing}
+              className="rounded-md border border-beton-700 px-3 py-1.5 text-xs text-beton-300 hover:border-emniyet-500 disabled:opacity-50">
+              {importing ? "Yükleniyor…" : "Excel'den bütçe yükle"}
+            </button>
+            <button onClick={() => setShowForm((v) => !v)}
+              className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-xs font-semibold px-3 py-1.5">
+              {showForm ? "Vazgeç" : "+ Kod ekle"}
+            </button>
+          </div>
         )}
       </div>
 
       {err && <p className="text-sm text-red-400">{err}</p>}
+
+      {importMsg && (
+        <div className="rounded-lg border border-beton-800 bg-beton-900 p-3 text-sm text-beton-200 space-y-1">
+          <p>{importMsg.processed} bütçe kaydedildi ({importMsg.total} satır okundu).</p>
+          {importMsg.unknown_codes.length > 0 && (
+            <p className="text-xs text-beton-400">
+              Projede olmayan kodlar (atlandı): {importMsg.unknown_codes.map((u) => `${u.code} (satır ${u.line})`).join(", ")}
+            </p>
+          )}
+          {importMsg.invalid_rows.length > 0 && (
+            <p className="text-xs text-red-300">
+              Geçersiz satırlar: {importMsg.invalid_rows.map((u) => `satır ${u.line}${u.reason ? ` — ${u.reason}` : ""}`).join("; ")}
+            </p>
+          )}
+        </div>
+      )}
 
       {showForm && (
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-4 grid gap-3 md:grid-cols-4">
