@@ -436,7 +436,7 @@ func (h *Handler) buildSnapshot(ctx context.Context, pid uuid.UUID, start, end t
 		}
 		// Teslimat kalemleri.
 		irows, err := h.pool.Query(ctx, `
-			SELECT material_name, unit, delivered_qty::float8
+			SELECT material_name, unit, received_qty::float8
 			FROM delivery_items WHERE delivery_id=$1 ORDER BY created_at`, delivID)
 		if err != nil {
 			drows.Close()

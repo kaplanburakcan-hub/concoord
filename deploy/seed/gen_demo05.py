@@ -89,6 +89,8 @@ for s in SUBS:
     s["work_ids"] = [uid() for _ in s["items"]]
 
 CONTRACTS_TOTAL = sum(s["amount"] for s in SUBS)
+for s_ in SUBS:
+    s_["start_date"] = date(s_["start"][0], s_["start"][1], 1)
 
 # Kaba inşaat fiziki tamamlanma oranı: toplam hakediş brütü = %60 × sözleşme toplamı
 def sub_final_total(s):
@@ -172,7 +174,7 @@ for k, mi in enumerate(mis):
         tutar = round(month_gross[mi] * mult, 2)
     running += tutar
     y, m = MONTHS[mi]
-    idari.append(dict(no=k + 1, y=y, m=m, tutar=tutar, prev=round(running - tutar, 2),
+    idari.append(dict(id=uid(), no=k + 1, y=y, m=m, tutar=tutar, prev=round(running - tutar, 2),
                       paid=(mi < NOW_MONTH_IDX)))
 
 # ------------------------------------------------------------------ PO / PR
@@ -189,6 +191,7 @@ PO_OPEN = [
     ("Cephe alüminyum doğrama", "Alüm Doğrama Sanayi", 4_500_000, "07 Dış Cephe", date(2026, 12, 15)),
     ("Güvenlik ve CCTV sistemi", "Güven Güvenlik Sist.", 1_500_000, "06 Elektrik Tesisat", date(2026, 11, 30)),
 ]
+PO_REF = []  # (po_id, desc, sup, amt, teslim_tarihi) — ödeme ve stok kayıtları için
 DELIVERED_TOTAL = sum(p[2] for p in PO_DELIVERED)
 AC_TOTAL = round(ACTUAL_HAK + DELIVERED_TOTAL, 2)
 
@@ -237,7 +240,7 @@ def main():
     w("-- ============================================================================")
     w("DO $$")
     w("DECLARE")
-    w("  v_admin uuid; v_role uuid; v_proj uuid;")
+    w("  v_admin uuid; v_role uuid; v_proj uuid; v_ce uuid;")
     w("BEGIN")
     w("  SELECT id INTO v_admin FROM users WHERE deleted_at IS NULL ORDER BY created_at LIMIT 1;")
     w("  IF v_admin IS NULL THEN RAISE EXCEPTION 'Kullanıcı yok'; END IF;")
@@ -303,9 +306,9 @@ VALUES ('{r['id']}', '{it['wid']}', {n(it['prev_qty'])}, {n(it['this_qty'])}, {n
         hd = month_end(d["y"], d["m"])
         odeme = f"DATE '{hd + timedelta(days=30)}'" if d["paid"] else "NULL"
         aciklama = f"{d['y']}-{d['m']:02d} dönemi hakedişi"
-        w(f"""INSERT INTO idari_hakedisler (project_id, donem_no, aciklama, tutar, kdv_pct, fatura_no, gelen_odeme_tarihi,
+        w(f"""INSERT INTO idari_hakedisler (id, project_id, donem_no, aciklama, tutar, kdv_pct, fatura_no, gelen_odeme_tarihi,
         created_by, hakedis_tarihi, onceki_hakedis_toplami, kesintiler)
-    VALUES (v_proj, {d['no']}, {q(aciklama)}, {n(d['tutar'])}, 20.00,
+    VALUES ('{d['id']}', v_proj, {d['no']}, {q(aciklama)}, {n(d['tutar'])}, 20.00,
         {q(f'FT-2026-{d["no"]:04d}')}, {odeme}, v_admin, DATE '{hd}', {n(d['prev'])}, '[]'::jsonb);""")
     w("")
     w("  -- 7) İŞ PROGRAMI KİLOMETRE TAŞLARI (PV kaynağı: milestone yedeği)")
@@ -330,6 +333,7 @@ VALUES (v_proj, {q(name)}, DATE '{pd}', {('DATE ' + chr(39) + str(ad) + chr(39))
     for (desc, sup, amt, code, dd) in PO_DELIVERED:
         pr_id, po_id = uid(), uid()
         cid = code_id(code)
+        PO_REF.append((po_id, desc, sup, amt, dd))
         w(f"""INSERT INTO purchase_requests (id, project_id, pr_no, requested_by, needed_by_date, status, submitted_at, decided_by, decided_at, decision_note, cost_code_id)
 VALUES ('{pr_id}', v_proj, 'TLP-2025-{po_no:03d}', v_admin, DATE '{dd}', 'Draft', NULL, NULL, NULL, NULL, '{cid}');""")
         w(f"""INSERT INTO purchase_request_items (pr_id, material_name, qty, unit) VALUES ('{pr_id}', {q(desc)}, 1, 'ad');""")
@@ -383,47 +387,357 @@ VALUES (v_proj, {q(wc)}, {q(name)}, {int(float(wc.split('.')[0]))*10 + (int(wc.s
     DATE '{bs}', DATE '{bf}', {('DATE ' + chr(39) + str(a_s) + chr(39)) if a_s else 'NULL'}, {('DATE ' + chr(39) + str(a_f) + chr(39)) if a_f else 'NULL'},
     'manual', {n(prog)}, {n(wt)});""")
 
-    # ---------------------------------------------------- 12) GÜNLÜK SAHA RAPORLARI
-    w("  -- 12) GÜNLÜK SAHA RAPORLARI (son 9 iş günü; taslak -> gönder)")
-    report_days = [date(2026,10,27), date(2026,10,28), date(2026,10,29), date(2026,10,30),
-                   date(2026,11,2), date(2026,11,3), date(2026,11,4), date(2026,11,5), date(2026,11,6)]
+    # ---------------------------------------------------- 12) GÜNLÜK SAHA RAPORLARI (tüm hafta içi iş günleri)
+    w("  -- 12) GÜNLÜK SAHA RAPORLARI (2025-06-02 .. 2026-11-06, Pzt-Cum)")
+    rng = random.Random(77)
     kaba = next(s for s in SUBS if s["key"] == "kaba")
     celik = next(s for s in SUBS if s["key"] == "celik")
     mep = next(s for s in SUBS if s["key"] == "mep")
-    rng = random.Random(77)
-    conditions = ["Güneşli", "Parçalı bulutlu", "Parçalı bulutlu", "Yağışlı", "Güneşli", "Bulutlu", "Güneşli", "Rüzgarlı", "Güneşli"]
-    for idx, d in enumerate(report_days):
-        rid = uid()
+    toprak = next(s for s in SUBS if s["key"] == "toprak")
+
+    work_days = []
+    d0 = date(2025, 6, 2)
+    while d0 <= date(2026, 11, 6):
+        if d0.weekday() < 5:
+            work_days.append(d0)
+        d0 += timedelta(days=1)
+
+    def mi_of(day):
+        return (day.year - 2025) * 12 + (day.month - 6)
+
+    # Ay bazında iş kalemi miktarı (hakediş ayından; hakediş yoksa önceki ayın hızı)
+    month_qty = {}
+    for r in progress_rows:
+        for it in r["items"]:
+            month_qty[(r["sub"]["key"], r["mi"], it["wid"])] = it["this_qty"]
+
+    month_days = {}
+    for day in work_days:
+        month_days.setdefault(mi_of(day), []).append(day)
+
+    # Her ay-iş kalemi miktarını o ayın iş günlerine rastgele böl
+    day_entries = {}
+    for s in SUBS:
+        for wi, wid in enumerate(s["work_ids"]):
+            for mi, days in month_days.items():
+                src_mi = mi if (s["key"], mi, wid) in month_qty else mi - 1
+                q_total = month_qty.get((s["key"], src_mi, wid), 0.0)
+                if q_total <= 0:
+                    continue
+                active = [x for x in days if x >= s["start_date"]]
+                if not active:
+                    continue
+                weights = [rng.uniform(0.6, 1.4) for _ in active]
+                wsum = sum(weights)
+                left = round(q_total, 2)
+                for k, day in enumerate(active):
+                    part = round(left * weights[k] / wsum, 2) if k < len(active) - 1 else round(left, 2)
+                    left = round(left - part, 2) if k < len(active) - 1 else 0.0
+                    if part > 0:
+                        day_entries.setdefault(day, []).append((s, wi, wid, part))
+
+    CONCRETE_IDX = {"kaba"}
+    for idx, day in enumerate(work_days):
+        winter = day.month in (12, 1, 2, 3)
+        summer = day.month in (6, 7, 8, 9)
+        roll = rng.random()
+        rain = roll < (0.12 if winter else 0.06)
+        wind = (not rain) and rng.random() < 0.04
+        if rain:
+            condition = "Yağışlı"
+        elif wind:
+            condition = "Rüzgarlı"
+        else:
+            condition = rng.choice(["Güneşli", "Güneşli", "Parçalı bulutlu", "Bulutlu"])
+        t_min = rng.randint(-1, 5) if winter else (rng.randint(17, 23) if summer else rng.randint(7, 14))
+        t_max = rng.randint(6, 12) if winter else (rng.randint(28, 35) if summer else rng.randint(15, 22))
         delay = []
-        if conditions[idx] == "Rüzgarlı":
+        if rain:
+            delay = [{"reason_code": "Hava", "hours": 3.5, "note": "Yağış nedeniyle beton dökümü ve yüksekte çalışma durduruldu"}]
+        elif wind:
             delay = [{"reason_code": "Hava", "hours": 2.0, "note": "Rüzgâr 50 km/s üzeri, vinç çalışması durduruldu"}]
-        if conditions[idx] == "Yağışlı":
-            delay = [{"reason_code": "Hava", "hours": 3.5, "note": "Yağış nedeniyle beton dökümü ertelendi"}]
+        rid = uid()
+        notes = "Hava koşulları nedeniyle kısmi çalışma yapıldı." if delay else rng.choice(
+            ["Kaba inşaat ve montaj planlandığı gibi ilerledi.", "İmalatlar planlanan sırada sürdü.",
+             "Taşeron ekipleri sahada, kalıp ve donatı işleri devam ediyor."])
         w(f"""INSERT INTO daily_reports (id, project_id, report_date, revision_no, weather, temperature_min, temperature_max,
     notes, status, author_id, delay_causes, issue_flagged)
-VALUES ('{rid}', v_proj, DATE '{d}', 1, '{{"condition": "{conditions[idx]}"}}'::jsonb, {rng.randint(6,12)}, {rng.randint(15,22)},
-    {q('Kaba inşaat ve çelik montajı planlandığı gibi ilerledi.' if not delay else 'Hava koşulları nedeniyle kısmi çalışma yapıldı.')},
-    'Draft', v_admin, '{json.dumps(delay, ensure_ascii=False)}'::jsonb, {str(bool(delay)).lower()});""")
-        for sub, mh in ((kaba, rng.randint(44, 58)), (celik, rng.randint(16, 22) if d >= date(2026,3,15) else 0),
-                        (mep, rng.randint(10, 15) if d >= date(2026,6,15) else 0)):
-            if mh <= 0:
+VALUES ('{rid}', v_proj, DATE '{day}', 1, '{{"condition": "{condition}"}}'::jsonb, {t_min}, {t_max},
+    {q(notes)}, 'Draft', v_admin, '{json.dumps(delay, ensure_ascii=False)}'::jsonb, {str(bool(delay)).lower()});""")
+
+        # Personel (taşeron ekipleri, aktif olduğu günlerde)
+        for sub, lo, hi, start in ((toprak, 24, 32, date(2025, 7, 1)), (kaba, 20, 46, date(2025, 10, 1)),
+                                   (celik, 12, 18, date(2026, 3, 1)), (mep, 8, 13, date(2026, 6, 1))):
+            if day < start or (sub is toprak and day > date(2026, 3, 31)):
                 continue
-            w(f"INSERT INTO daily_manpower (daily_report_id, subcontractor_id, trade, headcount) VALUES ('{rid}', '{sub['id']}', {q(sub['trade'])}, {mh});")
-        w(f"INSERT INTO daily_equipment (daily_report_id, equipment_name, count, working_hours, idle_reason) VALUES ('{rid}', 'Kule vinç', 2, {n(rng.choice([0, 9.0, 10.0]))}, NULL);")
-        w(f"INSERT INTO daily_equipment (daily_report_id, equipment_name, count, working_hours, idle_reason) VALUES ('{rid}', 'Beton pompası', 1, {n(rng.choice([0, 6.0, 7.5]))}, NULL);")
-        w(f"INSERT INTO daily_equipment (daily_report_id, equipment_name, count, working_hours, idle_reason) VALUES ('{rid}', 'Hidrolik ekskavatör', 1, {n(rng.choice([0, 0, 8.0]))}, NULL);")
-        dk_wid = kaba["work_ids"][3 if idx % 2 else 2]  # donatı ya da döşeme
-        qty = rng.randint(120, 220) if idx % 2 == 0 else rng.randint(8, 22)
-        w(f"""INSERT INTO daily_work_entries (daily_report_id, work_item_id, location, description, qty, unit, discipline)
-VALUES ('{rid}', '{dk_wid}', 'B Blok 2. kat', {q('Döşeme betonu dökümü' if idx % 2 == 0 else 'Nervürlü donatı montajı')}, {qty}, '{'m3' if idx % 2 == 0 else 'ton'}', 'Kaba inşaat');""")
-        if d >= date(2026,6,15):
+            if rain and sub is not toprak:
+                hc = max(4, rng.randint(lo // 2, hi // 2))
+            else:
+                hc = rng.randint(lo, hi)
+            w(f"INSERT INTO daily_manpower (daily_report_id, subcontractor_id, trade, headcount) VALUES ('{rid}', '{sub['id']}', {q(sub['trade'])}, {hc});")
+
+        # Ekipman
+        if day >= date(2025, 10, 1):
+            w(f"INSERT INTO daily_equipment (daily_report_id, equipment_name, count, working_hours, idle_reason) VALUES ('{rid}', 'Kule vinç', 2, {0 if (rain or wind) else rng.choice([9.0, 10.0])}, {q('Hava (rüzgâr)') if wind else 'NULL'});")
+        if day >= date(2025, 10, 1) and day.weekday() in (0, 2, 4):
+            w(f"INSERT INTO daily_equipment (daily_report_id, equipment_name, count, working_hours, idle_reason) VALUES ('{rid}', 'Beton pompası', 1, {0 if rain else rng.choice([6.5, 7.5])}, {q('Yağış') if rain else 'NULL'});")
+        if day <= date(2026, 3, 31) and day >= date(2025, 7, 1):
+            w(f"INSERT INTO daily_equipment (daily_report_id, equipment_name, count, working_hours, idle_reason) VALUES ('{rid}', 'Hidrolik ekskavatör', 1, {0 if rain else 8.0}, NULL);")
+            w(f"INSERT INTO daily_equipment (daily_report_id, equipment_name, count, working_hours, idle_reason) VALUES ('{rid}', 'Damper kamyon', 2, {0 if rain else 9.0}, NULL);")
+
+        # Personel devamı
+        durum_burak = "izinli" if rng.random() < 0.08 else "mevcut"
+        durum_demir = "izinli" if idx % 7 == 6 else "mevcut"
+        for grup, ad, unvan, durum in (
+            ("yuklenici", "Emre Kılıç", "Şantiye Şefi", "mevcut"),
+            ("yuklenici", "Deniz Aydın", "İSG Uzmanı", "mevcut"),
+            ("yuklenici", "Burak Yılmaz", "Saha Mühendisi", durum_burak),
+            ("musavir", "S. Demir", "Kontrol Mühendisi", durum_demir),
+        ):
+            w(f"INSERT INTO daily_staff_attendance (daily_report_id, grup, ad_soyad, unvan, durum) VALUES ('{rid}', '{grup}', {q(ad)}, {q(unvan)}, '{durum}');")
+
+        # İmalat kayıtları (aylık miktarın günlere bölünmüş hali; yağışlı günlerde beton ve yükseklik işi yok)
+        for s, wi, wid, part in day_entries.get(day, []):
+            if rain and s["key"] in CONCRETE_IDX:
+                continue
+            poz, desc, unit, _, _, _ = s["items"][wi]
+            loc = {"toprak": "Hafriyat sahası", "kaba": "B Blok " + str(1 + (idx // 40) % 3) + ". kat",
+                   "celik": "Çelik kolon montajı - A aks", "mep": "A Blok tavan arası"}[s["key"]]
             w(f"""INSERT INTO daily_work_entries (daily_report_id, work_item_id, location, description, qty, unit, discipline)
-VALUES ('{rid}', '{mep['work_ids'][1]}', 'A Blok tavan arası', 'Elektrik kablo kanalı çekimi', {rng.randint(300, 900)}, 'm', 'Elektrik');""")
-        if d >= date(2026,3,15):
-            w(f"""INSERT INTO daily_work_entries (daily_report_id, work_item_id, location, description, qty, unit, discipline)
-VALUES ('{rid}', '{celik['work_ids'][0]}', 'Çelik kolon montajı - A aks', 'Kolon-kiriş montajı', {rng.randint(4, 9)}, 'ton', 'Çelik');""")
-        # günlük rapor gönderildi (kilitlenmeden önce alt kayıtlar yazılır)
-        w(f"""UPDATE daily_reports SET status='Submitted', submitted_at=TIMESTAMPTZ '{d} 18:00:00+03', submitted_by=v_admin WHERE id='{rid}';""")
+VALUES ('{rid}', '{wid}', {q(loc)}, {q(desc)}, {n(part)}, {q(unit)}, {q(s['trade'])});""")
+
+        # Küçük nakit harcamaları (günlerin ~%30'u)
+        if rng.random() < 0.3:
+            for k in range(rng.randint(1, 2)):
+                cat = rng.choice(["Yakıt", "Küçük malzeme", "Yemek", "Ulaşım", "Ofis"])
+                desc = {"Yakıt": "Mazot ikmali (jeneratör/ekskavatör)", "Küçük malzeme": "Bağlama teli ve sarf malzeme",
+                        "Yemek": "Ekip öğle yemeği", "Ulaşım": "Personel servis ücreti", "Ofis": "Ofis kırtasiye ve sarf"}[cat]
+                amt = {"Yakıt": rng.randint(2500, 6500), "Küçük malzeme": rng.randint(400, 2200),
+                       "Yemek": rng.randint(900, 2400), "Ulaşım": rng.randint(600, 1500), "Ofis": rng.randint(150, 600)}[cat]
+                w(f"""INSERT INTO daily_cash_expenses (daily_report_id, description, category, amount, receipt_no)
+VALUES ('{rid}', {q(desc)}, {q(cat)}, {amt}, {q(f'FIS-{idx:03d}-{k + 1}')});""")
+
+        w(f"""UPDATE daily_reports SET status='Submitted', submitted_at=TIMESTAMPTZ '{day} 18:00:00+03', submitted_by=v_admin WHERE id='{rid}';""")
+
+    # ---------------------------------------------------- 13) RİSKLER
+    w("  -- 13) RİSK KAYDI (olasılık x etki 1-5)")
+    risks = [
+        ("Çelik çatı montajında hava koşulları", "Rüzgâr ve yağış nedeniyle vinç çalışma süresi kısalabilir.", 4, 4, "İzleniyor"),
+        ("Hazır beton tedarik gecikmesi", "Santral bakımı nedeniyle döşeme dökümlerinde plan dışı bekleme.", 3, 3, "Açık"),
+        ("Trafo ve ana pano devreye alma", "Enerji dağıtım şirketinin bağlantı onayı gecikebilir.", 3, 5, "Açık"),
+        ("Kur artışı (çelik ve ekipman)", "İthal ekipman ve çelik fiyatlarında artış maliyeti etkileyebilir.", 3, 4, "İzleniyor"),
+        ("Kazı sırasında yeraltı suyu", "Hafriyat tamamlandı; ana risk kapandı.", 2, 3, "Kapandı"),
+        ("Cephe panel montajında vinç kapasitesi", "Dış cephe için ek vinç ihtiyacı olabilir.", 2, 3, "Açık"),
+    ]
+    for i, (title, desc, pr, im, st) in enumerate(risks, 1):
+        w(f"""INSERT INTO project_risks (project_id, risk_no, title, description, probability, impact, status, created_by)
+VALUES (v_proj, {i}, {q(title)}, {q(desc)}, {pr}, {im}, {q(st)}, v_admin);""")
+
+    # ---------------------------------------------------- 14) İSG BULGULARI
+    w("  -- 14) İSG BULGULARI")
+    findings = [
+        (kaba, "Major", "Kolon kalıp iskelesinde korkuluk eksik", "B Blok 1. kat", "Closed", date(2026,9,20), date(2026,9,22), "Korkuluk tamamlandı, fotoğraf arşivlendi."),
+        (celik, "Major", "Çelik montajında emniyet kemeri kullanılmıyor", "Çelik kolon montajı - A aks", "InProgress", date(2026,11,15), None, None),
+        (mep, "Minor", "Kablo kanalı önünde malzeme yığını", "A Blok tavan arası", "Open", date(2026,11,20), None, None),
+        (kaba, "Observation", "Beton pompası hortumu için bağlantı noktası işaretlenmeli", "B Blok dış cephe", "Open", date(2026,11,30), None, None),
+    ]
+    for sub, sev, desc, loc, st, due, closed, note in findings:
+        cl_by = "v_admin" if closed else "NULL"
+        cl_at = ("TIMESTAMPTZ '" + str(closed) + " 15:00:00+03'") if closed else "NULL"
+        w(f"""INSERT INTO ohs_findings (project_id, subcontractor_id, severity, description, location, due_date, status, reported_by, closed_by, closed_at, close_note)
+VALUES (v_proj, '{sub['id']}', '{sev}', {q(desc)}, {q(loc)}, DATE '{due}', '{st}', v_admin, {cl_by}, {cl_at}, {q(note)});""")
+
+    # ---------------------------------------------------- 15) GÖREVLER
+    w("  -- 15) GÖREVLER (kanban)")
+    tasks = [
+        ("Çelik montaj planı revizyonu", "Kuzey açıklık için montaj sırası güncellenecek.", "Done", "High", date(2026,10,25), "toplanti"),
+        ("Trafo bağlantı başvurusunu tamamla", "Enerji dağıtım şirketine eksik evrakları gönder.", "InProgress", "Urgent", date(2026,11,10), "elle"),
+        ("Cephe panel teknik çizimlerini onayla", "Mimari onay bekleniyor.", "Review", "Normal", date(2026,11,14), "elle"),
+        ("İSG: çelik montajı için emniyet kemeri eğitimi", "Çelik ekibine toplu eğitim.", "Todo", "Urgent", date(2026,11,12), "isg"),
+        ("Kablo kanalı önü malzeme düzenlemesi", "Mep taşeronu ile koordinasyon.", "Todo", "Normal", date(2026,11,20), "isg"),
+        ("Hazır beton tedarik sözleşmesi güncellemesi", "Yedek santral için ek teklif iste.", "Backlog", "Normal", date(2026,11,30), "elle"),
+        ("Haftalık ilerleme raporunu paylaş", "Müşteriye PDF gönder.", "Todo", "Low", date(2026,11,8), "elle"),
+        ("Kaba inşaat 3. kat kalıp planı", "Kalıp ekibi için iş planı.", "Backlog", "Normal", date(2026,12,5), "elle"),
+    ]
+    for i, (title, desc, st, pr, due, src) in enumerate(tasks, 1):
+        tid = uid()
+        w(f"""INSERT INTO tasks (id, project_id, title, description, status, priority, due_date, created_by, kanban_order, source_module)
+VALUES ('{tid}', v_proj, {q(title)}, {q(desc)}, '{st}', '{pr}', DATE '{due}', v_admin, {i * 1000}, '{src}');""")
+        w(f"INSERT INTO task_assignees (task_id, user_id) VALUES ('{tid}', v_admin);")
+
+    # ---------------------------------------------------- 16) TOPLANTILAR
+    w("  -- 16) TOPLANTILAR")
+    meetings = [
+        ("TOP-001", "Proje kick-off toplantısı", "kickoff", date(2025,6,5), "gerceklesti", "Proje kapsamı, takvim ve sorumluluk matrisi görüşüldü.", "Kapsam onaylandı; haftalık ilerleme toplantısı kararlaştırıldı."),
+        ("TOP-014", "Haftalık ilerleme toplantısı", "ilerleme", date(2026,10,27), "gerceklesti", "Çelik montaj durumu, trafo başvurusu, cephe onayları.", "Çelik montaj planı revize edilecek; trafo başvurusu 10 Kasım'a kadar tamamlanacak."),
+        ("TOP-015", "Çelik montaj saha toplantısı", "saha", date(2026,11,12), "planli", "İSG önlemleri ve kuzey açıklık montaj sırası.", None),
+        ("TOP-016", "Taşeron koordinasyon toplantısı", "taseron", date(2026,11,20), "planli", "Kablo kanalı ve kalıp iş planı koordinasyonu.", None),
+    ]
+    for no, title, tur, dt_, dur, gund, karar in meetings:
+        w(f"""INSERT INTO project_meetings (project_id, toplanti_no, baslik, toplanti_turu, tarih, lokasyon, katilimcilar, gundem, kararlar, aksiyon_maddeleri, durum)
+VALUES (v_proj, {q(no)}, {q(title)}, '{tur}', DATE '{dt_}', 'Şantiye ofisi', ARRAY['Emre Kılıç (Yüklenici)', 'S. Demir (Müşavir)'], {q(gund)}, {q(karar)}, '[]'::jsonb, '{dur}');""")
+
+    # ---------------------------------------------------- 17) MAKİNE / EKİPMAN
+    w("  -- 17) MAKİNE VE EKİPMAN (şirket envanteri + projeye atama + çalışma kaydı)")
+    machines = [
+        ("is_makinesi", "Kule vinç (50 m)", "ozmal", "aktif", 12500, "KVN-01", "Liebherr", "100 EC-H", 2019),
+        ("is_makinesi", "Mobil vinç 60 ton", "kiralik", "aktif", 9800, "MVN-02", "Tadano", "GR-600", 2021),
+        ("is_makinesi", "Hidrolik ekskavatör 22 ton", "ozmal", "aktif", 5200, "EKS-03", "Komatsu", "PC220", 2018),
+        ("is_makinesi", "Beton pompası 37 m", "kiralik", "bakim", 7800, "PMP-04", "Putzmeister", "M37", 2020),
+        ("arac", "Kamyonet (Pickup)", "kiralik", "aktif", 2100, "34 DM 505", "Ford", "Ranger", 2023),
+    ]
+    rng2 = random.Random(9)
+    for i, (tip, ad, sahiplik, durum, ucret, dno, marka, model, yil) in enumerate(machines, 1):
+        ceid = uid()
+        atama = date(2026, 1, 15) if i < 5 else date(2026, 3, 1)
+        plaka = q(dno) if tip == 'arac' else 'NULL'
+        tedarikci = q('Demo Makine Kiralama Ltd.') if sahiplik == 'kiralik' else 'NULL'
+        w(f"""SELECT id INTO v_ce FROM company_equipment WHERE demirbas_no = {q(dno)} LIMIT 1;
+  IF v_ce IS NULL THEN
+    INSERT INTO company_equipment (id, tip, ad, plaka, demirbas_no, marka, model, uretim_yili, sahiplik, tedarikci, gunluk_ucret, durum, aciklama, current_project_id)
+    VALUES ('{ceid}', '{tip}', {q(ad)}, {plaka}, {q(dno)}, {q(marka)}, {q(model)}, {yil}, '{sahiplik}', {tedarikci}, {ucret}, '{durum}', 'Demo kaydı', v_proj)
+    RETURNING id INTO v_ce;
+  END IF;""")
+        mid = uid()
+        w(f"""INSERT INTO project_machines (id, project_id, company_equipment_id, atanma_tarihi, is_basi_tarihi, teslim_alindi_tarihi)
+VALUES ('{mid}', v_proj, v_ce, DATE '{atama}', DATE '{atama}', DATE '{atama}');""")
+        for dd in [date(2026,10,27), date(2026,10,29), date(2026,11,3), date(2026,11,5)]:
+            if dd < atama:
+                continue
+            hrs = rng2.choice([6.5, 8.0, 9.0]) if tip != 'arac' else rng2.choice([40.0, 65.0, 80.0])
+            birim = 'km' if tip == 'arac' else 'saat'
+            w(f"""INSERT INTO project_machine_logs (project_id, machine_id, tarih, calisma_miktari, calisma_birimi, operator, aciklama)
+VALUES (v_proj, '{mid}', DATE '{dd}', {hrs}, '{birim}', 'Demo operatör', 'Günlük çalışma kaydı');""")
+
+    # ---------------------------------------------------- 18) İDARİ HAKEDİŞ TAHSİLATLARI (nakit girişi)
+    w("  -- 18) İDARİ HAKEDİŞ TAHSİLATLARI")
+    for dd_ in idari:
+        if not dd_["paid"]:
+            continue
+        hd_ = month_end(dd_["y"], dd_["m"])
+        w(f"""INSERT INTO cash_events (project_id, direction, source_entity, source_id, description, amount, event_date, created_by)
+VALUES (v_proj, 'in', 'idari_hakedis', '{dd_['id']}', {q('İdari Hakediş — ' + str(dd_['y']) + '-' + f"{dd_['m']:02d}")}, {n(dd_['tutar'])}, DATE '{hd_ + timedelta(days=30)}', v_admin);""")
+
+    # ---------------------------------------------------- 19) TAŞERON ÖDEMELERİ (havale + nakit çıkışı)
+    w("  -- 19) TAŞERON ÖDEMELERİ (kesinleşen hakediş net tutarı, +20 gün)")
+    for r in progress_rows:
+        fin_d = date(r["y"] + (1 if r["m"] == 12 else 0), 1 if r["m"] == 12 else r["m"] + 1, 5)
+        pay_d = fin_d + timedelta(days=20)
+        if pay_d > date(2026, 11, 6):
+            continue
+        net = round(r["gross_this"] - round(r["gross_this"] * 0.05, 2), 2)
+        did = uid()
+        desc = r["sub"]["name"] + " hakedişi " + str(r["y"]) + "-" + f"{r['m']:02d}"
+        w(f"""INSERT INTO progress_payment_disbursements (id, progress_payment_id, amount, payment_method, event_date, created_by)
+VALUES ('{did}', '{r['id']}', {n(net)}, 'havale', DATE '{pay_d}', v_admin);""")
+        w(f"""INSERT INTO cash_events (project_id, direction, source_entity, source_id, description, amount, event_date, payment_method, created_by)
+VALUES (v_proj, 'out', 'progress_payment_disbursement', '{did}', {q(desc)}, {n(net)}, DATE '{pay_d}', 'havale', v_admin);""")
+
+    # ---------------------------------------------------- 20) TEDARİKÇİ ÖDEMELERİ (teslim + 30 gün)
+    w("  -- 20) TEDARİKÇİ ÖDEMELERİ (teslim tarihi + 30 gün)")
+    for po_id, desc, sup, amt, dd_ in PO_REF:
+        pay_d = dd_ + timedelta(days=30)
+        pyid = uid()
+        w(f"""INSERT INTO purchase_order_payments (id, po_id, amount, payment_method, event_date, created_by)
+VALUES ('{pyid}', '{po_id}', {n(amt)}, 'havale', DATE '{pay_d}', v_admin);""")
+        w(f"""INSERT INTO cash_events (project_id, direction, source_entity, source_id, description, amount, event_date, payment_method, created_by)
+VALUES (v_proj, 'out', 'po_payment', '{pyid}', {q(desc + ' — ' + sup)}, {n(amt)}, DATE '{pay_d}', 'havale', v_admin);""")
+
+    # ---------------------------------------------------- 21) TEDARİKÇİ KAYITLARI VE EKSTRELER
+    w("  -- 21) TEDARİKÇİLER VE EKSTRELER")
+    suppliers = {}
+    for po_id, desc, sup, amt, dd_ in PO_REF:
+        suppliers.setdefault(sup, {"toplam": 0.0, "odenen": 0.0})
+        suppliers[sup]["toplam"] += amt
+        suppliers[sup]["odenen"] += amt
+    for desc, sup, amt, code, dd_ in PO_OPEN:
+        suppliers.setdefault(sup, {"toplam": 0.0, "odenen": 0.0})
+        suppliers[sup]["toplam"] += amt
+    for i, (sup, vals) in enumerate(suppliers.items(), 1):
+        tid_ = uid()
+        w(f"""INSERT INTO tedarikciler (id, project_id, company_name, tax_no, contact_person, phone, email, trade, default_payment_method)
+VALUES ('{tid_}', v_proj, {q(sup)}, {q(str(6100000000 + i * 137))}, 'Satış Müdürü (Demo)', '0212 555 0{i:02d} {i:02d}', 'satis@{sup.split()[0].lower()}.demo', 'Tedarik', 'havale');""")
+        durum = "odendi" if abs(vals["odenen"] - vals["toplam"]) < 0.01 and vals["toplam"] > 0 else (
+            "kismi_odendi" if vals["odenen"] > 0 else "bekliyor")
+        w(f"""INSERT INTO supplier_statements (project_id, tedarikci_adi, ekstre_no, ekstre_tarihi, vade_tarihi, toplam_tutar, odenen_tutar, para_birimi, odeme_durumu, aciklama)
+VALUES (v_proj, {q(sup)}, 'EKS-2026-{i:03d}', DATE '2026-10-31', DATE '2026-11-30', {n(vals['toplam'])}, {n(vals['odenen'])}, 'TRY', '{durum}', 'Ekim 2026 dönemi ekstresi (demo)');""")
+
+    # ---------------------------------------------------- 22) SABİT GİDERLER
+    w("  -- 22) SABİT GİDERLER (her ay tekrarlanan; okuma anında üretilir)")
+    fixed = [
+        ("Şantiye ofis kirası", 45000, "kira", 5),
+        ("Güvenlik hizmeti", 180000, "hizmet", 1),
+        ("Temizlik hizmeti", 25000, "hizmet", 10),
+        ("Ofis internet ve telefon", 8500, "iletisim", 15),
+    ]
+    for label, amt, cat, dom in fixed:
+        w(f"""INSERT INTO fixed_expenses (project_id, label, amount, category, expense_day_of_month, start_date, active, created_by)
+VALUES (v_proj, {q(label)}, {amt}, {q(cat)}, {dom}, DATE '2025-06-01', true, v_admin);""")
+
+    # ---------------------------------------------------- 23) TEDARİK PLANI
+    w("  -- 23) SATINALMA PLANI (kalem bazlı)")
+    plan = [
+        ("04.110", "Çelik profil (HEA/IPE)", "Yapısal çelik", 980, "ton", "Mavi Çelik Tic. Ltd.", date(2026,1,20), date(2026,2,20), "Kritik", "TeslimAlindi"),
+        ("05.210", "Trafo ve ana pano", "Elektrik", 1, "ad", "Enerji Ekipman A.Ş.", date(2026,4,20), date(2026,5,15), "Kritik", "TeslimAlindi"),
+        ("06.400", "Jeneratör ve UPS", "Elektrik", 1, "ad", "Enerji Ekipman A.Ş.", date(2026,6,1), date(2026,7,2), "Normal", "TeslimAlindi"),
+        ("07.120", "Cephe panel kaplama", "Dış cephe", 6200, "m2", "Yapı Kaplama A.Ş.", date(2026,8,10), date(2026,9,12), "Kritik", "TeslimAlindi"),
+        ("07.310", "Cephe alüminyum doğrama", "Dış cephe", 1, "takım", "Alüm Doğrama Sanayi", date(2026,11,1), date(2026,12,15), "Normal", "SiparisVerildi"),
+        ("05.500", "Hidrolik asansör", "Mekanik", 2, "adet", "Asansör Dünyası Ltd.", date(2026,8,20), date(2026,10,5), "Kritik", "TeslimAlindi"),
+        ("06.520", "Güvenlik ve CCTV", "Elektrik", 1, "sistem", "Güven Güvenlik Sist.", date(2026,10,25), date(2026,11,30), "Normal", "SiparisVerildi"),
+        ("03.300", "Hazır beton C30/37 (yedek santral)", "Beton", 1200, "m3", "Akdeniz Hazır Beton", date(2026,11,10), date(2026,11,25), "Kritik", "Planlandi"),
+        ("08.210", "Asfalt karışımı (yol üst tabaka)", "Yol", 480, "ton", "Sakarya Asfalt A.Ş.", date(2027,4,1), date(2027,4,20), "Normal", "Planlandi"),
+        ("05.120", "Yangın söndürme sprinkler", "Mekanik", 1, "sistem", "Yangın Sistemleri Ltd.", date(2026,5,1), date(2026,6,18), "Kritik", "TeslimAlindi"),
+        ("06.110", "Aydınlatma armatürü LED", "Elektrik", 1200, "adet", "Işık Aydınlatma Tic.", date(2026,9,1), date(2026,10,30), "Normal", "Gecikti"),
+        ("01.050", "Şantiye konteyneri", "Genel", 4, "adet", "Saha Lojistik Ltd.", date(2025,7,20), date(2025,8,5), "Normal", "TeslimAlindi"),
+    ]
+    for code_, desc_, cat_, qty_, unit_, sup_, od, dd_, crit, st in plan:
+        w(f"""INSERT INTO procurement_plan_items (project_id, poz_no, description, category, quantity, unit, supplier_name, planned_order_date, planned_delivery_date, criticality, status, created_by)
+VALUES (v_proj, {q(code_)}, {q(desc_)}, {q(cat_)}, {qty_}, {q(unit_)}, {q(sup_)}, DATE '{od}', DATE '{dd_}', {q(crit)}, '{st}', v_admin);""")
+
+    # ---------------------------------------------------- 24) MALZEME ONAYLARI
+    w("  -- 24) MALZEME ONAYLARI (taşeron talebi, müşavir kararı)")
+    approvals = [
+        (kaba, "MAR-001", "C30/37 hazır beton (reçete)", "Akdeniz Hazır Beton", "Approved", "Reçete uygun, numune testi geçti.", 3, date(2025,10,20)),
+        (kaba, "MAR-004", "B500C nervürlü donatı", "Kardemir (demo)", "Approved", "TS 708 belgesi uygun.", 7, date(2026,1,10)),
+        (celik, "MAR-007", "Yüksek mukavemetli cıvata 10.9", "Bulonsan (demo)", "ConditionallyApproved", "Sertlik raporu eklenmesi şartıyla onaylandı.", 14, date(2026,3,5)),
+        (mep, "MAR-011", "PPR boru sistemi", "Tesisat Malzeme Ltd. (demo)", "Rejected", "Basınç sınıfı talep edilenin altında, yeniden teklif istendi.", 10, date(2026,6,20)),
+        (mep, "MAR-013", "LED armatür 40W", "Işık Aydınlatma Tic.", "UnderReview", None, 21, date(2026,10,28)),
+    ]
+    for sub_, mar, mname, manu, st, note, lead, need in approvals:
+        dec_by = "NULL" if st in ("Submitted", "UnderReview") else "v_admin"
+        dec_at = "NULL" if st in ("Submitted", "UnderReview") else f"TIMESTAMPTZ '{need} 16:00:00+03'"
+        w(f"""INSERT INTO material_approvals (project_id, subcontractor_id, mar_no, material_name, manufacturer, status, decision_note, decided_by, decided_at, created_by, lead_time_days, needed_by_date)
+VALUES (v_proj, '{sub_['id']}', {q(mar)}, {q(mname)}, {q(manu)}, '{st}', {q(note) if note else 'NULL'}, {dec_by}, {dec_at}, v_admin, {lead}, DATE '{need}');""")
+
+    # ---------------------------------------------------- 25) ŞANTİYE DEPOSU
+    w("  -- 25) ŞANTİYE DEPOSU (stok kalemleri ve hareketler)")
+    wh = [
+        ("Donatı B500C (çap 12-20)", "Donatı", "ton", 42.5, 10),
+        ("CEM I 42.5 çimento", "Bağlayıcı", "ton", 18.0, 6),
+        ("Kaynak teli", "Sarf", "kg", 240, 50),
+        ("Mazot", "Yakıt", "litre", 1850, 500),
+        ("Bağlama teli", "Sarf", "kg", 65, 20),
+        ("Çelik profil (HEA)", "Yapısal", "ton", 0, 2),
+    ]
+    wh_ids = {}
+    for i, (nm, cat_, un, cur, mn) in enumerate(wh, 1):
+        wid_ = uid()
+        wh_ids[nm] = wid_
+        w(f"""INSERT INTO site_warehouse_items (id, project_id, malzeme_adi, kategori, birim, mevcut_miktar, min_stok, sira)
+VALUES ('{wid_}', v_proj, {q(nm)}, {q(cat_)}, {q(un)}, {cur}, {mn}, {i});""")
+    celik_po = next((po_id for po_id, desc, sup, amt, dd_ in PO_REF if desc.startswith("Çelik profil")), None)
+    if celik_po:
+        w(f"""INSERT INTO site_warehouse_movements (project_id, item_id, hareket_turu, miktar, tarih, belge_no, aciklama, purchase_order_id)
+VALUES (v_proj, '{wh_ids['Çelik profil (HEA)']}', 'giris', 980, DATE '2026-02-20', 'IRS-0001', 'Çelik profil teslim girişi', '{celik_po}');""")
+        w(f"""INSERT INTO site_warehouse_movements (project_id, item_id, hareket_turu, miktar, tarih, belge_no, aciklama)
+VALUES (v_proj, '{wh_ids['Çelik profil (HEA)']}', 'cikis', 980, DATE '2026-03-01', 'CKS-0001', 'Kolon montajı için sahaya çıkış');""")
+    for k, day in enumerate([d for d in work_days if d.day in (5, 20) and d >= date(2025, 8, 1)][:24]):
+        w(f"""INSERT INTO site_warehouse_movements (project_id, item_id, hareket_turu, miktar, tarih, belge_no, aciklama)
+VALUES (v_proj, '{wh_ids['Mazot']}', 'cikis', {rng.randint(180, 420)}, DATE '{day}', 'CKS-M{k + 1:03d}', 'Jeneratör ve ekskavatör ikmali');""")
+    w(f"""INSERT INTO site_warehouse_movements (project_id, item_id, hareket_turu, miktar, tarih, belge_no, aciklama)
+VALUES (v_proj, '{wh_ids['Donatı B500C (çap 12-20)']}', 'giris', 60, DATE '2026-01-08', 'IRS-D01', 'Donatı teslim girişi (Kardemir)');""")
+    w(f"""INSERT INTO site_warehouse_movements (project_id, item_id, hareket_turu, miktar, tarih, belge_no, aciklama)
+VALUES (v_proj, '{wh_ids['CEM I 42.5 çimento']}', 'giris', 40, DATE '2026-02-10', 'IRS-C01', 'Çimento teslim girişi');""")
 
     w("END $$;")
 
