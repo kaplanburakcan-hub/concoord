@@ -7,6 +7,7 @@ import { Can } from "../auth/guards";
 import { useProjects } from "../projects/ProjectContext";
 import { useTheme } from "../theme/ThemeContext";
 import NotificationBell from "./NotificationBell";
+import NotificationsSidebar from "./NotificationsSidebar";
 import HeaderClock from "./HeaderClock";
 
 type AltKirilim = { to: string; label: string; end?: boolean };
@@ -242,7 +243,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     .split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase();
 
   return (
-    <div className="min-h-screen grid grid-cols-1 md:grid-cols-[250px_1fr]">
+    <div className="min-h-screen grid grid-cols-1 md:grid-cols-[250px_1fr] xl:grid-cols-[250px_1fr_250px]">
       <aside
         className="no-print hidden md:flex flex-col sticky top-0 h-screen border-r"
         style={{ background: "var(--chrome)", color: "var(--chrome-text)", borderColor: "var(--chrome-border)" }}
@@ -339,7 +340,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <HeaderClock />
 
           <div className="ml-auto flex items-center gap-2.5">
-            <NotificationBell />
+            {/* Geniş ekranda bildirimler sağ kenar çubuğunda; zil yalnızca o bar gizliyken açılır liste sunar */}
+            <div className="xl:hidden">
+              <NotificationBell />
+            </div>
             <button
               onClick={toggle}
               aria-label="Tema değiştir"
@@ -377,6 +381,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </div>
         </main>
       </div>
+
+      {/* Sağ kenar çubuğu — widget/bildirim alanı. Sol barla aynı genişlik;
+          orta sütun kalan alanı kullandığı için içerik bu iki bar arasında ortalanır. */}
+      <aside
+        className="no-print hidden xl:flex flex-col sticky top-0 h-screen border-l"
+        style={{ background: "var(--chrome)", color: "var(--chrome-text)", borderColor: "var(--chrome-border)" }}
+      >
+        <NotificationsSidebar />
+        <div className="flex-1 overflow-y-auto p-3" />
+      </aside>
     </div>
   );
 }
