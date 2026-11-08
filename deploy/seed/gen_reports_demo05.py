@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 from datetime import date, timedelta
 
-BASE = "http://localhost:8080/api/v1"
+BASE = os.environ.get("IPKS_BASE", "http://localhost:8080/api/v1")
 
 
 def load_env(path):
@@ -41,12 +41,13 @@ def call(method, path, token=None, body=None):
 
 
 def main():
-    here = os.path.dirname(os.path.abspath(__file__))
-    env = load_env(os.path.join(here, "..", "..", ".env"))
-    s, body = call("POST", "/auth/login", None, {
-        "identifier": env["IPKS_BOOTSTRAP_ADMIN_EMAIL"],
-        "password": env["IPKS_BOOTSTRAP_ADMIN_PASSWORD"],
-    })
+    if "IPKS_ADMIN_EMAIL" in os.environ:
+        email, pw = os.environ["IPKS_ADMIN_EMAIL"], os.environ["IPKS_ADMIN_PASSWORD"]
+    else:
+        here = os.path.dirname(os.path.abspath(__file__))
+        env = load_env(os.path.join(here, "..", "..", ".env"))
+        email, pw = env["IPKS_BOOTSTRAP_ADMIN_EMAIL"], env["IPKS_BOOTSTRAP_ADMIN_PASSWORD"]
+    s, body = call("POST", "/auth/login", None, {"identifier": email, "password": pw})
     token = body["tokens"]["access_token"]
     s, body = call("GET", "/projects", token)
     pid = next(p["id"] for p in body["projects"] if p["code"] == "DEMO-05")
@@ -80,8 +81,8 @@ def main():
     results["custom"].append(("2025-06-01..2026-10-31", s))
 
     for k, v in results.items():
-        ok = sum(1 for _, s in v if s in (200, 201))
-        bad = [(p, s) for p, s in v if s not in (200, 201)]
+        ok = sum(1 for _, s in v if s in (200, 201, 202))
+        bad = [(p, s) for p, s in v if s not in (200, 201, 202)]
         print(f"{k}: {ok}/{len(v)} oluşturuldu", ("hatalar: " + str(bad[:5])) if bad else "")
 
 
