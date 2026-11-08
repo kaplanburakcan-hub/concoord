@@ -49,35 +49,58 @@ export default function NotificationsSidebar() {
     } catch { /* */ }
   }
 
+  const initials = (user?.username ?? "")
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
+  // Üstte kullanıcı, altta Bildirimler: iki ayrı, eş ebatlı çerçeve (proje seçicinin çerçevesiyle aynı stil)
+  const frameStyle = { background: "rgba(255,255,255,.06)", borderColor: "var(--chrome-border)" };
+
   return (
     <>
-      <div className="px-4 py-3 border-b shrink-0" style={{ borderColor: "var(--chrome-border)" }}>
-        <div className="text-[13px] text-white truncate">{user?.username}</div>
-        {user?.title && (
-          <div className="text-[11px] truncate" style={{ color: "var(--chrome-text-3)" }}>{user.title}</div>
-        )}
-      </div>
-      <div
-        className="h-16 flex items-center justify-between gap-2 px-4 border-b shrink-0"
-        style={{ borderColor: "var(--chrome-border)" }}
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-[13px] font-semibold">Bildirimler</span>
-          {unread > 0 && (
-            <span className="rounded-full bg-red-500 px-1.5 text-center text-[10px] font-bold leading-[18px] text-white">
-              {unread > 99 ? "99+" : unread}
-            </span>
-          )}
+      <div className="px-3 pt-3 space-y-2 shrink-0">
+        <div className="h-[52px] flex items-center justify-between gap-3 rounded-[10px] px-3 border" style={frameStyle}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className="w-[30px] h-[30px] rounded-full grid place-items-center shrink-0 text-[12px] font-bold"
+              style={{ background: "var(--group-accent)", color: "#141414" }}
+            >
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <div className="text-[13px] text-white truncate">{user?.username}</div>
+              {user?.title && (
+                <div className="text-[11px] truncate" style={{ color: "var(--chrome-text-3)" }}>{user.title}</div>
+              )}
+            </div>
+          </div>
+          <Link to="/bildirim-ayarlari" className="text-[12px] shrink-0" style={{ color: "var(--chrome-text-3)" }} title="Kanal tercihleri">
+            ⚙
+          </Link>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="h-[52px] flex items-center justify-between gap-3 rounded-[10px] px-3 border" style={frameStyle}>
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className="text-[11px] font-bold uppercase tracking-[.1em] whitespace-nowrap"
+              style={{ color: "var(--chrome-text-3)" }}
+            >
+              Bildirimler
+            </span>
+            {unread > 0 && (
+              <span className="rounded-full bg-red-500 px-1.5 text-center text-[10px] font-bold leading-[18px] text-white">
+                {unread > 99 ? "99+" : unread}
+              </span>
+            )}
+          </div>
           {unread > 0 && (
-            <button onClick={markAll} className="text-[11px] hover:underline" style={{ color: "var(--group-accent)" }}>
+            <button onClick={markAll} className="text-[11px] hover:underline shrink-0" style={{ color: "var(--group-accent)" }}>
               Tümü okundu
             </button>
           )}
-          <Link to="/bildirim-ayarlari" className="text-[12px]" style={{ color: "var(--chrome-text-3)" }} title="Kanal tercihleri">
-            ⚙
-          </Link>
         </div>
       </div>
 
