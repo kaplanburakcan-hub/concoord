@@ -256,7 +256,7 @@ func BuildWeekly(in WeeklyData) []byte {
 		p.tableAt(mL, fillCols([]col{{"Tedarikçi", 110, false}, {"Malzeme", -1, false}, {"Miktar", 62, true}}, lw), rows, false)
 	}
 	for _, s := range firstNStock(in.LowStock, 2) {
-		p.y += p.noteBox(mL, p.y+4, lw, "Stok uyarısı", fmt.Sprintf("%s: %s / min %s %s — sipariş önerilir.", s.Name, Qty(s.Cur), Qty(s.Min), s.Unit)) + 4
+		p.y += p.noteBox(mL, p.y+4, lw, "Stok uyarısı", fmt.Sprintf("%s: %s / min %s %s — minimum stok seviyesinin altında.", s.Name, Qty(s.Cur), Qty(s.Min), s.Unit)) + 4
 	}
 	yLeft = p.y
 	p.y = yTop
