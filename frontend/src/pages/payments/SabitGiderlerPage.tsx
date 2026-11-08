@@ -167,16 +167,20 @@ export default function SabitGiderlerPage() {
                 <td className="py-2 px-3 text-beton-400 text-xs">{e.start_date}</td>
                 <td className="py-2 px-3 text-beton-400 text-xs">{e.end_date || "—"}</td>
                 <td className="py-2 px-3">
-                  <button onClick={() => aktifDegistir(e)}
-                    className={`text-xs px-2 py-0.5 rounded-full border ${
-                      e.active ? "bg-green-500/15 text-green-300 border-green-500/40"
-                      : "bg-beton-800 text-beton-500 border-beton-700"
-                    }`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                    e.active ? "bg-green-500/15 text-green-300 border-green-500/40"
+                    : "bg-beton-800 text-beton-500 border-beton-700"
+                  }`}>
                     {e.active ? "Aktif" : "Pasif"}
-                  </button>
+                  </span>
                 </td>
                 <td className="py-2 px-3">
-                  <button onClick={() => setConfirmDelete(e)} className="text-xs text-red-500 hover:text-red-400">Sil</button>
+                  <div className="flex items-center gap-3 whitespace-nowrap">
+                    <button onClick={() => aktifDegistir(e)} className="text-xs text-emniyet-400 hover:text-emniyet-300">
+                      {e.active ? "Pasife al" : "Aktife al"}
+                    </button>
+                    <button onClick={() => setConfirmDelete(e)} className="text-xs text-red-500 hover:text-red-400">Sil</button>
+                  </div>
                 </td>
               </tr>
             ))}

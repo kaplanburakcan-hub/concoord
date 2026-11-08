@@ -90,15 +90,22 @@ export default function UsersPage() {
                   <Td>{u.email}</Td>
                   <Td className="font-mono text-xs">{u.username}</Td>
                   <Td>
-                    <button
-                      onClick={() => toggleActive(u)}
-                      className={
-                        "font-mono text-xs px-2 py-0.5 rounded " +
-                        (u.is_active ? "bg-emniyet-500/15 text-emniyet-500" : "bg-beton-800 text-beton-400")
-                      }
-                    >
-                      {u.is_active ? "aktif" : "pasif"}
-                    </button>
+                    <div className="flex items-center gap-3 whitespace-nowrap">
+                      <span
+                        className={
+                          "font-mono text-xs px-2 py-0.5 rounded " +
+                          (u.is_active ? "bg-emniyet-500/15 text-emniyet-500" : "bg-beton-800 text-beton-400")
+                        }
+                      >
+                        {u.is_active ? "aktif" : "pasif"}
+                      </span>
+                      <button
+                        onClick={() => toggleActive(u)}
+                        className="text-xs text-emniyet-400 hover:text-emniyet-300"
+                      >
+                        {u.is_active ? "Pasife al" : "Aktife al"}
+                      </button>
+                    </div>
                   </Td>
                   <Td>
                     <Link to={`/admin/permissions?user=${u.id}`} className="text-emniyet-500 hover:underline">
