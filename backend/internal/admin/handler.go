@@ -42,6 +42,7 @@ type userDTO struct {
 	Email       string     `json:"email"`
 	Username    string     `json:"username"`
 	FullName    string     `json:"full_name"`
+	Title       *string    `json:"title"`
 	Phone       *string    `json:"phone,omitempty"`
 	IsActive    bool       `json:"is_active"`
 	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
@@ -52,7 +53,7 @@ type userDTO struct {
 func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("query"))
 	rows, err := h.pool.Query(r.Context(), `
-		SELECT id, email, username, full_name, phone, is_active, last_login_at, row_version, created_at
+		SELECT id, email, username, full_name, title, phone, is_active, last_login_at, row_version, created_at
 		FROM users
 		WHERE deleted_at IS NULL
 		  AND ($1 = '' OR email ILIKE '%'||$1||'%' OR username ILIKE '%'||$1||'%' OR full_name ILIKE '%'||$1||'%')
@@ -67,7 +68,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	out := []userDTO{}
 	for rows.Next() {
 		var u userDTO
-		if err := rows.Scan(&u.ID, &u.Email, &u.Username, &u.FullName, &u.Phone,
+		if err := rows.Scan(&u.ID, &u.Email, &u.Username, &u.FullName, &u.Title, &u.Phone,
 			&u.IsActive, &u.LastLoginAt, &u.RowVersion, &u.CreatedAt); err != nil {
 			httpx.Internal(w, r)
 			return
@@ -81,6 +82,7 @@ type createUserReq struct {
 	Email    string  `json:"email"`
 	Username string  `json:"username"`
 	FullName string  `json:"full_name"`
+	Title    *string `json:"title"`
 	Phone    *string `json:"phone"`
 	Password string  `json:"password"`
 	IsActive *bool   `json:"is_active"`
@@ -129,11 +131,11 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	var u userDTO
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO users (email, username, password_hash, full_name, phone, is_active)
-		VALUES ($1,$2,$3,$4,$5,$6)
-		RETURNING id, email, username, full_name, phone, is_active, last_login_at, row_version, created_at`,
-		req.Email, req.Username, hash, strings.TrimSpace(req.FullName), req.Phone, active).
-		Scan(&u.ID, &u.Email, &u.Username, &u.FullName, &u.Phone, &u.IsActive, &u.LastLoginAt, &u.RowVersion, &u.CreatedAt)
+		INSERT INTO users (email, username, password_hash, full_name, title, phone, is_active)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)
+		RETURNING id, email, username, full_name, title, phone, is_active, last_login_at, row_version, created_at`,
+		req.Email, req.Username, hash, strings.TrimSpace(req.FullName), normTitle(req.Title), req.Phone, active).
+		Scan(&u.ID, &u.Email, &u.Username, &u.FullName, &u.Title, &u.Phone, &u.IsActive, &u.LastLoginAt, &u.RowVersion, &u.CreatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
 			httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict, "E-posta veya kullanıcı adı zaten kayıtlı.", nil)
@@ -166,9 +168,9 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 	var u userDTO
 	err := h.pool.QueryRow(r.Context(), `
-		SELECT id, email, username, full_name, phone, is_active, last_login_at, row_version, created_at
+		SELECT id, email, username, full_name, title, phone, is_active, last_login_at, row_version, created_at
 		FROM users WHERE id=$1 AND deleted_at IS NULL`, id).
-		Scan(&u.ID, &u.Email, &u.Username, &u.FullName, &u.Phone, &u.IsActive, &u.LastLoginAt, &u.RowVersion, &u.CreatedAt)
+		Scan(&u.ID, &u.Email, &u.Username, &u.FullName, &u.Title, &u.Phone, &u.IsActive, &u.LastLoginAt, &u.RowVersion, &u.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Kullanıcı bulunamadı.", nil)
 		return
@@ -182,6 +184,7 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 type updateUserReq struct {
 	FullName   *string `json:"full_name"`
+	Title      *string `json:"title"`
 	Phone      *string `json:"phone"`
 	IsActive   *bool   `json:"is_active"`
 	RowVersion int     `json:"row_version"` // optimistic locking
@@ -206,9 +209,9 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	// row_version ile çakışma kontrolü + audit için before.
 	var before userDTO
 	err = tx.QueryRow(r.Context(), `
-		SELECT id, email, username, full_name, phone, is_active, last_login_at, row_version, created_at
+		SELECT id, email, username, full_name, title, phone, is_active, last_login_at, row_version, created_at
 		FROM users WHERE id=$1 AND deleted_at IS NULL FOR UPDATE`, id).
-		Scan(&before.ID, &before.Email, &before.Username, &before.FullName, &before.Phone,
+		Scan(&before.ID, &before.Email, &before.Username, &before.FullName, &before.Title, &before.Phone,
 			&before.IsActive, &before.LastLoginAt, &before.RowVersion, &before.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, r, http.StatusNotFound, httpx.CodeNotFound, "Kullanıcı bulunamadı.", nil)
@@ -227,6 +230,10 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	if req.FullName != nil {
 		full = strings.TrimSpace(*req.FullName)
 	}
+	title := before.Title
+	if req.Title != nil {
+		title = normTitle(req.Title)
+	}
 	phone := before.Phone
 	if req.Phone != nil {
 		phone = req.Phone
@@ -237,11 +244,11 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	var after userDTO
 	err = tx.QueryRow(r.Context(), `
-		UPDATE users SET full_name=$2, phone=$3, is_active=$4, row_version=row_version+1
+		UPDATE users SET full_name=$2, title=$3, phone=$4, is_active=$5, row_version=row_version+1
 		WHERE id=$1
-		RETURNING id, email, username, full_name, phone, is_active, last_login_at, row_version, created_at`,
-		id, full, phone, active).
-		Scan(&after.ID, &after.Email, &after.Username, &after.FullName, &after.Phone,
+		RETURNING id, email, username, full_name, title, phone, is_active, last_login_at, row_version, created_at`,
+		id, full, title, phone, active).
+		Scan(&after.ID, &after.Email, &after.Username, &after.FullName, &after.Title, &after.Phone,
 			&after.IsActive, &after.LastLoginAt, &after.RowVersion, &after.CreatedAt)
 	if err != nil {
 		httpx.Internal(w, r)
@@ -250,8 +257,8 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	m := audit.MetaFrom(r.Context())
 	if err := h.rec.RecordTx(r.Context(), tx, audit.Entry{
 		ActorID: m.ActorID, Entity: "users", EntityID: id.String(), Action: audit.ActionUpdate,
-		Before: map[string]interface{}{"full_name": before.FullName, "is_active": before.IsActive},
-		After:  map[string]interface{}{"full_name": after.FullName, "is_active": after.IsActive},
+		Before: map[string]interface{}{"full_name": before.FullName, "title": before.Title, "is_active": before.IsActive},
+		After:  map[string]interface{}{"full_name": after.FullName, "title": after.Title, "is_active": after.IsActive},
 		IP:     m.IP, ReqID: m.ReqID,
 	}); err != nil {
 		httpx.Internal(w, r)
@@ -473,12 +480,12 @@ func (h *Handler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 	type member struct {
-		ID             uuid.UUID  `json:"id"`
-		UserID         uuid.UUID  `json:"user_id"`
-		FullName       string     `json:"full_name"`
-		Email          string     `json:"email"`
-		RoleCode       string     `json:"role_code"`
-		RoleName       string     `json:"role_name"`
+		ID              uuid.UUID  `json:"id"`
+		UserID          uuid.UUID  `json:"user_id"`
+		FullName        string     `json:"full_name"`
+		Email           string     `json:"email"`
+		RoleCode        string     `json:"role_code"`
+		RoleName        string     `json:"role_name"`
 		SubcontractorID *uuid.UUID `json:"subcontractor_id,omitempty"`
 	}
 	out := []member{}
@@ -610,17 +617,17 @@ func (h *Handler) ListAuditLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 	type entry struct {
-		ID        uuid.UUID       `json:"id"`
-		ActorID   *uuid.UUID      `json:"actor_id,omitempty"`
-		ActorName *string         `json:"actor_name,omitempty"`
-		Entity    string          `json:"entity"`
-		EntityID  *uuid.UUID      `json:"entity_id,omitempty"`
-		Action    string          `json:"action"`
-		Before    map[string]any  `json:"before,omitempty"`
-		After     map[string]any  `json:"after,omitempty"`
-		IP        *string         `json:"ip,omitempty"`
-		RequestID *string         `json:"request_id,omitempty"`
-		At        time.Time       `json:"at"`
+		ID        uuid.UUID      `json:"id"`
+		ActorID   *uuid.UUID     `json:"actor_id,omitempty"`
+		ActorName *string        `json:"actor_name,omitempty"`
+		Entity    string         `json:"entity"`
+		EntityID  *uuid.UUID     `json:"entity_id,omitempty"`
+		Action    string         `json:"action"`
+		Before    map[string]any `json:"before,omitempty"`
+		After     map[string]any `json:"after,omitempty"`
+		IP        *string        `json:"ip,omitempty"`
+		RequestID *string        `json:"request_id,omitempty"`
+		At        time.Time      `json:"at"`
 	}
 	out := []entry{}
 	for rows.Next() {
@@ -659,3 +666,14 @@ func sqlState(err error) string {
 	return ""
 }
 
+// normTitle — görev alanını kırpar; boş metin NULL olarak saklanır.
+func normTitle(t *string) *string {
+	if t == nil {
+		return nil
+	}
+	v := strings.TrimSpace(*t)
+	if v == "" {
+		return nil
+	}
+	return &v
+}

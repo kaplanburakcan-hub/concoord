@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 
 // Sağ kenar çubuğundaki bildirim paneli (xl ekran). Üst bardaki zil ile aynı
 // veri kaynağı; burada liste kalıcı olarak görünür. Liste ~10 satır yüksekliğinde
@@ -14,6 +15,7 @@ type Notif = {
 const FETCH_LIMIT = 50;
 
 export default function NotificationsSidebar() {
+  const { user } = useAuth();
   const [items, setItems] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
 
@@ -49,6 +51,12 @@ export default function NotificationsSidebar() {
 
   return (
     <>
+      <div className="px-4 py-3 border-b shrink-0" style={{ borderColor: "var(--chrome-border)" }}>
+        <div className="text-[13px] text-white truncate">{user?.username}</div>
+        {user?.title && (
+          <div className="text-[11px] truncate" style={{ color: "var(--chrome-text-3)" }}>{user.title}</div>
+        )}
+      </div>
       <div
         className="h-16 flex items-center justify-between gap-2 px-4 border-b shrink-0"
         style={{ borderColor: "var(--chrome-border)" }}

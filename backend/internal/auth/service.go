@@ -22,6 +22,7 @@ type User struct {
 	Email       string     `json:"email"`
 	Username    string     `json:"username"`
 	FullName    string     `json:"full_name"`
+	Title       *string    `json:"title,omitempty"`
 	Phone       *string    `json:"phone,omitempty"`
 	IsActive    bool       `json:"is_active"`
 	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
@@ -52,10 +53,10 @@ func (s *Service) Login(ctx context.Context, identifier, password, ua, ip string
 		hash string
 	)
 	err := s.pool.QueryRow(ctx, `
-		SELECT id, email, username, full_name, phone, is_active, last_login_at, password_hash
+		SELECT id, email, username, full_name, title, phone, is_active, last_login_at, password_hash
 		FROM users
 		WHERE (email = $1 OR username = $1) AND deleted_at IS NULL`, identifier).
-		Scan(&u.ID, &u.Email, &u.Username, &u.FullName, &u.Phone, &u.IsActive, &u.LastLoginAt, &hash)
+		Scan(&u.ID, &u.Email, &u.Username, &u.FullName, &u.Title, &u.Phone, &u.IsActive, &u.LastLoginAt, &hash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Zamanlama sızıntısını azaltmak için yine de bir doğrulama yap.
 		_, _ = VerifyPassword(password, "$argon2id$v=19$m=65536,t=2,p=2$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
@@ -239,9 +240,9 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword strin
 func (s *Service) GetUser(ctx context.Context, userID uuid.UUID) (*User, error) {
 	var u User
 	err := s.pool.QueryRow(ctx, `
-		SELECT id, email, username, full_name, phone, is_active, last_login_at
+		SELECT id, email, username, full_name, title, phone, is_active, last_login_at
 		FROM users WHERE id=$1 AND deleted_at IS NULL`, userID).
-		Scan(&u.ID, &u.Email, &u.Username, &u.FullName, &u.Phone, &u.IsActive, &u.LastLoginAt)
+		Scan(&u.ID, &u.Email, &u.Username, &u.FullName, &u.Title, &u.Phone, &u.IsActive, &u.LastLoginAt)
 	if err != nil {
 		return nil, err
 	}

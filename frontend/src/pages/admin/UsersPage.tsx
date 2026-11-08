@@ -74,21 +74,23 @@ export default function UsersPage() {
               <Th>Ad</Th>
               <Th>E-posta</Th>
               <Th>Kullanıcı adı</Th>
+              <Th>Görev</Th>
               <Th>Durum</Th>
               <Th>İzinler</Th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-beton-400">Yükleniyor…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-beton-400">Yükleniyor…</td></tr>
             ) : users.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-beton-400">Kayıt yok.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-beton-400">Kayıt yok.</td></tr>
             ) : (
               users.map((u) => (
                 <tr key={u.id} className="border-t border-beton-800">
                   <Td className="text-beton-200">{u.full_name}</Td>
                   <Td>{u.email}</Td>
                   <Td className="font-mono text-xs">{u.username}</Td>
+                  <Td><TitleCell user={u} onSaved={load} /></Td>
                   <Td>
                     <div className="flex items-center gap-3 whitespace-nowrap">
                       <span
@@ -123,7 +125,7 @@ export default function UsersPage() {
 }
 
 function NewUserForm({ onCreated }: { onCreated: () => void }) {
-  const [f, setF] = useState({ full_name: "", email: "", username: "", password: "" });
+  const [f, setF] = useState({ full_name: "", email: "", username: "", title: "", password: "" });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -142,10 +144,10 @@ function NewUserForm({ onCreated }: { onCreated: () => void }) {
 
   return (
     <div className="mt-4 rounded-lg border border-beton-800 bg-beton-900 p-4 grid gap-3 sm:grid-cols-2">
-      {(["full_name", "email", "username", "password"] as const).map((k) => (
+      {(["full_name", "email", "username", "title", "password"] as const).map((k) => (
         <div key={k}>
           <label className="block text-xs text-beton-400 mb-1">
-            {{ full_name: "Ad Soyad", email: "E-posta", username: "Kullanıcı adı", password: "Parola (≥8)" }[k]}
+            {{ full_name: "Ad Soyad", email: "E-posta", username: "Kullanıcı adı", title: "Görev", password: "Parola (≥8)" }[k]}
           </label>
           <input
             type={k === "password" ? "password" : "text"}
@@ -166,6 +168,49 @@ function NewUserForm({ onCreated }: { onCreated: () => void }) {
         </button>
       </div>
     </div>
+  );
+}
+
+// Görev (ünvan) — Admin bu alanı burada düzenler; proje üyeliğinden gelmez.
+function TitleCell({ user, onSaved }: { user: UserRow; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(user.title ?? "");
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    try {
+      await api(`/admin/users/${user.id}`, {
+        method: "PATCH",
+        body: { title: value, row_version: user.row_version },
+      });
+      setEditing(false);
+      onSaved();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <span className="inline-flex items-center gap-3">
+        <span className="text-beton-300">{user.title || <span className="text-beton-600">—</span>}</span>
+        <button onClick={() => { setValue(user.title ?? ""); setEditing(true); }}
+          className="text-xs text-emniyet-400 hover:text-emniyet-300">Düzenle</button>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-2">
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        className="w-44 rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-200 outline-none focus:border-emniyet-500"
+      />
+      <button onClick={save} disabled={busy}
+        className="text-xs text-emniyet-400 hover:text-emniyet-300 disabled:opacity-60">Kaydet</button>
+      <button onClick={() => setEditing(false)} className="text-xs text-beton-500 hover:text-beton-300">İptal</button>
+    </span>
   );
 }
 
