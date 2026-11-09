@@ -66,16 +66,11 @@ const GROUPS: NavGroup[] = [
       { to: "/proje/ozet", label: "Özet / Dashboard", perm: "projects.view", icon: I.ozet },
       { to: "/proje/paydaslar", label: "Proje Paydaşları", perm: "projects.view", icon: I.kullanici },
       { to: "/proje/kesif", label: "Proje Keşfi", perm: "projects.view", icon: I.dok },
-      { to: "/proje/riskler", label: "Risk Kaydı", perm: "risks.view", icon: I.rapor },
-      { to: "/proje/kararlar", label: "Karar Günlüğü", perm: "decisions.view", icon: I.rapor },
-      { to: "/proje/uygunsuzluklar", label: "Uygunsuzluklar", perm: "ncr.view", icon: I.rapor },
-      { to: "/proje/sure-uzatimi", label: "Süre Uzatımı", perm: "claims.view", icon: I.gantt },
-      { to: "/proje/maliyet-kodlari", label: "Maliyet Kodları", perm: "budget.view", icon: I.rapor },
-      { to: "/proje/degisiklikler", label: "Değişiklik Olayları", perm: "changes.view", icon: I.sozlesme },
-      { to: "/verimlilik-normlari", label: "Verimlilik Normları", perm: "reports.view", icon: I.rapor },
       { to: "/proje/ana-sozlesme", label: "Ana Sözleşme", perm: "projects.view", icon: I.sozlesme },
+      { to: "/malzeme-onaylari", label: "Malzeme Onayları", perm: "material_approvals.view", icon: I.malzeme },
+      { to: "/proje/is-programi", label: "İş Programı", perm: "schedule.view", icon: I.gantt },
+      { to: "/proje/personel", label: "Personel Yönetimi", perm: "reports.view", icon: I.personel, end: true },
       { to: "/proje/tasarim-projeler", label: "Tasarım ve Projeler", perm: "projects.view", icon: I.tasarim },
-      { to: "/documents", label: "Dokümanlar", perm: "documents.view", icon: I.dok },
       {
         to: "/yazismalar", label: "Yazışmalar", perm: "correspondence.view", icon: I.evrak,
         children: [
@@ -91,24 +86,8 @@ const GROUPS: NavGroup[] = [
           { to: "/satinalma", label: "Akış Panosu", end: true },
           { to: "/satinalma/talepler", label: "Talepler (PR)" },
           { to: "/satinalma/siparisler", label: "Siparişler (PO)" },
-          { to: "/satinalma/performans", label: "Tedarikçi Performansı" },
         ],
       },
-      { to: "/malzeme-onaylari", label: "Malzeme Onayları", perm: "material_approvals.view", icon: I.malzeme },
-      { to: "/proje/is-programi", label: "İş Programı", perm: "schedule.view", icon: I.gantt },
-      { to: "/proje/ilerleme-raporlari", label: "Proje İzleme Raporları", perm: "reports.view", icon: I.rapor },
-      { to: "/aylik-raporlar/imalat", label: "İmalat Raporları", perm: "reports.view_financial_reports", icon: I.aylik },
-      { to: "/proje/personel", label: "Personel Yönetimi", perm: "reports.view", icon: I.personel, end: true },
-    ],
-  },
-  {
-    title: "Taşeron ve Tedarikçi Yönetimi",
-    items: [
-      { to: "/taseronlar/dashboard", label: "Dashboard", perm: "contracts.view", icon: I.panel },
-      { to: "/taseronlar", label: "Sözleşmeler", perm: "contracts.view", icon: I.taseron, end: true },
-      { to: "/taseronlar/sozlesme-takip", label: "Sözleşme Takip", perm: "contracts.view", icon: I.rapor },
-      { to: "/hakedis", label: "Taşeron Hakedişleri", perm: "progress_payments.view", icon: I.hakedis, end: true },
-      { to: "/tedarikci-ekstreler", label: "Tedarikçi Ekstreler", perm: "contracts.view", icon: I.ekstrem },
     ],
   },
   {
@@ -116,8 +95,14 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: "/nakit-akis", label: "Nakit Akış", perm: "reports.view_financial_reports", icon: I.ozet },
       { to: "/odeme-planlari", label: "Ödeme Planları", perm: "reports.view_financial_reports", icon: I.hakedis },
-      { to: "/odeme-plani-onaylari", label: "Ödeme Planı Onayları", perm: "payments.approve_plan_change", icon: I.izin },
       { to: "/sabit-giderler", label: "Sabit Giderler", perm: "progress_payments.view", icon: I.aylik },
+    ],
+  },
+  {
+    title: "Proje Raporları",
+    items: [
+      { to: "/proje/ilerleme-raporlari", label: "Proje İzleme Raporları", perm: "reports.view", icon: I.rapor },
+      { to: "/aylik-raporlar/imalat", label: "İmalat Raporları", perm: "reports.view_financial_reports", icon: I.aylik },
     ],
   },
   {
@@ -144,11 +129,13 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
-    title: "Ayarlar",
+    title: "Taşeron ve Tedarikçi Yönetimi",
     items: [
-      { to: "/admin/users", label: "Kullanıcılar", perm: "admin.manage_users", icon: I.kullanici },
-      { to: "/admin/permissions", label: "İzin Matrisi", perm: "admin.manage_permissions", icon: I.izin },
-      { to: "/admin/audit", label: "Denetim İzi", perm: "admin.view_audit_log", icon: I.denetim },
+      { to: "/taseronlar/dashboard", label: "Dashboard", perm: "contracts.view", icon: I.panel },
+      { to: "/taseronlar", label: "Sözleşmeler", perm: "contracts.view", icon: I.taseron, end: true },
+      { to: "/taseronlar/sozlesme-takip", label: "Sözleşme Takip", perm: "contracts.view", icon: I.rapor },
+      { to: "/hakedis", label: "Taşeron Hakedişleri", perm: "progress_payments.view", icon: I.hakedis, end: true },
+      { to: "/tedarikci-ekstreler", label: "Tedarikçi Ekstreler", perm: "contracts.view", icon: I.ekstrem },
     ],
   },
   {
@@ -158,6 +145,29 @@ const GROUPS: NavGroup[] = [
       { to: "/makine/is-makineleri", label: "İş Makineleri", perm: "projects.view", icon: I.makine },
       { to: "/makine/ekipmanlar", label: "Ekipmanlar", perm: "projects.view", icon: I.makine },
       { to: "/makine/transfer-talepleri", label: "Transfer Talepleri", perm: "equipment.approve_transfer", icon: I.izin },
+    ],
+  },
+  {
+    title: "Ayarlar",
+    items: [
+      { to: "/admin/users", label: "Kullanıcılar", perm: "admin.manage_users", icon: I.kullanici },
+      { to: "/admin/permissions", label: "İzin Matrisi", perm: "admin.manage_permissions", icon: I.izin },
+      { to: "/admin/audit", label: "Denetim İzi", perm: "admin.view_audit_log", icon: I.denetim },
+    ],
+  },
+  {
+    title: "Ek Liste",
+    items: [
+      { to: "/proje/uygunsuzluklar", label: "Uygunsuzluklar", perm: "ncr.view", icon: I.rapor },
+      { to: "/proje/sure-uzatimi", label: "Süre Uzatımı", perm: "claims.view", icon: I.gantt },
+      { to: "/proje/maliyet-kodlari", label: "Maliyet Kodları", perm: "budget.view", icon: I.rapor },
+      { to: "/proje/degisiklikler", label: "Değişiklik Olayları", perm: "changes.view", icon: I.sozlesme },
+      { to: "/verimlilik-normlari", label: "Verimlilik Normları", perm: "reports.view", icon: I.rapor },
+      { to: "/satinalma/performans", label: "Tedarikçi Performansı", perm: "procurement.view", icon: I.satinalma },
+      { to: "/odeme-plani-onaylari", label: "Ödeme Planı Onayları", perm: "payments.approve_plan_change", icon: I.izin },
+      { to: "/proje/riskler", label: "Risk Kaydı", perm: "risks.view", icon: I.rapor },
+      { to: "/proje/kararlar", label: "Karar Günlüğü", perm: "decisions.view", icon: I.rapor },
+      { to: "/documents", label: "Dokümanlar", perm: "documents.view", icon: I.dok },
     ],
   },
 ];
