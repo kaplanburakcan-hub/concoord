@@ -104,6 +104,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 	}
 	projectH := projects.NewHandler(pool, store, eval, recorder, log)
 	docH := documents.NewHandler(pool, store, recorder, log)
+	if err := docH.ConfigureDrive(cfg.GoogleServiceAccountJSON, cfg.DriveDrawingsFolderID); err != nil {
+		log.Error("google drive çizim klasörü yapılandırılamadı", "err", err)
+	}
 
 	// --- Faz 4 bağımlılıkları (görev yönetimi + merkezi bildirim motoru) ---
 	// Not: payments/statements Faz 3'ten ama Nakit Akış Faz C'nin onay akışı

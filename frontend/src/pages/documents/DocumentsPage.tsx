@@ -288,7 +288,11 @@ function DocPanel({ projectId, folderId, docs, records, catFilter, canUpload, ca
                 <span className="font-mono text-xs px-2 py-0.5 rounded bg-beton-800 text-beton-300">{r.source_label}</span>
                 {r.status && <span className="text-xs text-beton-400">{r.status}</span>}
                 <span className="text-xs text-beton-500">{new Date(r.date).toLocaleDateString("tr-TR")}</span>
-                <Link to={r.link} className="text-xs text-emniyet-500 hover:underline whitespace-nowrap">Kaynağı aç →</Link>
+                {r.source === "drive" ? (
+                  <a href={r.link} target="_blank" rel="noreferrer" className="text-xs text-emniyet-500 hover:underline whitespace-nowrap">Drive'da aç ↗</a>
+                ) : (
+                  <Link to={r.link} className="text-xs text-emniyet-500 hover:underline whitespace-nowrap">Kaynağı aç →</Link>
+                )}
               </div>
             ))}
           </div>

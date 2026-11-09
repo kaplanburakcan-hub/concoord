@@ -76,6 +76,12 @@ type Config struct {
 	// tetiklenen /internal/cron/* uçları için paylaşılan gizli anahtar.
 	// Boşsa bu uçlar 503 ile kapalı kalır (yanlışlıkla açık bırakılmasın).
 	CronSecret string
+
+	// Google Drive (opsiyonel): Dokümanlar'daki Çizim kategorisi bu klasörün
+	// dosyalarını gösterir. Servis hesabına klasörde okuyucu izni verilmelidir.
+	// Klasör kimliği boşsa özellik kapalı kalır.
+	GoogleServiceAccountJSON string
+	DriveDrawingsFolderID    string
 }
 
 func Load() (*Config, error) {
@@ -122,6 +128,8 @@ func Load() (*Config, error) {
 	c.ClamdAddr = os.Getenv("IPKS_CLAMD_ADDR")
 	c.ErrorWebhookURL = os.Getenv("IPKS_ERROR_WEBHOOK_URL")
 	c.CronSecret = os.Getenv("IPKS_CRON_SECRET")
+	c.GoogleServiceAccountJSON = os.Getenv("IPKS_GOOGLE_SERVICE_ACCOUNT_JSON")
+	c.DriveDrawingsFolderID = os.Getenv("IPKS_DRIVE_CIZIM_FOLDER_ID")
 
 	if c.DBDSN == "" {
 		return nil, fmt.Errorf("IPKS_DB_DSN zorunludur")

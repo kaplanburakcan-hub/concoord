@@ -53,6 +53,10 @@ type Handler struct {
 	store *storage.Client
 	rec   *audit.Recorder
 	log   *slog.Logger
+
+	// Google Drive Çizim klasörü (ConfigureDrive ile etkinleşir; nil ise kapalı).
+	drive         *driveClient
+	driveFolderID string
 }
 
 func NewHandler(pool *pgxpool.Pool, store *storage.Client, rec *audit.Recorder, log *slog.Logger) *Handler {
@@ -333,6 +337,12 @@ func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 			httpx.Internal(w, r)
 			return
 		}
+		// Drive hatası tüm listeyi düşürmesin; çizimler olmadan liste yine gösterilir.
+		drive, driveErr := h.driveDrawingRecords(r.Context(), category)
+		if driveErr != nil {
+			h.log.Warn("google drive çizim listesi", "err", driveErr)
+		}
+		records = append(records, drive...)
 	}
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{"documents": out, "module_records": records})
 }
