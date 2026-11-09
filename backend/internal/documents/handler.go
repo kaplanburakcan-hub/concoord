@@ -324,7 +324,17 @@ func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, d)
 	}
-	httpx.JSON(w, http.StatusOK, map[string]interface{}{"documents": out})
+	// Modül kayıtları yalnızca klasör/varlık kapsamı dışında (genel liste) eklenir.
+	records := []moduleRecordDTO{}
+	if folderID == "" && entityType == "" && entityID == "" {
+		records, err = h.moduleRecords(r.Context(), pid, category)
+		if err != nil {
+			h.log.Error("modül kayıtları", "err", err)
+			httpx.Internal(w, r)
+			return
+		}
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"documents": out, "module_records": records})
 }
 
 type createDocumentReq struct {

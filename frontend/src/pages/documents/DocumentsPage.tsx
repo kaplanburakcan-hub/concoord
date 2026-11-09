@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api, apiUpload, apiDownload, describeLoadError } from "../../api/client";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import { useProjects } from "../ProjectContext";
 
@@ -13,6 +14,13 @@ type Doc = {
   id: string; folder_id?: string; title: string; doc_category: string;
   approval_status: string; row_version: number;
   version_count: number; latest_version?: number; updated_at: string;
+};
+
+// Diğer modüllerdeki kayıtlar (sözleşme, malzeme onayı, irsaliye, İSG, saha tutanağı).
+// documents tablosunda satır değildir; kaynak modüle bağlanır.
+type ModuleRecord = {
+  source: string; source_label: string; id: string; title: string;
+  doc_category: string; status?: string; date: string; link: string;
 };
 
 const CATS = ["Contract", "Addendum", "Submittal", "Drawing", "Delivery", "OHS", "Other"];
@@ -35,6 +43,7 @@ export default function DocumentsPage() {
   const { can } = useAuth();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [docs, setDocs] = useState<Doc[]>([]);
+  const [records, setRecords] = useState<ModuleRecord[]>([]);
   const [sel, setSel] = useState<string | null>(null); // seçili klasör (null = tümü)
   const [catFilter, setCatFilter] = useState<string | null>(null); // kategori filtresi
   const [err, setErr] = useState<string | null>(null);
@@ -51,8 +60,10 @@ export default function DocumentsPage() {
       if (folder) params.set("folder_id", folder);
       if (cat) params.set("category", cat);
       const query = params.toString() ? `?${params}` : "";
-      const d = await api<{ documents: Doc[] }>(`/projects/${pid}/documents${query}`, { projectId: pid });
+      const d = await api<{ documents: Doc[]; module_records?: ModuleRecord[] }>(
+        `/projects/${pid}/documents${query}`, { projectId: pid });
       setDocs(d.documents);
+      setRecords(d.module_records ?? []);
     } catch (e) {
       setErr(describeLoadError(e, "Dokümanlar"));
     }
@@ -93,6 +104,7 @@ export default function DocumentsPage() {
           projectId={pid!}
           folderId={sel}
           docs={docs}
+          records={records}
           catFilter={catFilter}
           canUpload={can("documents.upload")}
           canDelete={can("documents.delete")}
@@ -186,9 +198,9 @@ function FolderPanel({ projectId, folders, selected, onSelect, catFilter, onCatF
   );
 }
 
-function DocPanel({ projectId, folderId, docs, catFilter, canUpload, canDelete, canDownload, onChanged }: {
+function DocPanel({ projectId, folderId, docs, records, catFilter, canUpload, canDelete, canDownload, onChanged }: {
   catFilter?: string | null;
-  projectId: string; folderId: string | null; docs: Doc[];
+  projectId: string; folderId: string | null; docs: Doc[]; records: ModuleRecord[];
   canUpload: boolean; canDelete: boolean; canDownload: boolean; onChanged: () => void;
 }) {
   const [showNew, setShowNew] = useState(false);
@@ -246,8 +258,8 @@ function DocPanel({ projectId, folderId, docs, catFilter, canUpload, canDelete, 
       )}
 
       <div className={"mt-3 border border-beton-800 rounded-lg divide-y divide-beton-800" +
-        (docs.length === 0 ? " min-h-[320px] flex items-center justify-center" : "")}>
-        {docs.length === 0 ? (
+        (docs.length === 0 && records.length === 0 ? " min-h-[320px] flex items-center justify-center" : "")}>
+        {docs.length === 0 && records.length === 0 ? (
           <p className="px-4 py-6 text-center text-beton-400 text-sm">Bu kapsamda doküman yok.</p>
         ) : (
           docs.map((d) => (
@@ -266,6 +278,22 @@ function DocPanel({ projectId, folderId, docs, catFilter, canUpload, canDelete, 
           ))
         )}
       </div>
+      {records.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[10px] uppercase tracking-wider text-beton-500 mb-1">Modül kayıtları</p>
+          <div className="border border-beton-800 rounded-lg divide-y divide-beton-800">
+            {records.map((r) => (
+              <div key={`${r.source}-${r.id}`} className="flex items-center gap-3 px-4 py-2">
+                <span className="text-beton-200 text-sm flex-1 min-w-0 truncate">{r.title}</span>
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-beton-800 text-beton-300">{r.source_label}</span>
+                {r.status && <span className="text-xs text-beton-400">{r.status}</span>}
+                <span className="text-xs text-beton-500">{new Date(r.date).toLocaleDateString("tr-TR")}</span>
+                <Link to={r.link} className="text-xs text-emniyet-500 hover:underline whitespace-nowrap">Kaynağı aç →</Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

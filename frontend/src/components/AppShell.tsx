@@ -75,6 +75,7 @@ const GROUPS: NavGroup[] = [
       { to: "/verimlilik-normlari", label: "Verimlilik Normları", perm: "reports.view", icon: I.rapor },
       { to: "/proje/ana-sozlesme", label: "Ana Sözleşme", perm: "projects.view", icon: I.sozlesme },
       { to: "/proje/tasarim-projeler", label: "Tasarım ve Projeler", perm: "projects.view", icon: I.tasarim },
+      { to: "/documents", label: "Dokümanlar", perm: "documents.view", icon: I.dok },
       {
         to: "/yazismalar", label: "Yazışmalar", perm: "correspondence.view", icon: I.evrak,
         children: [
@@ -106,7 +107,6 @@ const GROUPS: NavGroup[] = [
       { to: "/taseronlar/dashboard", label: "Dashboard", perm: "contracts.view", icon: I.panel },
       { to: "/taseronlar", label: "Sözleşmeler", perm: "contracts.view", icon: I.taseron, end: true },
       { to: "/taseronlar/sozlesme-takip", label: "Sözleşme Takip", perm: "contracts.view", icon: I.rapor },
-      { to: "/documents", label: "Dokümanlar", perm: "documents.view", icon: I.dok },
       { to: "/hakedis", label: "Taşeron Hakedişleri", perm: "progress_payments.view", icon: I.hakedis, end: true },
       { to: "/tedarikci-ekstreler", label: "Tedarikçi Ekstreler", perm: "contracts.view", icon: I.ekstrem },
     ],
