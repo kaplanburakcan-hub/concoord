@@ -114,7 +114,7 @@ const GROUPS: NavGroup[] = [
       { to: "/proje/personel-puantaj", label: "Personel & Puantaj Girişi", perm: "reports.view", icon: I.puantaj },
       { to: "/proje/pdks-puantaj", label: "PDKS Puantaj (QR/GPS)", perm: "attendance.view", icon: I.puantaj },
       { to: "/proje/pdks-geofence", label: "Şantiye Sınırları", perm: "attendance.manage_geofences", icon: I.konum },
-      { to: "/proje/depo", label: "Depo Raporları", perm: "reports.view", icon: I.depo },
+      { to: "/proje/depo", label: "Depo & Stok & Zimmet", perm: "reports.view", icon: I.depo },
       {
         to: "/isg", label: "İSG & OSGB", perm: "ohs.view", icon: I.isg,
         children: [
