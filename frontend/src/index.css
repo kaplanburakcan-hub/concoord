@@ -91,6 +91,16 @@
   --panel-ink3: 98 107 123;
 }
 
+/* Açık temada panel, haftalık raporla aynı açık palette döner (kart zemini,
+   ince gri çizgi, koyu metin). Varsayılan koyu değerler yukarıda kalır. */
+[data-theme="light"] {
+  --panel-bg: 255 255 255;
+  --panel-hairline: 213 220 229;
+  --panel-ink: 20 32 46;
+  --panel-ink2: 91 104 119;
+  --panel-ink3: 120 132 146;
+}
+
 body {
   @apply bg-beton-950 text-beton-200 font-body antialiased;
   transition: background-color .25s, color .25s;
@@ -146,6 +156,11 @@ body {
     --beton-600: 108 125 146; --beton-500: 108 125 146; --beton-400: 147 163 183;
     --beton-300: 190 202 217; --beton-200: 228 235 243; --beton-100: 245 248 251;
     --emniyet-500: 224 180 0; --emniyet-600: 190 152 0;
+  }
+  [data-theme="light"] .panel-scope {
+    --beton-950: 255 255 255; --beton-900: 243 246 250; --beton-800: 228 233 240; --beton-700: 213 220 229;
+    --beton-600: 120 132 146; --beton-500: 120 132 146; --beton-400: 91 104 119;
+    --beton-300: 60 74 92; --beton-200: 40 52 70; --beton-100: 20 32 46;
   }
   [data-theme="light"] body .panel-scope .text-beton-950 { color: #0b2545 !important; }
   [data-theme="light"] body .panel-scope .text-red-300,
