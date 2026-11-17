@@ -43,6 +43,8 @@ type Tutanak = {
   created_by_name: string;
   created_at: string;
   row_version: number;
+  iade_tarihi?: string;
+  iade_notu?: string;
 };
 
 type Sub = { id: string; company_name: string };
@@ -125,6 +127,7 @@ export default function SahaTutanaklariPage() {
   const [secili, setSecili] = useState<Tutanak | null>(null);
   const [seciliFotograflar, setSeciliFotograflar] = useState<Foto[]>([]);
   const [onayModal, setOnayModal] = useState(false);
+  const [iadeForm, setIadeForm] = useState<{ tarih: string; not: string } | null>(null);
   const [onayNot, setOnayNot] = useState("");
   const [filtre, setFiltre] = useState<TutanakTip | "hepsi">("hepsi");
   const [fotografBuyuk, setFotografBuyuk] = useState<Foto | null>(null);
@@ -333,6 +336,21 @@ export default function SahaTutanaklariPage() {
     }
   }
 
+  async function iadeKaydet(t: Tutanak) {
+    if (!pid || !iadeForm) return;
+    try {
+      await api(`/projects/${pid}/tutanaklar/${t.id}/iade`, {
+        method: "POST", projectId: pid, body: { tarih: iadeForm.tarih, not: iadeForm.not || null },
+      });
+      setIadeForm(null);
+      await load();
+      const guncel = await api<{ tutanaklar: Tutanak[] }>(`/projects/${pid}/tutanaklar`, { projectId: pid });
+      setSecili(guncel.tutanaklar.find((x) => x.id === t.id) ?? null);
+    } catch {
+      setErr("İade kaydedilemedi. Tarih zimmet tarihinden önce olamaz.");
+    }
+  }
+
   async function sil(id: string) {
     if (!pid || !confirm("Bu tutanağı silmek istediğinize emin misiniz?")) return;
     try {
@@ -446,6 +464,12 @@ export default function SahaTutanaklariPage() {
               </p>
             )}
             <p className="text-sm text-beton-200">{secili.aciklama}</p>
+            {secili.tip === "zimmet" && secili.iade_tarihi && (
+              <p className="text-sm text-green-300">
+                İade edildi: <span className="text-white">{secili.iade_tarihi.split("-").reverse().join(".")}</span>
+                {secili.iade_notu && <span className="text-beton-400"> · {secili.iade_notu}</span>}
+              </p>
+            )}
 
             {(secili.tutar || secili.miktar) && (
               <div className="rounded-md bg-beton-800 p-3 space-y-1 text-sm">
@@ -528,6 +552,33 @@ export default function SahaTutanaklariPage() {
                 <button onClick={() => setOnayModal(true)}
                   className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-beton-950 hover:brightness-110"
                 >Onay Ver / Reddet</button>
+              )}
+              {secili.tip === "zimmet" && secili.durum === "onaylandi" && !secili.iade_tarihi && !iadeForm && (
+                <button onClick={() => setIadeForm({ tarih: new Date().toISOString().slice(0, 10), not: "" })}
+                  className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-beton-950 hover:brightness-110"
+                >İade al</button>
+              )}
+              {iadeForm && secili.tip === "zimmet" && (
+                <div className="w-full flex flex-wrap items-end gap-2 rounded-md border border-beton-700 bg-beton-950 p-3">
+                  <label className="flex flex-col gap-1 text-xs text-beton-400">
+                    İade tarihi
+                    <input type="date" value={iadeForm.tarih}
+                      onChange={(e) => setIadeForm({ ...iadeForm, tarih: e.target.value })}
+                      className="rounded-md border border-beton-700 bg-beton-900 px-2 py-1 text-sm text-beton-100" />
+                  </label>
+                  <label className="flex flex-1 min-w-[160px] flex-col gap-1 text-xs text-beton-400">
+                    Not
+                    <input type="text" value={iadeForm.not}
+                      onChange={(e) => setIadeForm({ ...iadeForm, not: e.target.value })}
+                      className="rounded-md border border-beton-700 bg-beton-900 px-2 py-1 text-sm text-beton-100" />
+                  </label>
+                  <button onClick={() => iadeKaydet(secili)}
+                    className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-beton-950 hover:brightness-110"
+                  >Kaydet</button>
+                  <button onClick={() => setIadeForm(null)}
+                    className="rounded-md border border-beton-700 px-3 py-1.5 text-xs text-beton-300 hover:border-beton-500"
+                  >Vazgeç</button>
+                </div>
               )}
               {secili.durum === "taslak" && (
                 <button onClick={() => sil(secili.id)}

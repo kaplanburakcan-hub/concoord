@@ -478,6 +478,8 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("reports.generate_weekly")).Post("/projects/{projectID}/weekly-reports", reportH.GenerateWeekly)
 			pr.With(mw.RequirePermission("reports.generate_weekly")).Get("/projects/{projectID}/weekly-reports/{id}", reportH.GetWeekly)
 			pr.With(mw.RequirePermission("reports.generate_weekly")).Get("/projects/{projectID}/weekly-reports/{id}/download", reportH.DownloadWeekly)
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/inventory/depo-stok.pdf", reportH.InventoryDepoStokPDF)
+			pr.With(mw.RequirePermission("reports.view")).Get("/projects/{projectID}/inventory/makine-ekipman.pdf", reportH.InventoryMakineEkipmanPDF)
 		})
 
 		// ---- Faz 7: Satınalma ve Tedarik Zinciri ----
@@ -751,6 +753,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler 
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/tutanaklar", tutanaklarH.Create)
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/tutanaklar/{id}/submit", tutanaklarH.Submit)
 			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/tutanaklar/{id}/decide", tutanaklarH.Decide)
+			pr.With(mw.RequirePermission("projects.edit")).Post("/projects/{projectID}/tutanaklar/{id}/iade", tutanaklarH.Iade)
 			pr.With(mw.RequirePermission("projects.edit")).Delete("/projects/{projectID}/tutanaklar/{id}", tutanaklarH.Delete)
 		})
 

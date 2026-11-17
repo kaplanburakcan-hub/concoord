@@ -84,19 +84,23 @@ type Tutanak struct {
 	CreatedByName   string     `json:"created_by_name"`
 	CreatedAt       time.Time  `json:"created_at"`
 	RowVersion      int        `json:"row_version"`
+	IadeTarihi      *string    `json:"iade_tarihi,omitempty"`
+	IadeNotu        *string    `json:"iade_notu,omitempty"`
 }
 
 const listCols = `
 	t.id, t.project_id, t.tip, t.baslik, to_char(t.tarih,'YYYY-MM-DD'),
 	t.taseron_id, s.company_name, t.personel_id, p.ad_soyad, p.firma, t.kisim, t.aciklama, t.tutar, t.birim, t.miktar,
-	t.durum, t.onay_zinciri::text, t.hakedise_eklendi, u.full_name, t.created_at, t.row_version`
+	t.durum, t.onay_zinciri::text, t.hakedise_eklendi, u.full_name, t.created_at, t.row_version,
+	to_char(t.iade_tarihi,'YYYY-MM-DD'), t.iade_notu`
 
 func scanRow(row pgx.Row, t *Tutanak) error {
 	var onayJSON string
 	if err := row.Scan(&t.ID, &t.ProjectID, &t.Tip, &t.Baslik, &t.Tarih,
 		&t.TaseronID, &t.TaseronAdi, &t.PersonelID, &t.PersonelAdSoyad, &t.PersonelFirma,
 		&t.Kisim, &t.Aciklama, &t.Tutar, &t.Birim, &t.Miktar,
-		&t.Durum, &onayJSON, &t.HakediseEklendi, &t.CreatedByName, &t.CreatedAt, &t.RowVersion); err != nil {
+		&t.Durum, &onayJSON, &t.HakediseEklendi, &t.CreatedByName, &t.CreatedAt, &t.RowVersion,
+		&t.IadeTarihi, &t.IadeNotu); err != nil {
 		return err
 	}
 	return json.Unmarshal([]byte(onayJSON), &t.OnayZinciri)
@@ -449,6 +453,50 @@ func (h *Handler) Decide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"status": yeniDurum, "hakedise_eklendi": hakediseEklendi})
+}
+
+// ── Zimmet iadesi ─────────────────────────────────────────────────────────────
+
+type iadeReq struct {
+	Tarih string  `json:"tarih"` // YYYY-MM-DD
+	Not   *string `json:"not"`
+}
+
+// Iade — onaylanmış ve henüz iade edilmemiş bir zimmet kaydının iadesini
+// kaydeder. İade tarihi zimmet tarihinden önce olamaz.
+func (h *Handler) Iade(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseID(w, r, "projectID")
+	if !ok {
+		return
+	}
+	id, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+	var req iadeReq
+	if !httpx.DecodeJSON(w, r, &req) {
+		return
+	}
+	tarih, err := time.Parse("2006-01-02", req.Tarih)
+	if err != nil {
+		httpx.ValidationFailed(w, r, map[string]string{"tarih": "geçerli bir iade tarihi girin"})
+		return
+	}
+	ct, err := h.pool.Exec(r.Context(), `
+		UPDATE saha_tutanaklari SET iade_tarihi=$3, iade_notu=$4, row_version=row_version+1
+		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL AND tip='zimmet'
+		  AND durum='onaylandi' AND iade_tarihi IS NULL AND tarih <= $3`,
+		id, pid, tarih, req.Not)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	if ct.RowsAffected() == 0 {
+		httpx.Error(w, r, http.StatusConflict, httpx.CodeConflict,
+			"Zimmet iade edilemedi: kayıt onaylı ve açık olmalı, iade tarihi zimmet tarihinden önce olamaz.", nil)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"status": "iade_edildi", "iade_tarihi": req.Tarih})
 }
 
 // ── Delete (yalnızca taslak) ─────────────────────────────────────────────────

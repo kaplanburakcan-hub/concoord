@@ -52,6 +52,7 @@ import IdariHakedisPage from "./pages/payments/IdariHakedisPage";
 import PersonelPage from "./pages/project/PersonelPage";
 import ImalatRaporlariPage from "./pages/project/ImalatRaporlariPage";
 import ProjeIzlemeRaporlariPage from "./pages/project/ProjeIzlemeRaporlariPage";
+import MalzemeEnvanterPage from "./pages/reports/MalzemeEnvanterPage";
 import DepoPage from "./pages/project/DepoPage";
 import ToplantiPage from "./pages/project/ToplantiPage";
 import FotograflarPage from "./pages/project/FotograflarPage";
@@ -405,6 +406,7 @@ export default function App() {
                       <Route path="/aylik-raporlar/imalat" element={<RequirePerm perm="reports.view_financial_reports"><ImalatRaporlariPage /></RequirePerm>} />
                       <Route path="/proje/is-programi" element={<RequirePerm perm="schedule.view"><IsProgramiPage /></RequirePerm>} />
                       <Route path="/proje/ilerleme-raporlari" element={<RequirePerm perm="reports.view"><ProjeIzlemeRaporlariPage /></RequirePerm>} />
+                      <Route path="/proje/malzeme-envanter" element={<RequirePerm perm="reports.view"><MalzemeEnvanterPage /></RequirePerm>} />
                       <Route path="/proje/depo" element={<RequirePerm perm="reports.view"><DepoPage /></RequirePerm>} />
                       <Route path="/proje/toplanti" element={<RequirePerm perm="reports.view"><ToplantiPage /></RequirePerm>} />
                       <Route path="/proje/fotograflar" element={<RequirePerm perm="documents.view"><FotograflarPage /></RequirePerm>} />

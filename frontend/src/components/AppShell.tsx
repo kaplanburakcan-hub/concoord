@@ -101,6 +101,7 @@ const GROUPS: NavGroup[] = [
   {
     title: "Proje Raporları",
     items: [
+      { to: "/proje/malzeme-envanter", label: "Malzeme - Envanter Raporları", perm: "reports.view", icon: I.rapor },
       { to: "/proje/ilerleme-raporlari", label: "Proje İzleme Raporları", perm: "reports.view", icon: I.rapor },
       { to: "/aylik-raporlar/imalat", label: "İmalat Raporları", perm: "reports.view_financial_reports", icon: I.aylik },
     ],
