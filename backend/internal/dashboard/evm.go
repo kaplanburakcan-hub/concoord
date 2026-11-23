@@ -171,6 +171,40 @@ func ProgressPct(ev, bac float64) float64 {
 	return p
 }
 
+// Veri güncelliği seviyeleri (EV/AC/CPI'nın dayandığı hakediş verisi).
+const (
+	FreshnessGuncel    = "guncel"    // son kesinleşen hakediş bu ay veya geçen ay
+	FreshnessGecikmeli = "gecikmeli" // 2–3 ay önce
+	FreshnessEski      = "eski"      // 4+ ay önce
+	FreshnessYok       = "yok"       // hiç kesinleşmiş hakediş yok
+)
+
+// DataFreshness — son kesinleşen hakediş ayı (YYYY-MM, boşsa yok) ile
+// referans ayı (asOf) arasındaki ay farkına göre güncellik seviyesi.
+// Hakediş yoksa monthsSince = -1. Gelecek ay (bozuk tarih) 0 sayılır.
+func DataFreshness(lastFinal, asOf string) (level string, monthsSince int) {
+	if lastFinal == "" {
+		return FreshnessYok, -1
+	}
+	l, errL := time.Parse("2006-01", lastFinal)
+	a, errA := time.Parse("2006-01", asOf)
+	if errL != nil || errA != nil {
+		return FreshnessYok, -1
+	}
+	diff := (a.Year()*12 + int(a.Month())) - (l.Year()*12 + int(l.Month()))
+	if diff < 0 {
+		diff = 0
+	}
+	switch {
+	case diff <= 1:
+		return FreshnessGuncel, diff
+	case diff <= 3:
+		return FreshnessGecikmeli, diff
+	default:
+		return FreshnessEski, diff
+	}
+}
+
 // NormalizeMonthTotals — anahtarları sıralı döndürür (deterministik çıktı).
 func NormalizeMonthTotals(m map[string]float64) []string {
 	keys := make([]string, 0, len(m))

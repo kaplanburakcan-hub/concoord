@@ -34,6 +34,12 @@ type EVMResult struct {
 	SCurve         []SCurvePoint `json:"s_curve"`
 	AsOfMonth      string        `json:"as_of_month"` // kümülatiflerin kesildiği ay
 
+	// Veri güvencesi: EV/AC/CPI'nın dayandığı hakediş verisinin güncelliği.
+	// LastFinalizedMonth boşsa hiç kesinleşmiş hakediş yoktur.
+	LastFinalizedMonth string `json:"last_finalized_month,omitempty"`
+	DataFreshness      string `json:"data_freshness"`     // guncel | gecikmeli | eski | yok
+	MonthsSinceFinal   int    `json:"months_since_final"` // -1 = hakediş yok
+
 	// Parasal ilerleme: yapılan İDARİ HAKEDİŞ toplamı (idareye/işverene
 	// kesilen hakediş — cari ödeme durumundan bağımsız) / ANA SÖZLEŞME
 	// bedeli (project_main_contracts.sozlesme_bedeli — Ana Sözleşme
@@ -204,6 +210,15 @@ func LoadEVM(ctx context.Context, pool *pgxpool.Pool, pid uuid.UUID, now time.Ti
 	}
 	res.SPI = SPI(res.EV, res.PV)
 	res.CPI = CPI(res.EV, res.AC)
+
+	// Veri güvencesi: EV/AC'nin dayandığı son kesinleşen hakediş ayı.
+	// evByMonth yalnızca kesinleşmiş hakedişlerden doldu (bkz. yukarı).
+	for m := range evByMonth {
+		if m > res.LastFinalizedMonth {
+			res.LastFinalizedMonth = m
+		}
+	}
+	res.DataFreshness, res.MonthsSinceFinal = DataFreshness(res.LastFinalizedMonth, MonthKey(now))
 	rawCPI := 0.0
 	if res.AC > 0 {
 		rawCPI = res.EV / res.AC

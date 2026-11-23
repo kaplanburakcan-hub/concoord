@@ -71,6 +71,9 @@ type EVM = {
   as_of_month: string;
   contract_amount?: number;
   financial_progress_pct: number;
+  last_finalized_month?: string;
+  data_freshness: "guncel" | "gecikmeli" | "eski" | "yok";
+  months_since_final: number;
 };
 type Dash = {
   project: { id: string; code: string; name: string; status: string; currency: string };
@@ -265,6 +268,9 @@ export default function Dashboard() {
               <PanelKpi label="Toplam Harcama" value="—" icon={<IconReceipt />} />
             )}
           </div>
+
+          {/* ── Veri güvencesi: SPI/CPI'nın dayandığı verinin güncelliği ── */}
+          {dash.evm && <EVMTrustStrip evm={dash.evm} />}
 
           {addingAccident && (
             <div className="px-5 py-3 border-b" style={{ borderColor: "rgb(var(--panel-hairline))" }}>
@@ -688,6 +694,59 @@ function cpiHint(v: number): string {
   if (v >= 0.9) return "Bütçede";
   return "Bütçe üzerinde";
 }
+const AYLAR_TR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+function monthTR(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  if (!y || !m || m < 1 || m > 12) return ym;
+  return `${AYLAR_TR[m - 1]} ${y}`;
+}
+
+// EVMTrustStrip — SPI/CPI'nın hangi hakediş verisine ve hangi PV dağılımına
+// dayandığını gösterir. Veri eskidikçe endeksler de eskir; bunu kullanıcıya açıkça söyler.
+function EVMTrustStrip({ evm }: { evm: EVM }) {
+  const meta: Record<EVM["data_freshness"], { label: string; color: string }> = {
+    guncel: { label: "Güncel", color: "#4ade80" },
+    gecikmeli: { label: "Gecikmeli", color: "#fbbf24" },
+    eski: { label: "Eski", color: "#f87171" },
+    yok: { label: "Hakediş yok", color: "#f87171" },
+  };
+  const m = meta[evm.data_freshness] ?? meta.yok;
+  const ago =
+    evm.months_since_final === 0 ? "bu ay"
+    : evm.months_since_final > 0 ? `${evm.months_since_final} ay önce`
+    : "";
+  const linear = evm.plan_source === "linear";
+
+  return (
+    <div
+      className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-5 py-2.5 text-[11.5px] border-b"
+      style={{ borderColor: "rgb(var(--panel-hairline))", color: "rgb(var(--panel-ink2))" }}
+    >
+      <span className="font-bold uppercase tracking-[.08em] text-[10px]" style={{ color: "rgb(var(--panel-ink3))" }}>
+        Veri güvencesi
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block h-2 w-2 rounded-full" style={{ background: m.color }} />
+        <strong style={{ color: m.color }}>{m.label}</strong>
+      </span>
+      {evm.last_finalized_month ? (
+        <span>
+          Son kesinleşen hakediş: <strong style={{ color: "rgb(var(--panel-ink))" }}>{monthTR(evm.last_finalized_month)}</strong>
+          {ago && <> ({ago})</>}
+        </span>
+      ) : (
+        <span>Kesinleşmiş hakediş yok — EV, AC ve CPI hesaplanamıyor.</span>
+      )}
+      <span>
+        PV: <strong style={{ color: "rgb(var(--panel-ink))" }}>{planSourceTR(evm.plan_source)}</strong>
+      </span>
+      {linear && (
+        <span style={{ color: "#fbbf24" }}>Doğrusal plan varsayımı — zaman performansı (SPI) sınırlı yorumlanmalı.</span>
+      )}
+    </div>
+  );
+}
+
 function planSourceTR(s: string) {
   if (s.startsWith("baseline:")) return `iş programı baseline'ı (${s.slice("baseline:".length)})`;
   if (s === "manual") return "aylık dağılım girişi";
