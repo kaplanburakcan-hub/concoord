@@ -211,7 +211,7 @@ export default function PdksCheckinPage() {
               <button
                 onClick={() => setEventType("in")}
                 className={`rounded-lg py-3 text-sm font-semibold transition ${
-                  eventType === "in" ? "bg-emniyet-500 text-beton-950" : "bg-beton-950 border border-beton-800 text-beton-300"
+                  eventType === "in" ? "bg-emniyet-500 text-white-solid" : "bg-beton-950 border border-beton-800 text-beton-300"
                 }`}
               >
                 Giriş
@@ -219,7 +219,7 @@ export default function PdksCheckinPage() {
               <button
                 onClick={() => setEventType("out")}
                 className={`rounded-lg py-3 text-sm font-semibold transition ${
-                  eventType === "out" ? "bg-emniyet-500 text-beton-950" : "bg-beton-950 border border-beton-800 text-beton-300"
+                  eventType === "out" ? "bg-emniyet-500 text-white-solid" : "bg-beton-950 border border-beton-800 text-beton-300"
                 }`}
               >
                 Çıkış

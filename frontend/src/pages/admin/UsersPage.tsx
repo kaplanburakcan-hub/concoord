@@ -44,7 +44,7 @@ export default function UsersPage() {
         <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Kullanıcılar</h1>
         <button
           onClick={() => setShowNew((v) => !v)}
-          className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold px-3 py-1.5 text-sm transition"
+          className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold px-3 py-1.5 text-sm transition"
         >
           {showNew ? "Kapat" : "+ Yeni kullanıcı"}
         </button>
@@ -162,7 +162,7 @@ function NewUserForm({ onCreated }: { onCreated: () => void }) {
         <button
           onClick={submit}
           disabled={busy}
-          className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-semibold px-4 py-1.5 text-sm transition"
+          className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-white-solid font-semibold px-4 py-1.5 text-sm transition"
         >
           {busy ? "Kaydediliyor…" : "Oluştur"}
         </button>

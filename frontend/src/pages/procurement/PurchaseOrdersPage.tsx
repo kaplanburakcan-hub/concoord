@@ -138,7 +138,7 @@ export default function PurchaseOrdersPage() {
         <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Satınalma Siparişleri</h1>
         {can("procurement.manage_po") && (
           <button onClick={() => setShowForm((v) => !v)}
-            className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
+            className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400">
             {showForm ? "Vazgeç" : "Yeni Sipariş"}
           </button>
         )}
@@ -200,7 +200,7 @@ export default function PurchaseOrdersPage() {
               className="mt-1 block w-full rounded-md bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
           </label>
           <button onClick={create} disabled={!supplier.trim()}
-            className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400 disabled:opacity-40">
+            className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400 disabled:opacity-40">
             Oluştur
           </button>
         </div>

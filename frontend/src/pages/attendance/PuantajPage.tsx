@@ -80,7 +80,7 @@ export default function PuantajPage() {
         />
         <button
           onClick={approveMonth}
-          className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold px-3 py-1.5 text-sm transition"
+          className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold px-3 py-1.5 text-sm transition"
         >
           Dönemi Onayla
         </button>
@@ -207,7 +207,7 @@ function AdjustModal({ day, onClose, onSaved }: { day: Day; onClose: () => void;
           {!locked && (
             <button
               onClick={save} disabled={busy}
-              className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-semibold px-3 py-1.5 text-sm transition"
+              className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-white-solid font-semibold px-3 py-1.5 text-sm transition"
             >
               {busy ? "Kaydediliyor…" : "Kaydet"}
             </button>

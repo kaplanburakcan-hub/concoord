@@ -121,7 +121,7 @@ export default function ProgressPaymentsPage() {
             </select>
             <button
               onClick={createDraft} disabled={!newSub || creating}
-              className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-sm px-3 py-1.5 disabled:opacity-50"
+              className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold text-sm px-3 py-1.5 disabled:opacity-50"
             >
               {creating ? "Oluşturuluyor…" : "Yeni Taslak Hakediş"}
             </button>

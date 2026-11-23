@@ -67,7 +67,7 @@ export default function CalendarFeedCard({ projectId }: { projectId: string }) {
       </p>
 
       <button onClick={create} disabled={busy}
-        className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 disabled:opacity-50">
+        className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid disabled:opacity-50">
         Yeni takvim bağlantısı oluştur
       </button>
 

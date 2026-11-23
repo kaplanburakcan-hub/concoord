@@ -275,7 +275,7 @@ export default function FindingsPage() {
           </select>
           {canInspect && (
             <button onClick={() => setShowForm((v) => !v)}
-              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
+              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400">
               Yeni Bulgu
             </button>
           )}
@@ -340,7 +340,7 @@ export default function FindingsPage() {
             <input ref={fileRef} type="file" accept="image/*" capture="environment"
               className="text-xs text-beton-300 file:mr-2 file:rounded file:border-0 file:bg-beton-800 file:px-2 file:py-1 file:text-beton-200" />
             <button onClick={create} disabled={busy || !desc.trim()}
-              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400 disabled:opacity-40">
+              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400 disabled:opacity-40">
               {busy ? "Kaydediliyor…" : "Kaydet"}
             </button>
           </div>

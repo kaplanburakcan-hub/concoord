@@ -91,7 +91,7 @@ export default function DailyReportsPage() {
           {can("reports.create_daily") && (
             <Link
               to="/saha-raporlari/yeni"
-              className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-beton-950 hover:brightness-110"
+              className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-white-solid hover:brightness-110"
             >
               + Yeni Rapor
             </Link>

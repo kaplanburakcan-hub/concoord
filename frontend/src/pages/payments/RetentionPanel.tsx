@@ -218,7 +218,7 @@ export default function RetentionPanel({
                   disabled={busy || !f.description.trim() || !(Number(f.amount) > 0) ||
                             (stageNeedsDoc && !file)}
                   onClick={submit}
-                  className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-50 text-beton-950 text-sm font-medium px-4 py-2">
+                  className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-50 text-white-solid text-sm font-medium px-4 py-2">
                   {busy ? "Kaydediliyor…" : "İadeyi Kaydet"}
                 </button>
                 {stageNeedsDoc && !file && (

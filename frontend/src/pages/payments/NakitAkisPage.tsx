@@ -78,7 +78,7 @@ export default function NakitAkisPage() {
           {(Object.keys(GROUP_LABEL) as Group[]).map((g) => (
             <button key={g} onClick={() => setGroup(g)}
               className={`rounded-md px-3 py-1.5 text-xs font-medium border transition ${
-                group === g ? "bg-emniyet-500 text-beton-950 border-emniyet-500"
+                group === g ? "bg-emniyet-500 text-white-solid border-emniyet-500"
                 : "border-beton-700 text-beton-300 hover:border-beton-500"
               }`}>
               {GROUP_LABEL[g]}

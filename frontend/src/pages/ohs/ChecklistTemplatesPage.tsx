@@ -89,7 +89,7 @@ export default function ChecklistTemplatesPage() {
         <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">İSG Checklist Şablonları</h1>
         {canManage && !editing && (
           <button onClick={startNew}
-            className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
+            className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400">
             Yeni Şablon
           </button>
         )}
@@ -136,7 +136,7 @@ export default function ChecklistTemplatesPage() {
           </div>
           <div className="flex gap-2">
             <button onClick={save} disabled={!editing.name.trim()}
-              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400 disabled:opacity-40">
+              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400 disabled:opacity-40">
               Kaydet
             </button>
             <button onClick={() => setEditing(null)}

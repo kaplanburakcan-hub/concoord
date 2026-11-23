@@ -369,7 +369,7 @@ export default function PurchaseOrderDetailPage() {
               onChange={(e) => setPForm({ ...pForm, note: e.target.value })}
               className="flex-1 min-w-[140px] rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
             <button onClick={addPayment}
-              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
+              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400">
               Ekle
             </button>
           </div>
@@ -501,7 +501,7 @@ export default function PurchaseOrderDetailPage() {
             <button onClick={addDelivery}
               disabled={busy || !noteNo.trim() || !hasNoteFile || !hasMatFile ||
                         (condition !== "Complete" && !discrepancy.trim())}
-              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400 disabled:opacity-40">
+              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400 disabled:opacity-40">
               {busy ? "Kaydediliyor…" : "Kaydet"}
             </button>
             {(!hasNoteFile || !hasMatFile) && (

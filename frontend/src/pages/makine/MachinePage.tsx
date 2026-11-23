@@ -157,7 +157,7 @@ function RentalUploadPanel({
       )}
       <div className="flex justify-end pt-1">
         <button type="button" onClick={onDone}
-          className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium">
+          className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-medium">
           {compact ? "Tamam" : "Bitti"}
         </button>
       </div>
@@ -601,7 +601,7 @@ export default function MachinePage({
         <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">{tipLabel}</h1>
         <button
           onClick={() => openAdd()}
-          className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium"
+          className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-medium"
         >
           + {tipLabel === "Ekipmanlar" ? "Ekipman" : tipLabel === "İş Makineleri" ? "Makine" : "Araç"} Ekle
         </button>
@@ -865,7 +865,7 @@ export default function MachinePage({
                       <button
                         onClick={addLog}
                         disabled={logSaving || (logForm.calisma_miktari ?? 0) <= 0}
-                        className="px-3 py-1.5 rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium disabled:opacity-50"
+                        className="px-3 py-1.5 rounded bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-medium disabled:opacity-50"
                       >
                         {logSaving ? "…" : "Ekle"}
                       </button>
@@ -994,14 +994,14 @@ export default function MachinePage({
                   <button
                     type="button"
                     onClick={() => setKayitYeri("proje")}
-                    className={`flex-1 px-3 py-1.5 ${kayitYeri === "proje" ? "bg-emniyet-500 text-beton-950 font-medium" : "bg-beton-950 text-beton-300 hover:bg-[var(--bg-hover)]"}`}
+                    className={`flex-1 px-3 py-1.5 ${kayitYeri === "proje" ? "bg-emniyet-500 text-white-solid font-medium" : "bg-beton-950 text-beton-300 hover:bg-[var(--bg-hover)]"}`}
                   >
                     Proje
                   </button>
                   <button
                     type="button"
                     onClick={() => setKayitYeri("firma_envanteri")}
-                    className={`flex-1 px-3 py-1.5 border-l border-beton-800 ${kayitYeri === "firma_envanteri" ? "bg-emniyet-500 text-beton-950 font-medium" : "bg-beton-950 text-beton-300 hover:bg-[var(--bg-hover)]"}`}
+                    className={`flex-1 px-3 py-1.5 border-l border-beton-800 ${kayitYeri === "firma_envanteri" ? "bg-emniyet-500 text-white-solid font-medium" : "bg-beton-950 text-beton-300 hover:bg-[var(--bg-hover)]"}`}
                   >
                     Firma Envanteri
                   </button>
@@ -1246,7 +1246,7 @@ export default function MachinePage({
               <button
                 onClick={saveMachine}
                 disabled={saving || !form.ad?.trim()}
-                className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium disabled:opacity-50"
+                className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-medium disabled:opacity-50"
               >
                 {saving ? "Kaydediliyor…" : kayitYeri === "firma_envanteri" && !editId ? "Envantere Kaydet" : "Kaydet"}
               </button>
@@ -1277,7 +1277,7 @@ export default function MachinePage({
               <button
                 onClick={requestTransfer}
                 disabled={transferRequesting}
-                className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium disabled:opacity-50"
+                className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-medium disabled:opacity-50"
               >
                 {transferRequesting ? "Gönderiliyor…" : "Transfer Talebi Oluştur"}
               </button>
@@ -1297,7 +1297,7 @@ export default function MachinePage({
             <div className="flex justify-end pt-1">
               <button
                 onClick={() => setTransferRequestedMsg(null)}
-                className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium"
+                className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-medium"
               >
                 Tamam
               </button>
@@ -1350,7 +1350,7 @@ export default function MachinePage({
                 <label className="text-xs font-medium text-beton-400">Arıza Durumu</label>
                 <div className="flex rounded-md border border-beton-800 overflow-hidden text-sm w-fit">
                   <button type="button" onClick={() => setDetailsForm(f => ({ ...f, ariza_var: false }))}
-                    className={`px-3 py-1.5 ${!detailsForm.ariza_var ? "bg-emniyet-500 text-beton-950 font-medium" : "bg-beton-950 text-beton-300"}`}>
+                    className={`px-3 py-1.5 ${!detailsForm.ariza_var ? "bg-emniyet-500 text-white-solid font-medium" : "bg-beton-950 text-beton-300"}`}>
                     Hayır
                   </button>
                   <button type="button" onClick={() => setDetailsForm(f => ({ ...f, ariza_var: true }))}
@@ -1364,7 +1364,7 @@ export default function MachinePage({
                 <label className="text-xs font-medium text-beton-400">Görünür Hasar Durumu</label>
                 <div className="flex rounded-md border border-beton-800 overflow-hidden text-sm w-fit">
                   <button type="button" onClick={() => setDetailsForm(f => ({ ...f, hasar_var: false }))}
-                    className={`px-3 py-1.5 ${!detailsForm.hasar_var ? "bg-emniyet-500 text-beton-950 font-medium" : "bg-beton-950 text-beton-300"}`}>
+                    className={`px-3 py-1.5 ${!detailsForm.hasar_var ? "bg-emniyet-500 text-white-solid font-medium" : "bg-beton-950 text-beton-300"}`}>
                     Hayır
                   </button>
                   <button type="button" onClick={() => setDetailsForm(f => ({ ...f, hasar_var: true }))}
@@ -1397,7 +1397,7 @@ export default function MachinePage({
                 <button
                   onClick={() => saveIsBasiDetaylari(m.id)}
                   disabled={isBasiSaving}
-                  className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium disabled:opacity-50"
+                  className="px-4 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-medium disabled:opacity-50"
                 >
                   {isBasiSaving ? "Kaydediliyor…" : "Kaydet"}
                 </button>

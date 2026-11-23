@@ -183,7 +183,7 @@ function StatementForm({
         <button
           onClick={handleSaveClick}
           disabled={saving}
-          className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm rounded-md disabled:opacity-40"
+          className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm rounded-md disabled:opacity-40"
         >
           {saving ? "Kaydediliyor…" : "Kaydet"}
         </button>
@@ -287,7 +287,7 @@ function StatementPaymentsPanel({ pid, statementId }: { pid: string; statementId
         <input value={form.note} placeholder="Not (opsiyonel)"
           onChange={(e) => setForm({ ...form, note: e.target.value })}
           className={`${inpBase} flex-1 min-w-[140px]`} />
-        <button onClick={add} className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-xs rounded-md">
+        <button onClick={add} className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-xs rounded-md">
           Ekle
         </button>
       </div>
@@ -378,7 +378,7 @@ export default function TedarikciEkstrerlerPage() {
         </div>
         <button
           onClick={() => { setAdding(true); setEditing(null); }}
-          className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm rounded-md"
+          className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm rounded-md"
         >
           + Ekstre Ekle
         </button>

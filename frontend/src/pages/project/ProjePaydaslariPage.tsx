@@ -522,7 +522,7 @@ export default function ProjePaydaslariPage() {
                   {!isTaseron && (
                     <button
                       onClick={(e) => { e.stopPropagation(); yeniEkle(kat.id); }}
-                      className="rounded-md bg-emniyet-500 px-3 py-1 text-xs font-medium text-beton-950 hover:brightness-110"
+                      className="rounded-md bg-emniyet-500 px-3 py-1 text-xs font-medium text-white-solid hover:brightness-110"
                     >
                       + Ekle
                     </button>
@@ -536,7 +536,7 @@ export default function ProjePaydaslariPage() {
                         setAktifKat("alt_yuklenici");
                         setFormAcik(true);
                       }}
-                      className="rounded-md bg-emniyet-500 px-3 py-1 text-xs font-medium text-beton-950 hover:brightness-110"
+                      className="rounded-md bg-emniyet-500 px-3 py-1 text-xs font-medium text-white-solid hover:brightness-110"
                     >
                       + Firma Ekle
                     </button>
@@ -846,7 +846,7 @@ export default function ProjePaydaslariPage() {
               <button
                 onClick={formGonder}
                 disabled={subsBusy || !form.kategoriId || (!form.ad && !form.firmaAdi)}
-                className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50"
+                className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-white-solid hover:brightness-110 disabled:opacity-50"
               >
                 {subsBusy ? "Kaydediliyor…" : duzenleId ? "Güncelle" : "Kaydet"}
               </button>

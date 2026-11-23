@@ -173,7 +173,7 @@ export default function ProcurementBoardPage() {
               ayrı renkte ki karışmasınlar. */}
           {can("procurement.create_pr") && (
             <Link to="/satinalma/talepler?yeni=1"
-              className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold px-3 py-1.5 text-xs">
+              className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold px-3 py-1.5 text-xs">
               Yeni Talep
             </Link>
           )}

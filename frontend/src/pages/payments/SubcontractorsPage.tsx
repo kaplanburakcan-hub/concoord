@@ -175,7 +175,7 @@ function SubPanel({ projectId, subs, selected, onSelect, canManage, onChanged }:
             <button
               onClick={() => onSelect(s.id)}
               className={`w-full text-left rounded px-2 py-1.5 text-sm ${
-                selected === s.id ? "bg-emniyet-500 text-beton-950 font-semibold" : "text-beton-200 hover:bg-beton-800"
+                selected === s.id ? "bg-emniyet-500 text-white-solid font-semibold" : "text-beton-200 hover:bg-beton-800"
               }`}
             >
               {s.company_name}
@@ -198,7 +198,7 @@ function SubPanel({ projectId, subs, selected, onSelect, canManage, onChanged }:
           />
           <button
             onClick={add} disabled={busy}
-            className="w-full rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-sm py-1.5 disabled:opacity-50"
+            className="w-full rounded bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold text-sm py-1.5 disabled:opacity-50"
           >
             Taşeron Ekle
           </button>
@@ -246,7 +246,7 @@ function TedarikciPanel({ projectId, tedarikciler, selected, onSelect, canManage
             <button
               onClick={() => onSelect(t.id)}
               className={`flex-1 text-left rounded px-2 py-1.5 text-sm ${
-                selected === t.id ? "bg-emniyet-500 text-beton-950 font-semibold" : "text-beton-200 hover:bg-beton-800"
+                selected === t.id ? "bg-emniyet-500 text-white-solid font-semibold" : "text-beton-200 hover:bg-beton-800"
               }`}
             >
               {t.company_name}
@@ -281,7 +281,7 @@ function TedarikciPanel({ projectId, tedarikciler, selected, onSelect, canManage
           </select>
           <button
             onClick={add} disabled={busy}
-            className="w-full rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-sm py-1.5 disabled:opacity-50"
+            className="w-full rounded bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold text-sm py-1.5 disabled:opacity-50"
           >
             Tedarikçi Ekle
           </button>
@@ -354,7 +354,7 @@ function WorkItemPanel({ projectId, subId, canManage, canDelete, canFin }: {
             />
             <button
               onClick={() => fileRef.current?.click()}
-              className="rounded border border-emniyet-500 text-emniyet-500 hover:bg-emniyet-500 hover:text-beton-950 text-xs font-semibold px-2 py-1"
+              className="rounded border border-emniyet-500 text-emniyet-500 hover:bg-emniyet-500 hover:text-white-solid text-xs font-semibold px-2 py-1"
             >
               Excel/CSV İçe Aktar
             </button>
@@ -411,7 +411,7 @@ function WorkItemPanel({ projectId, subId, canManage, canDelete, canFin }: {
           <input value={f.unit_price} onChange={(e) => setF({ ...f, unit_price: e.target.value })} placeholder="B. Fiyat" inputMode="decimal"
             className="rounded bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-white text-right" />
           <button onClick={add}
-            className="col-span-2 md:col-span-6 rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-sm py-1.5">
+            className="col-span-2 md:col-span-6 rounded bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold text-sm py-1.5">
             Poz Ekle
           </button>
         </div>

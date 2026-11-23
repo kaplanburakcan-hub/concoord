@@ -65,7 +65,7 @@ export default function Login() {
         <button
           type="submit"
           disabled={busy}
-          className="mt-6 w-full rounded-lg bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-medium py-2.5 transition"
+          className="mt-6 w-full rounded-lg bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-white-solid font-medium py-2.5 transition"
         >
           {busy ? "Giriş yapılıyor…" : "Giriş yap"}
         </button>

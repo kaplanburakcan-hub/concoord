@@ -190,7 +190,7 @@ export default function IsProgramiPage() {
           {canEdit && (
             <button
               onClick={() => { setNewItemParent(null); setEditingItem("new"); }}
-              className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold px-3 py-1.5 text-xs transition"
+              className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold px-3 py-1.5 text-xs transition"
             >
               + Kök Kalem
             </button>
@@ -334,7 +334,7 @@ function SurveyGenModal({ categories, busy, onClose, onConfirm }: {
             Vazgeç
           </button>
           <button onClick={onConfirm} disabled={busy}
-            className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-semibold px-3 py-1.5 text-sm transition">
+            className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-white-solid font-semibold px-3 py-1.5 text-sm transition">
             {busy ? "Oluşturuluyor…" : "Oluştur"}
           </button>
         </div>
@@ -590,7 +590,7 @@ function SCurveView({ projectId }: { projectId: string }) {
         {(["month", "week"] as const).map((b) => (
           <button
             key={b} onClick={() => setBucket(b)}
-            className={`rounded px-2 py-1 text-xs ${bucket === b ? "bg-emniyet-500 text-beton-950 font-semibold" : "bg-beton-900 text-beton-300"}`}
+            className={`rounded px-2 py-1 text-xs ${bucket === b ? "bg-emniyet-500 text-white-solid font-semibold" : "bg-beton-900 text-beton-300"}`}
           >
             {b === "month" ? "Aylık" : "Haftalık"}
           </button>
@@ -754,7 +754,7 @@ function ItemModal({
             İptal
           </button>
           <button onClick={save} disabled={busy || !wbsCode.trim() || !name.trim()}
-            className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-semibold px-3 py-1.5 text-sm transition">
+            className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-white-solid font-semibold px-3 py-1.5 text-sm transition">
             {busy ? "Kaydediliyor…" : "Kaydet"}
           </button>
         </div>
@@ -812,7 +812,7 @@ function PozLinkModal({ item, projectId, onClose, onChanged }: { item: ScheduleI
             Kapat
           </button>
           <button onClick={link} disabled={busy || !selected}
-            className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-semibold px-3 py-1.5 text-sm transition">
+            className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-white-solid font-semibold px-3 py-1.5 text-sm transition">
             {busy ? "Bağlanıyor…" : "Bağla"}
           </button>
         </div>
@@ -885,7 +885,7 @@ function DependencyPanel({ projectId, items, deps, onChanged }: { projectId: str
           <input type="number" value={lagDays} onChange={(e) => setLagDays(e.target.value)} className="w-20 rounded-md bg-beton-900 border border-beton-800 px-2 py-1.5 text-xs text-beton-100" />
         </div>
         <button onClick={add} disabled={busy || !pred || !succ}
-          className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-semibold px-3 py-1.5 text-xs transition">
+          className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-white-solid font-semibold px-3 py-1.5 text-xs transition">
           Ekle
         </button>
       </div>

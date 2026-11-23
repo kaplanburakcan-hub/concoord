@@ -80,13 +80,13 @@ export default function VerimlilikNormlariPage() {
       <div className="flex items-center gap-2">
         <button
           onClick={() => setTab("normlar")}
-          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${tab === "normlar" ? "bg-emniyet-500 border-emniyet-500 text-beton-950" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}
+          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${tab === "normlar" ? "bg-emniyet-500 border-emniyet-500 text-white-solid" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}
         >
           Genel Normlar
         </button>
         <button
           onClick={() => setTab("kiyaslama")}
-          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${tab === "kiyaslama" ? "bg-emniyet-500 border-emniyet-500 text-beton-950" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}
+          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${tab === "kiyaslama" ? "bg-emniyet-500 border-emniyet-500 text-white-solid" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}
         >
           Proje Kıyaslaması (İcmal)
         </button>

@@ -210,7 +210,7 @@ export default function TransferTalepleriPage() {
               <button
                 disabled={busy === t.id}
                 onClick={() => decide(t.id, true)}
-                className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 text-sm font-semibold px-4 py-1.5">
+                className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-white-solid text-sm font-semibold px-4 py-1.5">
                 Onayla
               </button>
               <button

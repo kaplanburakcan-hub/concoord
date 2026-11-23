@@ -438,7 +438,7 @@ function SideLink({ item }: { item: NavDef }) {
             </span>
             <span className="flex-1 min-w-0 truncate">{item.label}</span>
             {!!item.badge && item.badge > 0 && (
-              <span className="ml-auto rounded-full bg-emniyet-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-beton-950">
+              <span className="ml-auto rounded-full bg-emniyet-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white-solid">
                 {item.badge}
               </span>
             )}

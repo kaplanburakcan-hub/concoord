@@ -53,7 +53,7 @@ export default function PdfPreviewModal({
             <button
               onClick={download}
               disabled={downloading || !url}
-              className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 disabled:opacity-50 px-3 py-1.5 text-xs font-medium transition-colors"
+              className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-white-solid disabled:opacity-50 px-3 py-1.5 text-xs font-medium transition-colors"
             >
               {downloading ? "İndiriliyor…" : "Cihaza İndir"}
             </button>

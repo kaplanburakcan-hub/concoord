@@ -196,7 +196,7 @@ export default function ProjeIzlemeRaporlariPage() {
               <button onClick={addCustom}
                 disabled={!newLabel.trim() || busy}
                 className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-50
-                           text-beton-950 text-xs font-medium px-3 py-1.5">
+                           text-white-solid text-xs font-medium px-3 py-1.5">
                 {busy ? "Ekleniyor…" : "Ekle"}
               </button>
               <button onClick={() => { setAdding(false); setNewLabel(""); setNewDesc(""); }}

@@ -206,7 +206,7 @@ export default function MonthlyReportsPage() {
           <button
             onClick={generate}
             disabled={busy}
-            className="rounded-md bg-emniyet-500 px-4 py-1.5 text-sm font-semibold text-beton-950 hover:brightness-110 transition disabled:opacity-50"
+            className="rounded-md bg-emniyet-500 px-4 py-1.5 text-sm font-semibold text-white-solid hover:brightness-110 transition disabled:opacity-50"
           >
             {busy ? "Üretiliyor…" : "Rapor üret"}
           </button>
@@ -380,7 +380,7 @@ function ThresholdEditor({ projectId }: { projectId: string }) {
         </Field>
         <button
           onClick={save}
-          className="rounded-md bg-emniyet-500 px-4 py-1.5 text-sm font-semibold text-beton-950 hover:brightness-110 transition"
+          className="rounded-md bg-emniyet-500 px-4 py-1.5 text-sm font-semibold text-white-solid hover:brightness-110 transition"
         >
           Kaydet
         </button>

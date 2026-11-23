@@ -190,7 +190,7 @@ function FolderPanel({ projectId, folders, selected, onSelect, catFilter, onCatF
               placeholder="Ad"
               className="flex-1 min-w-0 rounded bg-beton-950 border border-beton-800 px-2 py-1 text-xs text-beton-200 outline-none focus:border-emniyet-500"
             />
-            <button onClick={addFolder} className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold px-2 text-xs">+</button>
+            <button onClick={addFolder} className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold px-2 text-xs">+</button>
           </div>
         </div>
       )}
@@ -233,7 +233,7 @@ function DocPanel({ projectId, folderId, docs, records, catFilter, canUpload, ca
         <div className="flex">
           <button
             onClick={() => setShowNew((v) => !v)}
-            className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold px-3 py-1.5 text-sm"
+            className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold px-3 py-1.5 text-sm"
           >
             {showNew ? "Kapat" : "Yeni doküman"}
           </button>
@@ -253,7 +253,7 @@ function DocPanel({ projectId, folderId, docs, records, catFilter, canUpload, ca
               {CATS.map((c) => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
             </select>
           </div>
-          <button onClick={createDoc} className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold px-4 py-1.5 text-sm">Oluştur</button>
+          <button onClick={createDoc} className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold px-4 py-1.5 text-sm">Oluştur</button>
         </div>
       )}
 
@@ -404,7 +404,7 @@ function DocRow({ projectId, doc, open, onToggle, canUpload, canDelete, canDownl
               <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Not (ops.)"
                 className="rounded bg-beton-950 border border-beton-800 px-2 py-1 text-xs text-beton-200 outline-none focus:border-emniyet-500" />
               <button onClick={upload} disabled={busy}
-                className="rounded bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-semibold px-3 py-1 text-xs">
+                className="rounded bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-white-solid font-semibold px-3 py-1 text-xs">
                 {busy ? "Yükleniyor…" : "Yeni versiyon yükle"}
               </button>
             </div>

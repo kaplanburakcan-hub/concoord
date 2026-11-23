@@ -566,7 +566,7 @@ function AssignModal({ item, projectId, onClose, onAssigned }: {
             İptal
           </button>
           <button onClick={assign} disabled={busy || !subId}
-            className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-semibold px-3 py-1.5 text-sm transition">
+            className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-white-solid font-semibold px-3 py-1.5 text-sm transition">
             {busy ? "Atanıyor…" : "Ata"}
           </button>
         </div>
@@ -680,7 +680,7 @@ function EditRow({ it, onUpdate, onSave, onCancel, saving, canEdit }: {
       <td className="py-1 px-2">
         <div className="flex gap-1">
           <button onClick={onSave} disabled={saving || !it.tanim}
-                  className="text-xs bg-emniyet-500 text-beton-950 px-2 py-0.5 rounded
+                  className="text-xs bg-emniyet-500 text-white-solid px-2 py-0.5 rounded
                              hover:bg-emniyet-600 disabled:opacity-50 transition-colors whitespace-nowrap">
             {saving ? "…" : "Kaydet"}
           </button>

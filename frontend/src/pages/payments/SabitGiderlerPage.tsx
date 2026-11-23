@@ -132,7 +132,7 @@ export default function SabitGiderlerPage() {
           </p>
         </div>
         <button onClick={() => setFormAcik(true)}
-          className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-beton-950 hover:brightness-110">
+          className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-white-solid hover:brightness-110">
           + Sabit Gider Ekle
         </button>
       </div>
@@ -251,7 +251,7 @@ export default function SabitGiderlerPage() {
               </button>
               <button onClick={olustur}
                 disabled={!form.label.trim() || !form.amount || olusturuluyor}
-                className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50">
+                className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-white-solid hover:brightness-110 disabled:opacity-50">
                 {olusturuluyor ? "Oluşturuluyor…" : "Oluştur"}
               </button>
             </div>

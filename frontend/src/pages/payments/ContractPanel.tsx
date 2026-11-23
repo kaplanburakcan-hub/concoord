@@ -435,7 +435,7 @@ export default function ContractPanel({
             <button
               disabled={busy || !f.contract_no.trim()}
               onClick={save}
-              className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 text-sm font-medium px-4 py-2"
+              className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-white-solid text-sm font-medium px-4 py-2"
             >
               {editing ? "Güncelle" : "Sözleşme Ekle"}
             </button>

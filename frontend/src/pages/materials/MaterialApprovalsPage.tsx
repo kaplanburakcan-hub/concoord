@@ -96,7 +96,7 @@ export default function MaterialApprovalsPage() {
           </button>
           {can("material_approvals.create") && (
             <button onClick={() => setShowForm((v) => !v)}
-              className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold px-3 py-1.5 text-xs">
+              className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold px-3 py-1.5 text-xs">
               {showForm ? "Vazgeç" : "Yeni MAR"}
             </button>
           )}
@@ -127,7 +127,7 @@ export default function MaterialApprovalsPage() {
           )}
           <div className="sm:col-span-2">
             <button onClick={create} disabled={!name.trim()}
-              className="rounded bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-semibold px-4 py-1.5 text-sm">
+              className="rounded bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-white-solid font-semibold px-4 py-1.5 text-sm">
               Sun (Submitted)
             </button>
           </div>

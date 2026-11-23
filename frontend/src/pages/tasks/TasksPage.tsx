@@ -115,7 +115,7 @@ export default function TasksPage() {
         {can("tasks.create") && (
           <button
             onClick={() => setCreating(true)}
-            className="rounded-md bg-emniyet-500 px-3 py-1.5 text-sm font-semibold text-beton-950 hover:brightness-110 transition"
+            className="rounded-md bg-emniyet-500 px-3 py-1.5 text-sm font-semibold text-white-solid hover:brightness-110 transition"
           >
             + Yeni Görev
           </button>
@@ -554,6 +554,6 @@ function Overlay({ title, children, onClose }: {
 const inputCls =
   "mt-1 w-full rounded-md bg-beton-950 border border-beton-800 px-2 py-1.5 text-sm text-beton-100 outline-none focus:border-emniyet-500";
 const btnPrimary =
-  "rounded-md bg-emniyet-500 px-3 py-1.5 text-sm font-semibold text-beton-950 hover:brightness-110 transition disabled:opacity-50";
+  "rounded-md bg-emniyet-500 px-3 py-1.5 text-sm font-semibold text-white-solid hover:brightness-110 transition disabled:opacity-50";
 const btnGhost =
   "rounded-md border border-beton-700 px-3 py-1.5 text-sm text-beton-200 hover:border-beton-500 transition";

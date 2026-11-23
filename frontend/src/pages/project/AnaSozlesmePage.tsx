@@ -364,7 +364,7 @@ export default function AnaSozlesmePage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-5 py-2 rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium
+            className="px-5 py-2 rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-medium
                        disabled:opacity-50 transition-colors"
           >
             {saving ? "Kaydediliyor…" : "Kaydet ve Kilitle"}
@@ -791,7 +791,7 @@ export default function AnaSozlesmePage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-2 rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium
+            className="px-6 py-2 rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-medium
                        disabled:opacity-50 transition-colors"
           >
             {saving ? "Kaydediliyor…" : "Sözleşmeyi Kaydet ve Kilitle"}

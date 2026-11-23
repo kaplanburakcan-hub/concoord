@@ -164,7 +164,7 @@ function MovementModal({
           <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-beton-800 text-sm text-beton-400 hover:text-beton-100 transition-colors">
             İptal
           </button>
-          <button onClick={submit} disabled={saving} className="flex-1 py-2 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium transition-colors disabled:opacity-50">
+          <button onClick={submit} disabled={saving} className="flex-1 py-2 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-medium transition-colors disabled:opacity-50">
             {saving ? "Kaydediliyor…" : "Kaydet"}
           </button>
         </div>
@@ -242,7 +242,7 @@ function ItemModal({
           <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-beton-800 text-sm text-beton-400 hover:text-beton-100 transition-colors">
             İptal
           </button>
-          <button onClick={submit} disabled={saving} className="flex-1 py-2 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium transition-colors disabled:opacity-50">
+          <button onClick={submit} disabled={saving} className="flex-1 py-2 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-medium transition-colors disabled:opacity-50">
             {saving ? "Kaydediliyor…" : "Kaydet"}
           </button>
         </div>
@@ -325,14 +325,14 @@ export default function DepoPage() {
           </Link>
           <button
             onClick={() => setShowItemModal(true)}
-            className="px-3 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium transition-colors"
+            className="px-3 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-medium transition-colors"
           >
             + Malzeme
           </button>
           {items.length > 0 && (
             <button
               onClick={() => setShowMovModal(true)}
-              className="px-3 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-medium transition-colors"
+              className="px-3 py-1.5 rounded-lg bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-medium transition-colors"
             >
               + Hareket Ekle
             </button>

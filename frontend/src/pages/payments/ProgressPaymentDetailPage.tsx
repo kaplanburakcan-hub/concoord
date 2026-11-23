@@ -533,7 +533,7 @@ export default function ProgressPaymentDetailPage() {
       <div className="flex flex-wrap gap-2">
         {editable && (
           <button onClick={save}
-            className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-sm px-4 py-2">
+            className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold text-sm px-4 py-2">
             Kaydet & Hesapla
           </button>
         )}
@@ -557,7 +557,7 @@ export default function ProgressPaymentDetailPage() {
                 <button key={l.id} onClick={() => setPdfLayout(l.id)} aria-pressed={pdfLayout === l.id}
                   title={l.hint}
                   className={`px-3 py-2 ${pdfLayout === l.id
-                    ? "bg-emniyet-500 text-beton-950 font-semibold"
+                    ? "bg-emniyet-500 text-white-solid font-semibold"
                     : "text-beton-200 hover:bg-beton-800"}`}>
                   {l.label}
                 </button>
@@ -978,7 +978,7 @@ export default function ProgressPaymentDetailPage() {
                       <button
                         onClick={() => upd({ done: true, snap: undefined })}
                         disabled={!valid}
-                        className="rounded bg-emniyet-500 px-3 py-1 text-xs font-semibold text-beton-950 hover:bg-emniyet-600 disabled:opacity-40 disabled:cursor-not-allowed">
+                        className="rounded bg-emniyet-500 px-3 py-1 text-xs font-semibold text-white-solid hover:bg-emniyet-600 disabled:opacity-40 disabled:cursor-not-allowed">
                         {e.snap ? "Değişikliği onayla" : "Ekle"}
                       </button>
                       {e.snap ? (
@@ -1115,7 +1115,7 @@ export default function ProgressPaymentDetailPage() {
               onChange={(e) => setDForm({ ...dForm, note: e.target.value })}
               className="flex-1 min-w-[140px] rounded bg-beton-950 border border-beton-800 px-2 py-1 text-sm text-beton-100" />
             <button onClick={addDisbursement}
-              className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-xs px-3 py-1.5">
+              className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold text-xs px-3 py-1.5">
               Ekle
             </button>
           </div>

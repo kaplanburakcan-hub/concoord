@@ -144,7 +144,7 @@ export default function MaterialApprovalDetailPage() {
       {/* İş akışı aksiyonları */}
       {mar.status === "Submitted" && can("material_approvals.review") && (
         <button onClick={() => act("review")} disabled={busy}
-          className="rounded bg-emniyet-500/80 hover:bg-emniyet-500 disabled:opacity-60 text-beton-950 font-semibold px-4 py-2 text-sm">
+          className="rounded bg-emniyet-500/80 hover:bg-emniyet-500 disabled:opacity-60 text-white-solid font-semibold px-4 py-2 text-sm">
           İncelemeye al ve karara sun
         </button>
       )}
@@ -188,7 +188,7 @@ export default function MaterialApprovalDetailPage() {
           <div className="flex flex-wrap gap-2">
             <DecideBtn label="Onayla" cls="bg-green-600 hover:bg-green-500" disabled={busy || !note.trim()}
               onClick={() => act("decide", { decision: "Approved", decision_note: note.trim() })} />
-            <DecideBtn label="Şartlı onayla" cls="bg-emniyet-500 hover:bg-emniyet-600 text-beton-950" disabled={busy || !note.trim()}
+            <DecideBtn label="Şartlı onayla" cls="bg-emniyet-500 hover:bg-emniyet-600 text-white-solid" disabled={busy || !note.trim()}
               onClick={() => act("decide", { decision: "ConditionallyApproved", decision_note: note.trim() })} />
             <DecideBtn label="Reddet" cls="bg-red-600 hover:bg-red-500" disabled={busy || !note.trim()}
               onClick={() => act("decide", { decision: "Rejected", decision_note: note.trim() })} />

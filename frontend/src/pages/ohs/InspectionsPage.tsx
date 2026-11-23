@@ -69,7 +69,7 @@ export default function InspectionsPage() {
         <Link to="/isg/cezalar" className="text-xs text-beton-400 hover:text-beton-200">Cezalar</Link>
         {can("ohs.perform_inspection") && (
           <Link to="/isg/denetimler/yeni"
-            className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
+            className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400">
             Yeni Denetim
           </Link>
         )}

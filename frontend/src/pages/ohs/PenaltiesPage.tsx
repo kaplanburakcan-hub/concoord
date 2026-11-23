@@ -130,7 +130,7 @@ export default function PenaltiesPage() {
         <Link to="/isg/denetimler" className="text-xs text-beton-400 hover:text-beton-200">Denetimler</Link>
         {canIssue && (
           <button onClick={() => setShowForm((v) => !v)}
-            className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
+            className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400">
             Ceza Kes
           </button>
         )}

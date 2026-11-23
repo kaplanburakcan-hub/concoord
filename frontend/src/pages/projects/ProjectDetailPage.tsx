@@ -384,7 +384,7 @@ function Kunye({ project, canEdit, onSaved }: { project: Project; canEdit: boole
       </Field>
       {err && <p className="sm:col-span-2 text-sm text-red-400">{err}</p>}
       <div className="sm:col-span-2 flex gap-2">
-        <button onClick={save} disabled={busy} className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-beton-950 font-semibold px-4 py-1.5 text-sm">
+        <button onClick={save} disabled={busy} className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 disabled:opacity-60 text-white-solid font-semibold px-4 py-1.5 text-sm">
           {busy ? "Kaydediliyor…" : "Kaydet"}
         </button>
         <button onClick={() => { setEdit(false); setFieldErr({}); }} className="rounded-md border border-beton-800 px-3 py-1.5 text-sm text-beton-200 hover:border-emniyet-500">Vazgeç</button>

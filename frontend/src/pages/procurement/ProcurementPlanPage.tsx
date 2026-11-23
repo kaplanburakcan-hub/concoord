@@ -204,11 +204,11 @@ export default function ProcurementPlanPage() {
             <input ref={fileRef} type="file" accept=".xlsx,.csv" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) doImport(f); e.currentTarget.value = ""; }} />
             <button onClick={() => fileRef.current?.click()}
-              className="rounded-md border border-emniyet-500 text-emniyet-500 hover:bg-emniyet-500 hover:text-beton-950 text-xs font-semibold px-3 py-1.5 transition-colors">
+              className="rounded-md border border-emniyet-500 text-emniyet-500 hover:bg-emniyet-500 hover:text-white-solid text-xs font-semibold px-3 py-1.5 transition-colors">
               Excel/CSV İçe Aktar
             </button>
             <button onClick={() => setShowForm((v) => !v)}
-              className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-xs font-semibold px-3 py-1.5">
+              className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-xs font-semibold px-3 py-1.5">
               {showForm ? "Vazgeç" : "+ Kalem Ekle"}
             </button>
           </div>
@@ -268,7 +268,7 @@ export default function ProcurementPlanPage() {
             </label>
           </div>
           <button onClick={create} disabled={saving || !form.description.trim()}
-            className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm font-semibold px-4 py-1.5 disabled:opacity-40">
+            className="rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm font-semibold px-4 py-1.5 disabled:opacity-40">
             {saving ? "Kaydediliyor…" : "Kaydet"}
           </button>
         </div>

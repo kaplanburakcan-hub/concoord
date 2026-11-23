@@ -374,7 +374,7 @@ export default function SahaTutanaklariPage() {
         <h1 className="font-display text-2xl font-bold tracking-tight text-beton-100">Saha Tutanakları</h1>
         <button
           onClick={() => setFormAcik(true)}
-          className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-beton-950 hover:brightness-110"
+          className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-white-solid hover:brightness-110"
         >
           + Yeni Tutanak
         </button>
@@ -386,7 +386,7 @@ export default function SahaTutanaklariPage() {
         {(["hepsi", ...Object.keys(TIP_LABEL)] as const).map((tip) => (
           <button key={tip} onClick={() => setFiltre(tip as typeof filtre)}
             className={`rounded-full px-3 py-1 text-xs border transition ${
-              filtre === tip ? "bg-emniyet-500 text-beton-950 border-emniyet-500 font-semibold"
+              filtre === tip ? "bg-emniyet-500 text-white-solid border-emniyet-500 font-semibold"
               : "border-beton-700 text-beton-400 hover:border-beton-500"
             }`}
           >
@@ -545,17 +545,17 @@ export default function SahaTutanaklariPage() {
             <div className="flex flex-wrap gap-2 pt-2 border-t border-beton-800">
               {secili.durum === "taslak" && (
                 <button onClick={() => onayaSuncu(secili)}
-                  className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-beton-950 hover:brightness-110"
+                  className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-white-solid hover:brightness-110"
                 >Onaya Sun</button>
               )}
               {secili.durum === "onay_sureci" && bekleyenOnay !== -1 && (
                 <button onClick={() => setOnayModal(true)}
-                  className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-beton-950 hover:brightness-110"
+                  className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-white-solid hover:brightness-110"
                 >Onay Ver / Reddet</button>
               )}
               {secili.tip === "zimmet" && secili.durum === "onaylandi" && !secili.iade_tarihi && !iadeForm && (
                 <button onClick={() => setIadeForm({ tarih: new Date().toISOString().slice(0, 10), not: "" })}
-                  className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-beton-950 hover:brightness-110"
+                  className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-white-solid hover:brightness-110"
                 >İade al</button>
               )}
               {iadeForm && secili.tip === "zimmet" && (
@@ -573,7 +573,7 @@ export default function SahaTutanaklariPage() {
                       className="rounded-md border border-beton-700 bg-beton-900 px-2 py-1 text-sm text-beton-100" />
                   </label>
                   <button onClick={() => iadeKaydet(secili)}
-                    className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-beton-950 hover:brightness-110"
+                    className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-white-solid hover:brightness-110"
                   >Kaydet</button>
                   <button onClick={() => setIadeForm(null)}
                     className="rounded-md border border-beton-700 px-3 py-1.5 text-xs text-beton-300 hover:border-beton-500"
@@ -803,7 +803,7 @@ export default function SahaTutanaklariPage() {
               >İptal</button>
               <button onClick={tutanakOlustur}
                 disabled={!form.baslik.trim() || !form.aciklama.trim() || olusturuluyor || (form.tip === "zimmet" && !form.personel_id)}
-                className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50"
+                className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-white-solid hover:brightness-110 disabled:opacity-50"
               >{olusturuluyor ? "Oluşturuluyor…" : "Oluştur"}</button>
             </div>
           </div>

@@ -219,7 +219,7 @@ function PolicyForm({
         <button
           onClick={submit}
           disabled={saving || !p.sigorta_sirketi.trim() || !p.police_no.trim()}
-          className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm rounded-md disabled:opacity-40"
+          className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm rounded-md disabled:opacity-40"
         >
           {saving ? "Kaydediliyor…" : "Kaydet"}
         </button>
@@ -313,7 +313,7 @@ export default function SigortaPolicelerPage() {
         {canEdit && (
           <button
             onClick={() => { setAdding(true); setEditing(null); }}
-            className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm rounded-md"
+            className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm rounded-md"
           >
             + Poliçe Ekle
           </button>
@@ -349,7 +349,7 @@ export default function SigortaPolicelerPage() {
         <div className="rounded-lg border border-beton-800 bg-beton-900 p-3 mb-3 flex gap-2 flex-wrap items-center">
           <span className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mr-1">Durum</span>
           <button onClick={() => setFilterDurum("")}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterDurum === "" ? "bg-emniyet-500 border-emniyet-500 text-beton-950" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}>
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterDurum === "" ? "bg-emniyet-500 border-emniyet-500 text-white-solid" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}>
             Tümü
           </button>
           {(Object.keys(DURUM_META) as Durum[]).map((d) => (

@@ -116,7 +116,7 @@ export default function PaymentPreview({
           )}
           <div className="mt-4 flex flex-wrap gap-2">
             <Link to={`/hakedis/${pmt.id}`}
-              className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 font-semibold text-sm px-4 py-2">
+              className="rounded bg-emniyet-500 hover:bg-emniyet-600 text-white-solid font-semibold text-sm px-4 py-2">
               {pmt.status === "Draft" ? "Düzenle →" : "Hakedişi aç →"}
             </Link>
             {canFin && (

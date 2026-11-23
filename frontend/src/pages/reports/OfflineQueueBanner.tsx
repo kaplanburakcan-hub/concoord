@@ -52,7 +52,7 @@ export default function OfflineQueueBanner({ onSynced }: { onSynced?: () => void
               <button
                 onClick={doSync}
                 disabled={busy}
-                className="rounded-md bg-emniyet-500 px-3 py-1 text-xs font-medium text-beton-950 disabled:opacity-50"
+                className="rounded-md bg-emniyet-500 px-3 py-1 text-xs font-medium text-white-solid disabled:opacity-50"
               >
                 {busy ? "Senkronize ediliyor…" : "Şimdi senkronize et"}
               </button>

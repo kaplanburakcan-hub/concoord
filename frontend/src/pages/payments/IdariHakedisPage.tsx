@@ -386,7 +386,7 @@ function HakedisForm({
             İptal
           </button>
           <button onClick={submit} disabled={saving || !f.donem_no}
-            className="rounded-md bg-emniyet-500 px-5 py-2 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50">
+            className="rounded-md bg-emniyet-500 px-5 py-2 text-sm font-medium text-white-solid hover:brightness-110 disabled:opacity-50">
             {saving ? "Kaydediliyor…" : "Hakedişi Kaydet"}
           </button>
         </div>
@@ -632,7 +632,7 @@ export default function IdariHakedisPage() {
         </div>
         {aktifId === null && (
           <button onClick={baslatYeni}
-            className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-beton-950 hover:brightness-110">
+            className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-white-solid hover:brightness-110">
             + Yeni Hakediş
           </button>
         )}

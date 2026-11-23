@@ -430,7 +430,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
         </button>
         {canManage && (
           <button onClick={openAdd}
-            className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-beton-950 hover:brightness-110">
+            className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-white-solid hover:brightness-110">
             + Yeni Kayıt
           </button>
         )}
@@ -469,7 +469,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mr-1">Durum</span>
           <button onClick={() => setFilterDurum("")}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterDurum === "" ? "bg-emniyet-500 border-emniyet-500 text-beton-950" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}>
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterDurum === "" ? "bg-emniyet-500 border-emniyet-500 text-white-solid" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}>
             Tümü
           </button>
           {DURUMLAR.map((d) => (
@@ -482,7 +482,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mr-1">Kategori</span>
           <button onClick={() => setFilterKategori("")}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterKategori === "" ? "bg-emniyet-500 border-emniyet-500 text-beton-950" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}>
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterKategori === "" ? "bg-emniyet-500 border-emniyet-500 text-white-solid" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}>
             Tümü
           </button>
           {KATEGORILER.map((k) => (
@@ -495,12 +495,12 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-beton-500 mr-1">Teslim Yöntemi</span>
           <button onClick={() => setFilterTeslim("")}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterTeslim === "" ? "bg-emniyet-500 border-emniyet-500 text-beton-950" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}>
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterTeslim === "" ? "bg-emniyet-500 border-emniyet-500 text-white-solid" : "border-beton-700 text-beton-400 hover:border-beton-500"}`}>
             Tümü
           </button>
           {TESLIM_YONTEMLERI.map((t) => (
             <button key={t} onClick={() => setFilterTeslim(filterTeslim === t ? "" : t)}
-              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterTeslim === t ? "bg-emniyet-500 border-emniyet-500 text-beton-950" : "border-beton-700 text-beton-500 hover:border-beton-500"}`}>
+              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${filterTeslim === t ? "bg-emniyet-500 border-emniyet-500 text-white-solid" : "border-beton-700 text-beton-500 hover:border-beton-500"}`}>
               <TeslimIcon type={t} className="w-3 h-3" />
               {TESLIM_LABEL[t]}
             </button>
@@ -722,7 +722,7 @@ export default function CorrespondencePage({ direction, title }: { direction: Di
                 İptal
               </button>
               <button onClick={saveForm} disabled={saving}
-                className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50">
+                className="rounded-md bg-emniyet-500 px-4 py-2 text-sm font-medium text-white-solid hover:brightness-110 disabled:opacity-50">
                 {saving ? "Kaydediliyor…" : "Kaydet"}
               </button>
             </div>

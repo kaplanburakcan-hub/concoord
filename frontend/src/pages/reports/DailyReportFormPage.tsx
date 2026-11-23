@@ -905,13 +905,13 @@ export default function DailyReportFormPage() {
           )}
           {!isNew && !readOnly && canEdit && (
             <button onClick={submit} disabled={busy}
-              className="flex-1 rounded-md bg-emniyet-500 px-4 py-3 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50">
+              className="flex-1 rounded-md bg-emniyet-500 px-4 py-3 text-sm font-medium text-white-solid hover:brightness-110 disabled:opacity-50">
               Gönder
             </button>
           )}
           {readOnly && canEdit && (
             <button onClick={revise} disabled={busy}
-              className="flex-1 rounded-md bg-emniyet-500 px-4 py-3 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50">
+              className="flex-1 rounded-md bg-emniyet-500 px-4 py-3 text-sm font-medium text-white-solid hover:brightness-110 disabled:opacity-50">
               Revizyon aç
             </button>
           )}
@@ -1416,7 +1416,7 @@ function ReadOnlyView({
             <button
               onClick={onRevise}
               disabled={busy}
-              className="rounded-md bg-emniyet-500 px-5 py-2.5 text-sm font-medium text-beton-950 hover:brightness-110 disabled:opacity-50"
+              className="rounded-md bg-emniyet-500 px-5 py-2.5 text-sm font-medium text-white-solid hover:brightness-110 disabled:opacity-50"
             >
               Revizyon aç
             </button>

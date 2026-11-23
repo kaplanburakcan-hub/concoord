@@ -139,7 +139,7 @@ export default function PurchaseRequestsPage() {
         {can("procurement.create_pr") && (
           <button
             onClick={() => setShowForm((v) => !v)}
-            className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400"
+            className="ml-auto rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400"
           >
             {showForm ? "Vazgeç" : "Yeni Talep"}
           </button>
@@ -203,7 +203,7 @@ export default function PurchaseRequestsPage() {
               className="text-xs text-emniyet-500 hover:underline">+ Kalem ekle</button>
           </div>
           <button onClick={create}
-            className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
+            className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400">
             Taslak Oluştur
           </button>
         </div>

@@ -131,7 +131,7 @@ export default function FotograflarPage() {
         {canUpload && (
           <button
             onClick={() => setModalAcik(true)}
-            className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-beton-950 hover:brightness-110"
+            className="rounded-md bg-emniyet-500 px-3 py-2 text-sm font-medium text-white-solid hover:brightness-110"
           >
             + Fotoğraf Yükle
           </button>
@@ -144,7 +144,7 @@ export default function FotograflarPage() {
         {(["hepsi", "SahaFotografi", "ImalatFotografi", "DenetimFotografi"] as const).map((tip) => (
           <button key={tip} onClick={() => setFiltre(tip)}
             className={`rounded-full px-3 py-1 text-xs border transition ${
-              filtre === tip ? "bg-emniyet-500 text-beton-950 border-emniyet-500 font-semibold"
+              filtre === tip ? "bg-emniyet-500 text-white-solid border-emniyet-500 font-semibold"
               : "border-beton-700 text-beton-400 hover:border-beton-500"
             }`}
           >

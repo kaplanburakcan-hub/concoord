@@ -332,7 +332,7 @@ export default function PersonelPuantajPage() {
               key={t}
               onClick={() => setTab(t)}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === t ? "bg-emniyet-500 text-beton-950" : "text-beton-400 hover:text-beton-200"
+                tab === t ? "bg-emniyet-500 text-white-solid" : "text-beton-400 hover:text-beton-200"
               }`}
             >
               {t === "puantaj" ? "Puantaj Cetveli" : "Personel Listesi"}
@@ -477,7 +477,7 @@ export default function PersonelPuantajPage() {
             </p>
             <button
               onClick={startAddPersonel}
-              className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm rounded-md"
+              className="px-3 py-1.5 bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm rounded-md"
             >
               + Personel Ekle
             </button>
@@ -542,7 +542,7 @@ export default function PersonelPuantajPage() {
                 <button
                   onClick={savePersonel}
                   disabled={!personelForm.ad_soyad}
-                  className="px-3 py-1 bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-sm rounded-md disabled:opacity-40"
+                  className="px-3 py-1 bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-sm rounded-md disabled:opacity-40"
                 >
                   Kaydet
                 </button>

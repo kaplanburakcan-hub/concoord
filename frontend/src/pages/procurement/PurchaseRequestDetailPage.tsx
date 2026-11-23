@@ -118,7 +118,7 @@ export default function PurchaseRequestDetailPage() {
         {pr.status === "Draft" && can("procurement.create_pr") && (
           <>
             <button onClick={() => act("submit")}
-              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
+              className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400">
               Onaya Gönder
             </button>
             <button onClick={remove}
@@ -141,7 +141,7 @@ export default function PurchaseRequestDetailPage() {
         )}
         {pr.status === "Approved" && can("procurement.manage_po") && (
           <button onClick={() => setShowConvert((v) => !v)}
-            className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400">
+            className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400">
             Siparişe Dönüştür
           </button>
         )}
@@ -187,7 +187,7 @@ export default function PurchaseRequestDetailPage() {
               amount: amount ? Number(amount) : undefined,
               expected_date: expected || undefined,
             })}
-            className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-beton-950 hover:bg-emniyet-400 disabled:opacity-40">
+            className="rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-semibold text-white-solid hover:bg-emniyet-400 disabled:opacity-40">
             Sipariş Oluştur
           </button>
         </div>

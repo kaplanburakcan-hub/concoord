@@ -145,7 +145,7 @@ export default function InspectionFormPage() {
             </div>
           ))}
           <button onClick={submit} disabled={!allAnswered || busy}
-            className="w-full rounded-md bg-emniyet-500 py-2.5 text-sm font-semibold text-beton-950 hover:bg-emniyet-400 disabled:opacity-40">
+            className="w-full rounded-md bg-emniyet-500 py-2.5 text-sm font-semibold text-white-solid hover:bg-emniyet-400 disabled:opacity-40">
             {busy ? "Gönderiliyor…" : allAnswered ? "Denetimi Gönder" : "Tüm maddeleri yanıtlayın"}
           </button>
           <p className="text-xs text-beton-500">

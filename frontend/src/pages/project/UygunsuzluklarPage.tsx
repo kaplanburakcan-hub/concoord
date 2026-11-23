@@ -128,7 +128,7 @@ export default function UygunsuzluklarPage() {
         </button>
         {canManage && (
           <button onClick={() => setShowForm((v) => !v)}
-            className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-beton-950 text-xs font-semibold px-3 py-1.5">
+            className="ml-auto rounded-md bg-emniyet-500 hover:bg-emniyet-600 text-white-solid text-xs font-semibold px-3 py-1.5">
             {showForm ? "Vazgeç" : "+ Uygunsuzluk aç"}
           </button>
         )}
@@ -149,7 +149,7 @@ export default function UygunsuzluklarPage() {
             placeholder="Açıklama" className={`${inp} md:col-span-4`} />
           <div className="md:col-span-4 flex justify-end">
             <button onClick={create} disabled={saving || !title.trim()}
-              className="rounded-md bg-emniyet-500 px-4 py-1.5 text-sm font-semibold text-beton-950 disabled:opacity-50">
+              className="rounded-md bg-emniyet-500 px-4 py-1.5 text-sm font-semibold text-white-solid disabled:opacity-50">
               Kaydet
             </button>
           </div>
