@@ -743,6 +743,11 @@ function EVMTrustStrip({ evm }: { evm: EVM }) {
       {linear && (
         <span style={{ color: "#fbbf24" }}>Doğrusal plan varsayımı — zaman performansı (SPI) sınırlı yorumlanmalı.</span>
       )}
+      {!(evm.bac > 0) && (
+        <span style={{ color: "#f87171" }}>
+          Bütçe (BAC) girilmemiş — fiziksel ilerleme ve EV hesaplanamıyor. Proje künyesinden bütçe girin.
+        </span>
+      )}
     </div>
   );
 }
