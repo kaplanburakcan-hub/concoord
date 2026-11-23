@@ -21,7 +21,7 @@ const REPORTS: { key: ReportKey; title: string; desc: string }[] = [
 ];
 
 const inputCls = "rounded-md border border-beton-700 bg-beton-950 px-2 py-1.5 text-sm text-beton-100";
-const btnPrimary = "rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-beton-950 hover:brightness-110 disabled:opacity-50";
+const btnPrimary = "rounded-md bg-emniyet-500 px-3 py-1.5 text-xs font-medium text-white-solid hover:brightness-110 disabled:opacity-50";
 const btnGhost = "rounded-md border border-beton-700 px-3 py-1.5 text-xs text-beton-200 hover:border-beton-500 disabled:opacity-50";
 
 export default function MalzemeEnvanterPage() {
